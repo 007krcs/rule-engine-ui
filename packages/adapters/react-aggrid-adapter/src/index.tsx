@@ -60,7 +60,7 @@ function renderTable(component: UIComponent, ctx: AdapterContext): React.ReactEl
               </td>
             </tr>
           )}
-          {rows.map((row, rowIndex) => {
+          {rows.map((row: any, rowIndex) => {
             const rowId = row.id;
             const rowKey = typeof rowId === 'string' || typeof rowId === 'number' ? rowId : rowIndex;
             return (
