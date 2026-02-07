@@ -1,0 +1,82 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "api-mapping.schema.json",
+  "title": "ApiMapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiId", "method", "endpoint", "requestMap", "responseMap"],
+  "properties": {
+    "apiId": { "type": "string", "minLength": 1 },
+    "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+    "endpoint": { "type": "string", "minLength": 1 },
+    "requestMap": { "$ref": "#/$defs/requestMap" },
+    "responseMap": { "$ref": "#/$defs/responseMap" },
+    "transforms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/transform" }
+    },
+    "errorHandling": { "$ref": "#/$defs/errorHandling" }
+  },
+  "$defs": {
+    "mappingSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "properties": {
+        "from": { "type": "string", "minLength": 1 },
+        "transform": { "type": "string" },
+        "default": { "type": ["string", "number", "boolean", "object", "array", "null"] }
+      }
+    },
+    "requestMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/mappingSource" }
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/mappingSource" }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/mappingSource" }
+        }
+      }
+    },
+    "responseMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data": { "type": "object", "additionalProperties": { "type": "string" } },
+        "context": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "expression"],
+      "properties": {
+        "name": { "type": "string" },
+        "expression": { "type": "string" }
+      }
+    },
+    "errorHandling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "map": { "type": "object", "additionalProperties": { "type": "string" } },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 0 },
+            "backoffMs": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}

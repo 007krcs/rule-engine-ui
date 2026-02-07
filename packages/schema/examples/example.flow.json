@@ -1,0 +1,55 @@
+﻿{
+  "flowId": "order-flow",
+  "initialState": "start",
+  "states": {
+    "start": {
+      "uiPageId": "page-start",
+      "on": {
+        "next": {
+          "target": "details",
+          "guard": {
+            "op": "eq",
+            "left": { "path": "data.acceptedTerms" },
+            "right": { "value": true }
+          }
+        }
+      }
+    },
+    "details": {
+      "uiPageId": "page-details",
+      "on": {
+        "back": { "target": "start" },
+        "next": {
+          "target": "review",
+          "guard": {
+            "op": "eq",
+            "left": { "path": "data.formValid" },
+            "right": { "value": true }
+          }
+        }
+      }
+    },
+    "review": {
+      "uiPageId": "page-review",
+      "on": {
+        "back": { "target": "details" },
+        "submit": {
+          "target": "submitted",
+          "guard": {
+            "op": "eq",
+            "left": { "path": "data.readyToSubmit" },
+            "right": { "value": true }
+          },
+          "actions": ["evaluateRules", "callApi"],
+          "apiId": "submitOrder"
+        }
+      }
+    },
+    "submitted": {
+      "uiPageId": "page-submitted",
+      "on": {
+        "back": { "target": "review" }
+      }
+    }
+  }
+}

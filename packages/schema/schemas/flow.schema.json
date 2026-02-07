@@ -1,0 +1,132 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "flow.schema.json",
+  "title": "FlowSchema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["flowId", "initialState", "states"],
+  "properties": {
+    "flowId": { "type": "string", "minLength": 1 },
+    "initialState": { "type": "string", "minLength": 1 },
+    "states": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/state" }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uiPageId", "on"],
+      "properties": {
+        "uiPageId": { "type": "string", "minLength": 1 },
+        "on": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/transition" }
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target"],
+      "properties": {
+        "target": { "type": "string", "minLength": 1 },
+        "guard": { "$ref": "#/$defs/condition" },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["evaluateRules", "callApi", "setContext", "navigate"]
+          }
+        },
+        "apiId": { "type": "string" }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        { "$ref": "#/$defs/all" },
+        { "$ref": "#/$defs/any" },
+        { "$ref": "#/$defs/not" },
+        { "$ref": "#/$defs/compare" }
+      ]
+    },
+    "all": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all"],
+      "properties": {
+        "all": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/condition" }
+        }
+      }
+    },
+    "any": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["any"],
+      "properties": {
+        "any": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/condition" }
+        }
+      }
+    },
+    "not": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["not"],
+      "properties": {
+        "not": { "$ref": "#/$defs/condition" }
+      }
+    },
+    "compare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "left"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "in",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "exists"
+          ]
+        },
+        "left": { "$ref": "#/$defs/operand" },
+        "right": { "$ref": "#/$defs/operand" }
+      }
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string", "pattern": "^(data|context)\\." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": {
+            "value": {
+              "type": ["string", "number", "boolean", "object", "array", "null"]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

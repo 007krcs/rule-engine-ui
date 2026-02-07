@@ -1,0 +1,54 @@
+﻿{
+  "rules": [
+    {
+      "ruleId": "US_ADMIN_DISCOUNT",
+      "description": "Apply admin discount for US orders over 1000",
+      "priority": 100,
+      "scope": {
+        "countries": ["US"],
+        "roles": ["admin"]
+      },
+      "when": {
+        "op": "gt",
+        "left": { "path": "data.orderTotal" },
+        "right": { "value": 1000 }
+      },
+      "actions": [
+        { "type": "setField", "path": "data.discount", "value": 0.1 },
+        { "type": "emitEvent", "event": "discountApplied", "payload": { "level": "admin" } }
+      ]
+    },
+    {
+      "ruleId": "EU_GDPR_NOTICE",
+      "description": "Flag GDPR notice for EU visitors",
+      "priority": 50,
+      "scope": {
+        "countries": ["DE", "FR", "ES"],
+        "roles": ["user", "admin"]
+      },
+      "when": {
+        "op": "exists",
+        "left": { "path": "context.locale" }
+      },
+      "actions": [
+        { "type": "setContext", "path": "context.gdprNotice", "value": true }
+      ]
+    },
+    {
+      "ruleId": "BLOCK_GUEST_RESTRICTED",
+      "description": "Block guest access to restricted data",
+      "priority": 10,
+      "scope": {
+        "roles": ["guest"]
+      },
+      "when": {
+        "op": "eq",
+        "left": { "path": "data.restricted" },
+        "right": { "value": true }
+      },
+      "actions": [
+        { "type": "throwError", "message": "Guest access not permitted", "code": "GUEST_BLOCK" }
+      ]
+    }
+  ]
+}

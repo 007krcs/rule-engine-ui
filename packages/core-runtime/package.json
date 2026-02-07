@@ -1,0 +1,21 @@
+{
+  "name": "@platform/core-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "dependencies": {
+    "@platform/schema": "workspace:*",
+    "@platform/observability": "workspace:*",
+    "@platform/flow-engine": "workspace:*",
+    "@platform/rules-engine": "workspace:*",
+    "@platform/api-orchestrator": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  }
+}

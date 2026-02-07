@@ -1,0 +1,38 @@
+﻿{
+  "apiId": "submitOrder",
+  "method": "POST",
+  "endpoint": "https://api.example.com/orders",
+  "requestMap": {
+    "body": {
+      "orderId": { "from": "data.orderId" },
+      "customerId": { "from": "data.customerId" },
+      "total": { "from": "data.orderTotal" },
+      "locale": { "from": "context.locale", "transform": "upper($)" }
+    },
+    "headers": {
+      "x-tenant": { "from": "context.tenantId" }
+    }
+  },
+  "responseMap": {
+    "data": {
+      "orderId": "response.orderId",
+      "status": "response.status"
+    },
+    "context": {
+      "lastRequestId": "response.requestId"
+    }
+  },
+  "transforms": [
+    { "name": "upper", "expression": "upper($)" }
+  ],
+  "errorHandling": {
+    "map": {
+      "400": "BAD_REQUEST",
+      "500": "SERVER_ERROR"
+    },
+    "retry": {
+      "maxAttempts": 2,
+      "backoffMs": 250
+    }
+  }
+}

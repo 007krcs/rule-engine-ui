@@ -1,0 +1,199 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ui.schema.json",
+  "title": "UISchema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pageId", "layout", "components"],
+  "properties": {
+    "pageId": { "type": "string", "minLength": 1 },
+    "layout": { "$ref": "#/$defs/layoutNode" },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" }
+    }
+  },
+  "$defs": {
+    "layoutNode": {
+      "oneOf": [
+        { "$ref": "#/$defs/gridLayout" },
+        { "$ref": "#/$defs/stackLayout" },
+        { "$ref": "#/$defs/tabsLayout" },
+        { "$ref": "#/$defs/sectionLayout" }
+      ]
+    },
+    "baseLayout": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "props": { "type": "object", "additionalProperties": true },
+        "componentIds": { "type": "array", "items": { "type": "string" } },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layoutNode" }
+        }
+      }
+    },
+    "gridLayout": {
+      "allOf": [
+        { "$ref": "#/$defs/baseLayout" },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "grid" },
+            "columns": { "type": "integer", "minimum": 1 },
+            "rows": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "stackLayout": {
+      "allOf": [
+        { "$ref": "#/$defs/baseLayout" },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "stack" },
+            "direction": { "type": "string", "enum": ["vertical", "horizontal"] }
+          }
+        }
+      ]
+    },
+    "tabsLayout": {
+      "allOf": [
+        { "$ref": "#/$defs/baseLayout" },
+        {
+          "type": "object",
+          "required": ["type", "tabs"],
+          "properties": {
+            "type": { "const": "tabs" },
+            "tabs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "label", "child"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "child": { "$ref": "#/$defs/layoutNode" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sectionLayout": {
+      "allOf": [
+        { "$ref": "#/$defs/baseLayout" },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "section" },
+            "title": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "adapterHint", "accessibility"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "adapterHint": { "type": "string", "minLength": 1 },
+        "props": { "type": "object", "additionalProperties": true },
+        "bindings": { "$ref": "#/$defs/bindings" },
+        "validations": { "$ref": "#/$defs/validations" },
+        "accessibility": { "$ref": "#/$defs/accessibility" },
+        "responsive": { "$ref": "#/$defs/responsive" },
+        "events": { "$ref": "#/$defs/events" }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data": { "type": "object", "additionalProperties": { "type": "string" } },
+        "context": { "type": "object", "additionalProperties": { "type": "string" } },
+        "computed": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "validations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "regex": { "type": "string" },
+        "rules": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "accessibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ariaLabel"],
+      "properties": {
+        "ariaLabel": { "type": "string", "minLength": 1 },
+        "tabIndex": { "type": "integer" },
+        "role": { "type": "string" },
+        "keyboardNav": { "type": "boolean" },
+        "focusOrder": { "type": "integer" }
+      }
+    },
+    "responsive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "columns": { "type": "integer", "minimum": 1 },
+              "span": { "type": "integer", "minimum": 1 },
+              "hidden": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "onChange": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/eventAction" }
+        },
+        "onClick": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/eventAction" }
+        },
+        "onSubmit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/eventAction" }
+        }
+      }
+    },
+    "eventAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

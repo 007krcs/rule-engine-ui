@@ -1,0 +1,140 @@
+﻿{
+  "pageId": "dashboard",
+  "layout": {
+    "id": "root",
+    "type": "stack",
+    "direction": "vertical",
+    "children": [
+      {
+        "id": "filters",
+        "type": "section",
+        "title": "Filters",
+        "componentIds": ["customerNameInput"]
+      },
+      {
+        "id": "table",
+        "type": "section",
+        "title": "Orders",
+        "componentIds": ["ordersTable"]
+      },
+      {
+        "id": "chart",
+        "type": "section",
+        "title": "Revenue",
+        "componentIds": ["revenueChart"]
+      },
+      {
+        "id": "viz",
+        "type": "section",
+        "title": "Custom Insight",
+        "componentIds": ["customViz"]
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "customerNameInput",
+      "type": "input",
+      "adapterHint": "material.input",
+      "props": {
+        "label": "Customer Name",
+        "placeholder": "Search by name"
+      },
+      "bindings": {
+        "data": {
+          "value": "data.filters.customerName"
+        }
+      },
+      "validations": {
+        "required": false,
+        "min": 2,
+        "max": 64,
+        "regex": "^[a-zA-Z\\s]+$"
+      },
+      "accessibility": {
+        "ariaLabel": "Customer name filter",
+        "tabIndex": 0,
+        "role": "textbox",
+        "keyboardNav": true,
+        "focusOrder": 1
+      },
+      "responsive": {
+        "breakpoints": {
+          "sm": { "columns": 12, "span": 12 },
+          "md": { "columns": 12, "span": 6 }
+        }
+      },
+      "events": {
+        "onChange": [
+          { "type": "emitEvent", "payload": { "event": "filterChanged" } }
+        ]
+      }
+    },
+    {
+      "id": "ordersTable",
+      "type": "table",
+      "adapterHint": "aggrid.table",
+      "props": {
+        "columns": [
+          { "field": "orderId", "headerName": "Order" },
+          { "field": "customer", "headerName": "Customer" },
+          { "field": "total", "headerName": "Total" }
+        ],
+        "rows": []
+      },
+      "bindings": {
+        "data": {
+          "rows": "data.orders"
+        }
+      },
+      "accessibility": {
+        "ariaLabel": "Orders table",
+        "tabIndex": 0,
+        "role": "table",
+        "keyboardNav": true,
+        "focusOrder": 2
+      }
+    },
+    {
+      "id": "revenueChart",
+      "type": "chart",
+      "adapterHint": "highcharts.chart",
+      "props": {
+        "title": "Revenue Trend",
+        "series": []
+      },
+      "bindings": {
+        "data": {
+          "series": "data.revenueSeries"
+        }
+      },
+      "accessibility": {
+        "ariaLabel": "Revenue chart",
+        "tabIndex": 0,
+        "role": "img",
+        "keyboardNav": true,
+        "focusOrder": 3
+      }
+    },
+    {
+      "id": "customViz",
+      "type": "custom",
+      "adapterHint": "d3.custom",
+      "props": {
+        "height": 240
+      },
+      "bindings": {
+        "data": {
+          "dataset": "data.customViz"
+        }
+      },
+      "accessibility": {
+        "ariaLabel": "Custom D3 visualization",
+        "tabIndex": 0,
+        "role": "img",
+        "keyboardNav": true,
+        "focusOrder": 4
+      }
+    }
+  ]
+}
