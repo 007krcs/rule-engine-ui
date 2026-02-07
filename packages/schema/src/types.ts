@@ -13,6 +13,9 @@ export interface ExecutionContext {
   userId: string;
   role: string;
   roles: string[];
+  orgId?: string;
+  programId?: string;
+  issuerId?: string;
   country: CountryCode;
   locale: string;
   timezone: string;
@@ -22,6 +25,7 @@ export interface ExecutionContext {
 }
 
 export interface UISchema {
+  version: string;
   pageId: string;
   layout: LayoutNode;
   components: UIComponent[];
@@ -65,6 +69,7 @@ export interface UIComponent {
   props?: Record<string, JSONValue>;
   bindings?: BindingSpec;
   validations?: ValidationSpec;
+  i18n?: I18nSpec;
   accessibility: AccessibilitySpec;
   responsive?: ResponsiveSpec;
   events?: EventHandlers;
@@ -85,11 +90,17 @@ export interface ValidationSpec {
 }
 
 export interface AccessibilitySpec {
-  ariaLabel: string;
+  ariaLabelKey: string;
   tabIndex?: number;
   role?: string;
   keyboardNav?: boolean;
   focusOrder?: number;
+}
+
+export interface I18nSpec {
+  labelKey?: string;
+  helperTextKey?: string;
+  placeholderKey?: string;
 }
 
 export interface ResponsiveSpec {
@@ -115,6 +126,7 @@ export interface UIEventAction {
 }
 
 export interface FlowSchema {
+  version: string;
   flowId: string;
   initialState: string;
   states: Record<string, FlowState>;
@@ -135,6 +147,7 @@ export interface FlowTransition {
 export type FlowAction = 'evaluateRules' | 'callApi' | 'setContext' | 'navigate';
 
 export interface RuleSet {
+  version: string;
   rules: Rule[];
 }
 
@@ -153,6 +166,9 @@ export interface RuleScope {
   countries?: CountryCode[];
   roles?: string[];
   tenants?: string[];
+  orgs?: string[];
+  programs?: string[];
+  issuers?: string[];
 }
 
 export type RuleCondition = AllCondition | AnyCondition | NotCondition | CompareCondition;
@@ -200,12 +216,15 @@ export type RuleAction =
   | { type: 'emitEvent'; event: string; payload?: JSONValue };
 
 export interface ApiMapping {
+  version: string;
   apiId: string;
+  type: 'rest' | 'graphql';
   method: HttpMethod;
   endpoint: string;
   requestMap: RequestMap;
   responseMap: ResponseMap;
   transforms?: TransformSpec[];
+  conditions?: RuleCondition;
   errorHandling?: ErrorHandling;
 }
 

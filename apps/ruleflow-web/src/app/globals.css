@@ -1,0 +1,64 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 30% 98%;
+  --foreground: 222 47% 11%;
+  --muted: 210 22% 94%;
+  --muted-foreground: 215 15% 35%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 17% 93%;
+  --secondary-foreground: 222 47% 11%;
+  --accent: 262 83% 58%;
+  --accent-foreground: 0 0% 100%;
+  --border: 214 20% 88%;
+  --ring: 221 83% 53%;
+  --surface: 0 0% 100%;
+}
+
+.dark {
+  --background: 222 47% 8%;
+  --foreground: 210 40% 96%;
+  --muted: 217 22% 18%;
+  --muted-foreground: 215 15% 65%;
+  --primary: 221 83% 61%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 218 20% 16%;
+  --secondary-foreground: 210 40% 96%;
+  --accent: 262 74% 64%;
+  --accent-foreground: 0 0% 100%;
+  --border: 217 18% 20%;
+  --ring: 221 83% 61%;
+  --surface: 222 45% 12%;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+.bg-grid {
+  background-image: linear-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.dark .bg-grid {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}

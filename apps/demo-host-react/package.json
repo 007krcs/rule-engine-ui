@@ -1,21 +1,23 @@
-{
+﻿{
   "name": "demo-host-react",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@platform/schema": "workspace:*",
     "@platform/core-runtime": "workspace:*",
-    "@platform/react-renderer": "workspace:*",
-    "@platform/react-material-adapter": "workspace:*",
+    "@platform/i18n": "workspace:*",
     "@platform/react-aggrid-adapter": "workspace:*",
-    "@platform/react-highcharts-adapter": "workspace:*",
+    "@platform/react-company-adapter": "workspace:*",
     "@platform/react-d3-adapter": "workspace:*",
-    "@platform/react-company-adapter": "workspace:*"
+    "@platform/react-highcharts-adapter": "workspace:*",
+    "@platform/react-material-adapter": "workspace:*",
+    "@platform/react-renderer": "workspace:*",
+    "@platform/schema": "workspace:*",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "scripts": {
+    "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",

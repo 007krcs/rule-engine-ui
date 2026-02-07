@@ -1,6 +1,6 @@
 ﻿# React Renderer
 
-Generic renderer for UISchema with a plugin registry.
+Generic renderer for UISchema with a plugin registry and i18n support.
 
 ## Registering an Adapter
 
@@ -15,9 +15,11 @@ Example:
 import { registerAdapter } from '@platform/react-renderer';
 
 registerAdapter('acme.', (component, ctx) => {
-  return <div aria-label={component.accessibility.ariaLabel}>Acme Widget</div>;
+  const ariaLabel = ctx.i18n.t(component.accessibility.ariaLabelKey);
+  return <div aria-label={ariaLabel}>Acme Widget</div>;
 });
 ```
 
-Adapters should respect `component.accessibility.ariaLabel` and attach
-`ctx.events.onClick/onChange/onSubmit` to relevant UI events.
+Adapters should respect `component.accessibility.ariaLabelKey`, resolve
+text through `ctx.i18n`, and attach `ctx.events.onClick/onChange/onSubmit`
+to relevant UI events.

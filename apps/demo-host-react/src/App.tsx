@@ -2,6 +2,7 @@
 import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule, UISchema } from '@platform/schema';
 import { RenderPage } from '@platform/react-renderer';
 import { executeStep } from '@platform/core-runtime';
+import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 
 import exampleUi from '@platform/schema/examples/example.ui.json';
 import exampleFlow from '@platform/schema/examples/example.flow.json';
@@ -53,6 +54,18 @@ export default function App(): React.ReactElement {
     return map;
   }, [flow, uiSchema]);
 
+  const baseLocale = context.locale.split('-')[0] ?? context.locale;
+  const i18n = useMemo(
+    () =>
+      createProviderFromBundles({
+        locale: baseLocale,
+        fallbackLocale: 'en',
+        bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
+        mode: 'dev',
+      }),
+    [baseLocale],
+  );
+
   const currentState = flow.states[stateId];
   const currentUiSchema = currentState ? uiSchemasById[currentState.uiPageId] ?? uiSchema : uiSchema;
 
@@ -90,7 +103,7 @@ export default function App(): React.ReactElement {
           <button onClick={() => runEvent('next')}>Next</button>
           <button onClick={() => runEvent('submit')}>Submit</button>
         </div>
-        <RenderPage uiSchema={currentUiSchema} data={data} context={context} />
+        <RenderPage uiSchema={currentUiSchema} data={data} context={context} i18n={i18n} />
       </div>
       <aside>
         <h2>Trace</h2>

@@ -1,5 +1,7 @@
 ﻿{
+  "version": "1.0.0",
   "apiId": "submitOrder",
+  "type": "rest",
   "method": "POST",
   "endpoint": "https://api.example.com/orders",
   "requestMap": {

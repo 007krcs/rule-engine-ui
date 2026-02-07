@@ -1,12 +1,16 @@
-{
+﻿{
   "name": "@platform/validator",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
-    "@platform/schema": "workspace:*"
+    "@platform/i18n": "workspace:*",
+    "@platform/schema": "workspace:*",
+    "ajv": "^8.17.1"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

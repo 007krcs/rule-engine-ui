@@ -4,8 +4,9 @@
   "title": "UISchema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["pageId", "layout", "components"],
+  "required": ["version", "pageId", "layout", "components"],
   "properties": {
+    "version": { "type": "string", "minLength": 1 },
     "pageId": { "type": "string", "minLength": 1 },
     "layout": { "$ref": "#/$defs/layoutNode" },
     "components": {
@@ -113,9 +114,19 @@
         "props": { "type": "object", "additionalProperties": true },
         "bindings": { "$ref": "#/$defs/bindings" },
         "validations": { "$ref": "#/$defs/validations" },
+        "i18n": { "$ref": "#/$defs/i18n" },
         "accessibility": { "$ref": "#/$defs/accessibility" },
         "responsive": { "$ref": "#/$defs/responsive" },
         "events": { "$ref": "#/$defs/events" }
+      }
+    },
+    "i18n": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "labelKey": { "type": "string", "minLength": 1 },
+        "helperTextKey": { "type": "string", "minLength": 1 },
+        "placeholderKey": { "type": "string", "minLength": 1 }
       }
     },
     "bindings": {
@@ -141,13 +152,13 @@
     "accessibility": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ariaLabel"],
+      "required": ["ariaLabelKey", "keyboardNav", "focusOrder"],
       "properties": {
-        "ariaLabel": { "type": "string", "minLength": 1 },
+        "ariaLabelKey": { "type": "string", "minLength": 1 },
         "tabIndex": { "type": "integer" },
         "role": { "type": "string" },
-        "keyboardNav": { "type": "boolean" },
-        "focusOrder": { "type": "integer" }
+        "keyboardNav": { "type": "boolean", "const": true },
+        "focusOrder": { "type": "integer", "minimum": 1 }
       }
     },
     "responsive": {

@@ -1,0 +1,16 @@
+﻿# Schemas
+
+All schemas are versioned and validated before activation.
+
+## UI Schema
+- `version`, `pageId`, `layout`, `components`
+- Components use `i18n` keys instead of raw strings.
+
+## Flow Schema
+- `initialState` and transitions with guards.
+
+## Rules
+- JSON AST only; no eval.
+
+## API Mapping
+- Declarative request/response mapping.

@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "@platform/react-renderer",
   "version": "0.1.0",
   "type": "module",
@@ -6,6 +6,7 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "dependencies": {
+    "@platform/i18n": "workspace:*",
     "@platform/schema": "workspace:*"
   },
   "peerDependencies": {

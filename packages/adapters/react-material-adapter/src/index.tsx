@@ -1,33 +1,43 @@
 ﻿import React from 'react';
 import type { UIComponent } from '@platform/schema';
+import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
 
 export function registerMaterialAdapters(): void {
   registerAdapter('material.', (component, ctx) => renderMaterial(component, ctx));
 }
 
-function renderMaterial(
-  component: UIComponent,
-  ctx: { events: { onChange?: () => void; onClick?: () => void } },
-): React.ReactElement {
+function renderMaterial(component: UIComponent, ctx: AdapterContext): React.ReactElement {
+  const ariaLabel = ctx.i18n.t(component.accessibility.ariaLabelKey);
   switch (component.adapterHint) {
-    case 'material.input':
+    case 'material.input': {
+      const label = component.i18n?.labelKey
+        ? ctx.i18n.t(component.i18n.labelKey)
+        : String(component.props?.label ?? 'Input');
+      const placeholder = component.i18n?.placeholderKey
+        ? ctx.i18n.t(component.i18n.placeholderKey)
+        : String(component.props?.placeholder ?? '');
+      const helperText = component.i18n?.helperTextKey
+        ? ctx.i18n.t(component.i18n.helperTextKey)
+        : String(component.props?.helperText ?? '');
       return (
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>{String(component.props?.label ?? 'Input')}</span>
-          <input
-            aria-label={component.accessibility.ariaLabel}
-            placeholder={String(component.props?.placeholder ?? '')}
-            onChange={ctx.events.onChange}
-          />
+          <span>{label}</span>
+          <input aria-label={ariaLabel} placeholder={placeholder} onChange={ctx.events.onChange} />
+          {helperText && <small style={{ color: '#666' }}>{helperText}</small>}
         </label>
       );
-    case 'material.button':
+    }
+    case 'material.button': {
+      const label = component.i18n?.labelKey
+        ? ctx.i18n.t(component.i18n.labelKey)
+        : String(component.props?.label ?? 'Button');
       return (
-        <button aria-label={component.accessibility.ariaLabel} onClick={ctx.events.onClick}>
-          {String(component.props?.label ?? 'Button')}
+        <button aria-label={ariaLabel} onClick={ctx.events.onClick}>
+          {label}
         </button>
       );
+    }
     default:
       return (
         <div data-unsupported>

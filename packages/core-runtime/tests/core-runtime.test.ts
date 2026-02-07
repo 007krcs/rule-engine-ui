@@ -16,6 +16,7 @@ const context: ExecutionContext = {
 };
 
 const flow: FlowSchema = {
+  version: '1.0.0',
   flowId: 'demo',
   initialState: 'start',
   states: {
@@ -46,7 +47,9 @@ const rules: Rule[] = [
 ];
 
 const apiMapping: ApiMapping = {
+  version: '1.0.0',
   apiId: 'submitOrder',
+  type: 'rest',
   method: 'POST',
   endpoint: 'https://api.example.com/orders',
   requestMap: {
@@ -64,11 +67,13 @@ const apiMapping: ApiMapping = {
 
 const uiSchemasById: Record<string, UISchema> = {
   'page-start': {
+    version: '1.0.0',
     pageId: 'page-start',
     layout: { id: 'root', type: 'section', componentIds: [], title: 'Start' },
     components: [],
   },
   'page-done': {
+    version: '1.0.0',
     pageId: 'page-done',
     layout: { id: 'root', type: 'section', componentIds: [], title: 'Done' },
     components: [],

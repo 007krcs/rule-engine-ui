@@ -1,0 +1,42 @@
+﻿# Quickstart
+
+RuleFlow lets you ship configuration-driven UI, flows, and rules without embedding business logic in your host apps.
+
+## Install
+
+```bash
+pnpm install
+```
+
+## Run the product web app
+
+```bash
+pnpm dev
+```
+
+## Render a UI schema
+
+```tsx
+import { RenderPage } from '@platform/react-renderer';
+import { registerMaterialAdapters } from '@platform/react-material-adapter';
+
+registerMaterialAdapters();
+
+<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />
+```
+
+## Execute a flow
+
+```ts
+const result = await executeStep({
+  flow,
+  uiSchemasById,
+  rules,
+  apiMappingsById,
+  stateId: 'review',
+  event: 'submit',
+  context,
+  data,
+  fetchFn,
+});
+```

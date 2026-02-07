@@ -51,7 +51,7 @@ async function run(): Promise<void> {
   let currentContext = context;
   let currentData: Record<string, JSONValue> = data;
 
-  const nextResult = await executeStep({
+  const firstNext = await executeStep({
     flow,
     uiSchemasById,
     rules,
@@ -67,10 +67,31 @@ async function run(): Promise<void> {
       }),
   });
 
-  stateId = nextResult.nextStateId;
-  currentContext = nextResult.updatedContext;
-  currentData = nextResult.updatedData as Record<string, JSONValue>;
-  console.log('After next:', nextResult.trace.flow.reason);
+  stateId = firstNext.nextStateId;
+  currentContext = firstNext.updatedContext;
+  currentData = firstNext.updatedData as Record<string, JSONValue>;
+  console.log('After next (1):', firstNext.trace.flow.reason);
+
+  const secondNext = await executeStep({
+    flow,
+    uiSchemasById,
+    rules,
+    apiMappingsById,
+    stateId,
+    event: 'next',
+    context: currentContext,
+    data: currentData,
+    fetchFn: async () =>
+      new Response(JSON.stringify({ orderId: 'demo-1', status: 'submitted', requestId: 'req-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+  });
+
+  stateId = secondNext.nextStateId;
+  currentContext = secondNext.updatedContext;
+  currentData = secondNext.updatedData as Record<string, JSONValue>;
+  console.log('After next (2):', secondNext.trace.flow.reason);
 
   const submitResult = await executeStep({
     flow,

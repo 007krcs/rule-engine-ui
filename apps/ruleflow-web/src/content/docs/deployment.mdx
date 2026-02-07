@@ -1,0 +1,9 @@
+﻿# Deployment
+
+RuleFlow ships as a monorepo with Turbo + pnpm. Recommended deploy steps:
+
+1. Build all packages with `pnpm build`.
+2. Publish schema + config registry artifacts.
+3. Deploy the web app with `pnpm --filter ruleflow-web build`.
+
+Use GitOps export to promote config versions between environments.

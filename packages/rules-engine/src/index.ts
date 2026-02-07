@@ -51,8 +51,8 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
     errors: [],
   };
 
-  let data = deepClone(input.data);
-  let context = deepClone(input.context);
+  const data = deepClone(input.data);
+  const context = deepClone(input.context);
 
   const scoped = rulesArray.filter((rule) => matchesScope(rule.scope, context));
   const sorted = scoped.sort((a, b) => {
@@ -195,6 +195,21 @@ function matchesScope(scope: RuleScope | undefined, context: ExecutionContext): 
   }
   if (scope.tenants && scope.tenants.length > 0 && !scope.tenants.includes(context.tenantId)) {
     return false;
+  }
+  if (scope.orgs && scope.orgs.length > 0) {
+    if (!context.orgId || !scope.orgs.includes(context.orgId)) {
+      return false;
+    }
+  }
+  if (scope.programs && scope.programs.length > 0) {
+    if (!context.programId || !scope.programs.includes(context.programId)) {
+      return false;
+    }
+  }
+  if (scope.issuers && scope.issuers.length > 0) {
+    if (!context.issuerId || !scope.issuers.includes(context.issuerId)) {
+      return false;
+    }
   }
   if (scope.roles && scope.roles.length > 0) {
     const roles = new Set([context.role, ...context.roles]);

@@ -1,0 +1,33 @@
+﻿# I18n
+
+RuleFlow uses i18n keys in schema (`labelKey`, `placeholderKey`, `ariaLabelKey`).
+
+## Integrate your own provider
+
+```ts
+const provider: I18nProvider = {
+  locale: 'en-US',
+  direction: 'ltr',
+  t: (key, params) => customTranslate(key, params),
+  has: (key) => customHasKey(key),
+  formatNumber: (value, options) => new Intl.NumberFormat('en-US', options).format(value),
+  formatDate: (value, options) => new Intl.DateTimeFormat('en-US', options).format(value),
+};
+```
+
+Pass it to the renderer:
+
+```tsx
+<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={provider} />
+```
+
+## Tenant override bundles
+
+Bundles are resolved in this order:
+
+1. Tenant override bundle (tenant + locale + namespace)
+2. Platform bundle
+3. Key-as-text (dev) or fallback string (prod)
+
+## RTL
+The renderer applies `dir="rtl"` when the locale is RTL (`ar`, `he`, `fa`, `ur`).

@@ -4,9 +4,11 @@
   "title": "ApiMapping",
   "type": "object",
   "additionalProperties": false,
-  "required": ["apiId", "method", "endpoint", "requestMap", "responseMap"],
+  "required": ["version", "apiId", "type", "method", "endpoint", "requestMap", "responseMap"],
   "properties": {
+    "version": { "type": "string", "minLength": 1 },
     "apiId": { "type": "string", "minLength": 1 },
+    "type": { "type": "string", "enum": ["rest", "graphql"] },
     "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
     "endpoint": { "type": "string", "minLength": 1 },
     "requestMap": { "$ref": "#/$defs/requestMap" },
@@ -15,6 +17,7 @@
       "type": "array",
       "items": { "$ref": "#/$defs/transform" }
     },
+    "conditions": { "$ref": "#/$defs/condition" },
     "errorHandling": { "$ref": "#/$defs/errorHandling" }
   },
   "$defs": {
@@ -77,6 +80,85 @@
           }
         }
       }
+    },
+    "condition": {
+      "oneOf": [
+        { "$ref": "#/$defs/all" },
+        { "$ref": "#/$defs/any" },
+        { "$ref": "#/$defs/not" },
+        { "$ref": "#/$defs/compare" }
+      ]
+    },
+    "all": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all"],
+      "properties": {
+        "all": { "type": "array", "items": { "$ref": "#/$defs/condition" } }
+      }
+    },
+    "any": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["any"],
+      "properties": {
+        "any": { "type": "array", "items": { "$ref": "#/$defs/condition" } }
+      }
+    },
+    "not": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["not"],
+      "properties": {
+        "not": { "$ref": "#/$defs/condition" }
+      }
+    },
+    "compare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "left"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "in",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "exists"
+          ]
+        },
+        "left": { "$ref": "#/$defs/operand" },
+        "right": { "$ref": "#/$defs/operand" }
+      }
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string", "pattern": "^(data|context)\\." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": {
+            "value": {
+              "type": ["string", "number", "boolean", "object", "array", "null"]
+            }
+          }
+        }
+      ]
     }
   }
 }

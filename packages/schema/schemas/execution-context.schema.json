@@ -21,6 +21,9 @@
     "userId": { "type": "string", "minLength": 1 },
     "role": { "type": "string", "minLength": 1 },
     "roles": { "type": "array", "items": { "type": "string" } },
+    "orgId": { "type": "string", "minLength": 1 },
+    "programId": { "type": "string", "minLength": 1 },
+    "issuerId": { "type": "string", "minLength": 1 },
     "country": {
       "type": "string",
       "enum": [

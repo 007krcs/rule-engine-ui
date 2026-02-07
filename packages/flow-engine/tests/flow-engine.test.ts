@@ -16,6 +16,7 @@ const context: ExecutionContext = {
 };
 
 const flow: FlowSchema = {
+  version: '1.0.0',
   flowId: 'demo',
   initialState: 'start',
   states: {
