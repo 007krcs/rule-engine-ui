@@ -1,20 +1,23 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import {
   Activity,
   BookOpen,
   Boxes,
   LayoutDashboard,
+  Menu,
   PackageOpen,
   Plug,
   ShieldCheck,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
@@ -31,100 +34,195 @@ const systemItems = [
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
 ];
 
+function getPageTitle(pathname: string, tab?: string | null) {
+  if (pathname === '/') return 'Overview';
+
+  if (pathname.startsWith('/docs')) return 'Documentation';
+  if (pathname.startsWith('/integrations')) return 'Integration Hub';
+  if (pathname.startsWith('/builder')) return 'Builder';
+  if (pathname.startsWith('/playground')) return 'Playground';
+
+  if (pathname.startsWith('/console')) {
+    if (tab === 'governance') return 'Governance';
+    if (tab === 'observability') return 'Observability';
+    if (tab === 'versions') return 'Versions';
+    return 'Admin Console';
+  }
+
+  return pathname.slice(1);
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const tab = searchParams.get('tab');
+  const pageTitle = useMemo(() => getPageTitle(pathname, tab), [pathname, tab]);
+
+  const nav = (
+    <div className="space-y-6">
+      <nav className="rounded-xl border border-border bg-surface p-4 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platform</p>
+        <div className="mt-3 space-y-1">
+          {navItems.map((item) => {
+            const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileNavOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      <nav className="rounded-xl border border-border bg-surface p-4 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">System</p>
+        <div className="mt-3 space-y-1">
+          {systemItems.map((item) => {
+            const Icon = item.icon;
+            const itemTab = item.href.split('tab=')[1] ?? null;
+            const active = pathname === '/console' && itemTab && itemTab === tab;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileNavOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      <div className="rounded-xl border border-border bg-gradient-to-br from-primary/10 via-transparent to-accent/10 p-4">
+        <p className="text-sm font-semibold">RBAC: Author · Approver · Publisher · Viewer</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Tenant isolation active. Signed releases required for publishing.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+    <div className="flex h-dvh flex-col bg-background">
+      <header className="z-40 flex h-16 shrink-0 items-center border-b border-border bg-surface/80 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              RF
-            </div>
-            <div>
-              <p className="text-sm font-semibold">RuleFlow Platform</p>
-              <p className="text-xs text-muted-foreground">Enterprise Configuration Runtime</p>
-            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="lg:hidden"
+              aria-label="Open navigation"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                RF
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold">RuleFlow Platform</p>
+                <p className="text-xs text-muted-foreground">Enterprise Configuration Runtime</p>
+              </div>
+            </Link>
           </div>
+
           <div className="hidden items-center gap-3 md:flex">
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              title="Not available in local demo yet: GitOps export is wired after the local config store is added."
+            >
               Export GitOps
             </Button>
-            <Button size="sm">New Config</Button>
+            <Button
+              size="sm"
+              disabled
+              title="Not available in local demo yet: config creation is wired after the local store is added."
+            >
+              New Config
+            </Button>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[240px_1fr]">
-        <aside className="space-y-6">
-          <nav className="rounded-xl border border-border bg-surface p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Platform
-            </p>
-            <div className="mt-3 space-y-1">
-              {navItems.map((item) => {
-                const active = pathname === item.href;
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                      active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-black/40"
+            aria-label="Close navigation"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div className="absolute left-0 top-0 flex h-full w-[320px] max-w-[85vw] flex-col border-r border-border bg-background p-4 shadow-soft">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Navigation</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label="Close navigation"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          </nav>
-
-          <nav className="rounded-xl border border-border bg-surface p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">System</p>
-            <div className="mt-3 space-y-1">
-              {systemItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-
-          <div className="rounded-xl border border-border bg-gradient-to-br from-primary/10 via-transparent to-accent/10 p-4">
-            <p className="text-sm font-semibold">RBAC: Author · Approver · Publisher · Viewer</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Tenant isolation active. Signed releases required for publishing.
-            </p>
+            <div className="mt-4 overflow-y-auto pr-1 scrollbar-thin">{nav}</div>
           </div>
-        </aside>
+        </div>
+      )}
 
-        <main className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Breadcrumbs />
-              <h1 className="text-2xl font-semibold capitalize">{pathname === '/' ? 'Overview' : pathname.slice(1)}</h1>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 overflow-hidden px-4 py-6 sm:px-6">
+        <aside className="hidden w-[260px] shrink-0 overflow-y-auto pr-1 scrollbar-thin lg:block">{nav}</aside>
+
+        <main className="min-w-0 flex-1 overflow-y-auto pr-1 scrollbar-thin">
+          <div className="space-y-6 pb-10">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <Breadcrumbs />
+                <h1 className="truncate text-2xl font-semibold">{pageTitle}</h1>
+              </div>
+              <div className="flex items-center gap-2 md:hidden">
+                <ThemeToggle />
+                <Button
+                  size="sm"
+                  disabled
+                  title="Not available in local demo yet: config creation is wired after the local store is added."
+                >
+                  New
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 md:hidden">
-              <ThemeToggle />
-              <Button size="sm">New</Button>
-            </div>
+            {children}
           </div>
-          {children}
         </main>
       </div>
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { ArrowRight, ShieldCheck, Workflow, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -39,13 +39,10 @@ export default function HomePage() {
             accessibility, and security. Ship controlled configuration versions across tenants with confidence.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button size="lg">
+            <Link href="/console" className={cn(buttonVariants({ size: 'lg' }))}>
               Explore Console <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Link
-              href="/docs/quickstart"
-              className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}
-            >
+            </Link>
+            <Link href="/docs/quickstart" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
               Read Quickstart
             </Link>
           </div>
@@ -93,8 +90,8 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Designed for banking, insurance, and public sector workloads where governance,
-              determinism, and accessibility cannot be optional.
+              Designed for banking, insurance, and public sector workloads where governance, determinism, and
+              accessibility cannot be optional.
             </p>
           </CardContent>
         </Card>
@@ -102,3 +99,4 @@ export default function HomePage() {
     </div>
   );
 }
+

@@ -39,7 +39,7 @@ html, body {
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
+  @apply bg-background text-foreground antialiased overflow-hidden;
 }
 
 .bg-grid {
@@ -61,4 +61,13 @@ body {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: hsl(var(--border));
   border-radius: 999px;
+}
+
+pre {
+  max-width: 100%;
+}
+
+.prose pre {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }

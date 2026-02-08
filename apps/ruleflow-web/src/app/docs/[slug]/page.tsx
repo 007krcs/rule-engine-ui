@@ -4,8 +4,9 @@ import { docsBySlug, docs } from '@/lib/docs';
 import { Card, CardContent } from '@/components/ui/card';
 import { DocRenderer } from '@/components/docs/doc-renderer';
 
-export default function DocPage({ params }: { params: { slug: string } }) {
-  const doc = docsBySlug[params.slug];
+export default async function DocPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const doc = docsBySlug[slug];
   if (!doc) return notFound();
 
   return (
