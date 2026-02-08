@@ -74,15 +74,24 @@ type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; er
 
 type RuntimeTrace = Awaited<ReturnType<typeof executeStep>>['trace'];
 
-export function Playground() {
+export function Playground({
+  initialSnapshot,
+  initialVersion,
+}: {
+  initialSnapshot: ConsoleSnapshot;
+  initialVersion: ConfigVersion | null;
+}) {
   const { toast } = useToast();
 
-  const [snapshot, setSnapshot] = useState<ConsoleSnapshot | null>(null);
-  const [selectedVersionId, setSelectedVersionId] = useState<string>('');
-  const [version, setVersion] = useState<ConfigVersion | null>(null);
+  const [snapshot] = useState<ConsoleSnapshot>(initialSnapshot);
+  const [selectedVersionId, setSelectedVersionId] = useState<string>(initialVersion?.id ?? '');
+  const [version, setVersion] = useState<ConfigVersion | null>(initialVersion);
   const [busy, setBusy] = useState(false);
 
-  const [stateId, setStateId] = useState<string>('start');
+  const [stateId, setStateId] = useState<string>(() => {
+    const flow = (initialVersion?.bundle.flowSchema ?? null) as unknown as FlowSchema | null;
+    return flow?.initialState ?? 'start';
+  });
   const [context, setContext] = useState<ExecutionContext>(initialContext);
   const [data, setData] = useState<Record<string, JSONValue>>(initialData);
   const [trace, setTrace] = useState<RuntimeTrace | null>(null);
@@ -96,28 +105,8 @@ export function Playground() {
   }, []);
 
   useEffect(() => {
-    const load = async () => {
-      setBusy(true);
-      try {
-        const snap = await apiGet<ConsoleSnapshot>('/api/console');
-        setSnapshot(snap);
-        const defaultVersion = snap.versions.find((v) => v.status === 'ACTIVE') ?? snap.versions[0];
-        setSelectedVersionId(defaultVersion?.id ?? '');
-      } catch (error) {
-        toast({
-          variant: 'error',
-          title: 'Failed to load config registry',
-          description: error instanceof Error ? error.message : String(error),
-        });
-      } finally {
-        setBusy(false);
-      }
-    };
-    void load();
-  }, [toast]);
-
-  useEffect(() => {
     if (!selectedVersionId) return;
+    if (version?.id === selectedVersionId) return;
     const loadVersion = async () => {
       setBusy(true);
       try {
@@ -140,7 +129,7 @@ export function Playground() {
       }
     };
     void loadVersion();
-  }, [selectedVersionId, toast]);
+  }, [selectedVersionId, toast, version?.id]);
 
   const flow = (version?.bundle.flowSchema ?? null) as unknown as FlowSchema | null;
   const uiSchema = (version?.bundle.uiSchema ?? null) as unknown as UISchema | null;
