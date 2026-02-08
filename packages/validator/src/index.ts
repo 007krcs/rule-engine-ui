@@ -1,4 +1,4 @@
-﻿import Ajv, { type ErrorObject, type ValidateFunction } from 'ajv';
+import Ajv2020, { type ErrorObject, type ValidateFunction } from 'ajv/dist/2020';
 import type { TranslationBundle } from '@platform/i18n';
 import type { ApiMapping, ExecutionContext, FlowSchema, RuleSet, UISchema } from '@platform/schema';
 import {
@@ -20,7 +20,7 @@ export interface ValidationResult {
   issues: ValidationIssue[];
 }
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv2020({ allErrors: true, strict: false });
 const validators = {
   executionContext: ajv.compile(executionContextSchema),
   ui: ajv.compile(uiSchema),
