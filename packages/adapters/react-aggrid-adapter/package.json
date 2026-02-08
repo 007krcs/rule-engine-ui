@@ -9,6 +9,9 @@
     "@platform/react-renderer": "workspace:*",
     "@platform/schema": "workspace:*"
   },
+  "devDependencies": {
+    "@platform/i18n": "workspace:*"
+  },
   "peerDependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0"

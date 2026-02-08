@@ -25,17 +25,19 @@ export async function callApi(input: CallApiInput): Promise<CallApiResult> {
   const data = deepClone(input.data);
   const context = deepClone(input.context);
 
-  const request = buildRequest(input.mapping, data, context);
   const trace: ApiTrace = {
     startedAt: new Date(started).toISOString(),
     durationMs: 0,
     apiId: input.mapping.apiId,
     method: input.mapping.method,
     endpoint: input.mapping.endpoint,
-    request,
+    request: {},
   };
 
   try {
+    const request = buildRequest(input.mapping, data, context);
+    trace.request = request;
+
     const url = appendQuery(input.mapping.endpoint, request.query);
     const response = await fetchFn(url, {
       method: input.mapping.method,

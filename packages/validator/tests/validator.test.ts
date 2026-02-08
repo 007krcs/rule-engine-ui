@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { UISchema } from '@platform/schema';
+import type { ApiMapping, FlowSchema, RuleSet, UISchema } from '@platform/schema';
 import { PLATFORM_BUNDLES } from '@platform/i18n';
 import exampleUi from '@platform/schema/examples/example.ui.json';
+import exampleFlow from '@platform/schema/examples/example.flow.json';
+import exampleRules from '@platform/schema/examples/example.rules.json';
+import exampleApi from '@platform/schema/examples/example.api.json';
 import {
+  validateApiMapping,
   validateAccessibility,
+  validateFlowSchema,
   validateI18nCoverage,
+  validateRulesSchema,
   validateUISchema,
 } from '../src/index';
 
@@ -12,6 +18,24 @@ describe('validator', () => {
   it('validates the example UI schema', () => {
     const schema = exampleUi as unknown as UISchema;
     const result = validateUISchema(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates the example flow schema', () => {
+    const schema = exampleFlow as unknown as FlowSchema;
+    const result = validateFlowSchema(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates the example rules schema', () => {
+    const schema = exampleRules as unknown as RuleSet;
+    const result = validateRulesSchema(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates the example api mapping', () => {
+    const schema = exampleApi as unknown as ApiMapping;
+    const result = validateApiMapping(schema);
     expect(result.valid).toBe(true);
   });
 

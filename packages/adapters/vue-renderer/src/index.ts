@@ -61,14 +61,9 @@ function renderLayout(
         ${node.componentIds?.map((id) => renderComponent(id, components, ctx)).join('') ?? ''}
         ${node.children?.map((child) => renderLayout(child, components, ctx)).join('') ?? ''}
       </section>`;
-    default:
-      return wrapLayout(
-        'unknown',
-        'display:block;',
-        node.componentIds?.map((id) => renderComponent(id, components, ctx)).join('') ?? '',
-        node.children?.map((child) => renderLayout(child, components, ctx)).join('') ?? '',
-      );
   }
+
+  return assertNever(node);
 }
 
 function wrapLayout(type: string, style: string, components: string, children: string): string {
@@ -155,14 +150,16 @@ function parseColumns(component: UIComponent): string[] {
 function parseRows(component: UIComponent): Array<Record<string, string>> {
   const rowsSource = component.props?.rows;
   if (!Array.isArray(rowsSource)) return [];
-  return rowsSource
-    .map((row) => (isPlainRecord(row) ? row : null))
-    .filter((row): row is Record<string, unknown> => row !== null)
-    .map((row) =>
-      Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [key, value === undefined ? '' : String(value)]),
-      ),
+
+  const out: Array<Record<string, string>> = [];
+  for (const row of rowsSource) {
+    if (!isPlainRecord(row)) continue;
+    const record = row as Record<string, JSONValue>;
+    out.push(
+      Object.fromEntries(Object.entries(record).map(([key, value]) => [key, value === undefined ? '' : String(value)])),
     );
+  }
+  return out;
 }
 
 function assertAccessibility(component: UIComponent): void {
@@ -201,4 +198,9 @@ function escapeHtml(value: unknown): string {
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertNever(value: never): never {
+  const nodeType = typeof value === 'object' && value !== null && 'type' in value ? (value as any).type : undefined;
+  throw new Error(`Unsupported layout node type: ${String(nodeType ?? value)}`);
 }

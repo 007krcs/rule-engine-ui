@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import type { UIComponent } from '@platform/schema';
+import type { JSONValue, UIComponent } from '@platform/schema';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
 
@@ -17,10 +17,10 @@ function renderCompany(component: UIComponent, ctx: AdapterContext): React.React
         .map((item) => {
           if (!isPlainRecord(item)) return null;
           const metricLabel = typeof item.label === 'string' ? item.label : undefined;
-          const metricValue = item.value ?? '';
+          const metricValue: JSONValue = item.value ?? '';
           return metricLabel ? { label: metricLabel, value: metricValue } : null;
         })
-        .filter((item): item is { label: string; value: unknown } => item !== null)
+        .filter((item): item is { label: string; value: Exclude<JSONValue, null> } => item !== null)
     : [];
   const details = isPlainRecord(component.props?.details) ? component.props?.details : {};
 
@@ -64,7 +64,7 @@ function renderCompany(component: UIComponent, ctx: AdapterContext): React.React
   );
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
+function isPlainRecord(value: unknown): value is Record<string, JSONValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 

@@ -46,7 +46,7 @@ describe('react-renderer', () => {
       <RenderPage uiSchema={schema} data={{}} context={context} i18n={createFallbackI18nProvider()} />,
     );
     expect(html).toMatchInlineSnapshot(
-      '"<div data-ui-page=\\"page\\" dir=\\"ltr\\"><section data-layout=\\"section\\"><div data-component-id=\\"comp-1\\"><div aria-label=\\"runtime.customViz.aria\\">comp-1</div></div></section></div>"',
+      '"<div data-ui-page="page" dir="ltr"><section data-layout="section"><div data-component-id="comp-1"><div aria-label="runtime.customViz.aria">comp-1</div></div></section></div>"',
     );
   });
 

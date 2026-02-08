@@ -252,6 +252,10 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
 
   packages/adapters/react-company-adapter:
     dependencies:
@@ -267,6 +271,10 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
 
   packages/adapters/react-d3-adapter:
     dependencies:
@@ -282,6 +290,10 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
 
   packages/adapters/react-highcharts-adapter:
     dependencies:
@@ -297,6 +309,10 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
 
   packages/adapters/react-material-adapter:
     dependencies:
@@ -312,6 +328,10 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
 
   packages/adapters/react-renderer:
     dependencies:
@@ -406,11 +426,7 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
-  packages/schema:
-    devDependencies:
-      '@platform/validator':
-        specifier: workspace:*
-        version: link:../validator
+  packages/schema: {}
 
   packages/validator:
     dependencies:
