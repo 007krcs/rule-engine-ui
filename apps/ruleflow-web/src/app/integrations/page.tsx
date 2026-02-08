@@ -35,7 +35,7 @@ export default function IntegrationsPage() {
               <CardTitle>{snippet.title}</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="rounded-lg bg-muted/40 p-3 text-xs">{snippet.code}</pre>
+              <pre className="max-h-[360px] overflow-auto rounded-lg bg-muted/40 p-3 text-xs">{snippet.code}</pre>
             </CardContent>
           </Card>
         ))}
