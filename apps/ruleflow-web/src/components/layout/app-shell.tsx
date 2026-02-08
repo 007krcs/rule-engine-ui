@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
   Activity,
@@ -19,6 +19,11 @@ import { cn } from '@/lib/utils';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/toast';
+import { apiPost, downloadFromApi } from '@/lib/demo/api-client';
 
 const navItems = [
   { href: '/console', label: 'Admin Console', icon: LayoutDashboard },
@@ -54,8 +59,14 @@ function getPageTitle(pathname: string, tab?: string | null) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [newConfigOpen, setNewConfigOpen] = useState(false);
+  const [newConfigName, setNewConfigName] = useState('');
+  const [newConfigDescription, setNewConfigDescription] = useState('');
+  const [newConfigBusy, setNewConfigBusy] = useState(false);
+  const { toast } = useToast();
 
   const tab = searchParams.get('tab');
   const pageTitle = useMemo(() => getPageTitle(pathname, tab), [pathname, tab]);
@@ -124,6 +135,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  const createConfig = async () => {
+    const name = newConfigName.trim();
+    if (!name) {
+      toast({ variant: 'error', title: 'Config name is required' });
+      return;
+    }
+
+    setNewConfigBusy(true);
+    try {
+      const result = await apiPost<{ ok: true; packageId: string; versionId: string }>('/api/config-packages', {
+        name,
+        description: newConfigDescription.trim() || undefined,
+      });
+      toast({ variant: 'success', title: 'Created draft config', description: result.versionId });
+      setNewConfigOpen(false);
+      setNewConfigName('');
+      setNewConfigDescription('');
+      router.push(`/builder?versionId=${encodeURIComponent(result.versionId)}`);
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Failed to create config',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setNewConfigBusy(false);
+    }
+  };
+
+  const exportGitOps = async () => {
+    try {
+      await downloadFromApi('/api/gitops/export', 'ruleflow-gitops.json');
+      toast({ variant: 'success', title: 'Exported GitOps bundle' });
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Export failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   return (
     <div className="flex h-dvh flex-col bg-background">
       <header className="z-40 flex h-16 shrink-0 items-center border-b border-border bg-surface/80 backdrop-blur">
@@ -151,19 +204,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="Not available in local demo yet: GitOps export is wired after the local config store is added."
-            >
+            <Button variant="outline" size="sm" onClick={exportGitOps}>
               Export GitOps
             </Button>
-            <Button
-              size="sm"
-              disabled
-              title="Not available in local demo yet: config creation is wired after the local store is added."
-            >
+            <Button size="sm" onClick={() => setNewConfigOpen(true)}>
               New Config
             </Button>
             <ThemeToggle />
@@ -209,11 +253,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex items-center gap-2 md:hidden">
                 <ThemeToggle />
-                <Button
-                  size="sm"
-                  disabled
-                  title="Not available in local demo yet: config creation is wired after the local store is added."
-                >
+                <Button size="sm" onClick={() => setNewConfigOpen(true)}>
                   New
                 </Button>
               </div>
@@ -222,7 +262,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      <Modal
+        open={newConfigOpen}
+        title="New Config Package"
+        description="Create a new DRAFT package and start editing its UI schema."
+        onClose={() => (newConfigBusy ? null : setNewConfigOpen(false))}
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setNewConfigOpen(false)} disabled={newConfigBusy}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={createConfig} disabled={newConfigBusy || newConfigName.trim().length === 0}>
+              {newConfigBusy ? 'Creating…' : 'Create'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid gap-4">
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Name</label>
+            <Input value={newConfigName} onChange={(e) => setNewConfigName(e.target.value)} placeholder="Orders Bundle" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Description</label>
+            <Textarea
+              value={newConfigDescription}
+              onChange={(e) => setNewConfigDescription(e.target.value)}
+              placeholder="What does this bundle power?"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            This local demo stores config state in memory with JSON persistence under <code>.ruleflow-demo-data</code>.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }
-

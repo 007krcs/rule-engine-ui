@@ -75,9 +75,16 @@ export type GitOpsBundle = {
   audit: AuditEvent[];
 };
 
+export type ConsoleSnapshot = {
+  tenantId: string;
+  packages: ConfigPackage[];
+  versions: ConfigVersion[];
+  approvals: ApprovalRequest[];
+  audit: AuditEvent[];
+};
+
 export type JsonDiffItem = {
   path: string;
   before: unknown;
   after: unknown;
 };
-
