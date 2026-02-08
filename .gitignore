@@ -41,3 +41,7 @@ Thumbs.db
 .swc
 .parcel-cache
 .pnpm-store
+
+# Local demo data
+.ruleflow-demo-data
+apps/ruleflow-web/.ruleflow-demo-data
