@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @platform/validator build",
+    "predev": "pnpm -r --filter @platform/observability --filter @platform/validator build",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

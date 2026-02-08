@@ -9,14 +9,26 @@ export async function POST(request: Request) {
 
   if (contentType.includes('application/json')) {
     bundle = await request.json().catch(() => null);
+    if (!bundle) {
+      return NextResponse.json({ ok: false, error: 'invalid JSON body' }, { status: 400 });
+    }
   } else if (contentType.includes('multipart/form-data')) {
-    const form = await request.formData();
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return NextResponse.json({ ok: false, error: 'invalid multipart form data' }, { status: 400 });
+    }
     const file = form.get('file');
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ ok: false, error: 'file is required' }, { status: 400 });
     }
     const text = await file.text();
-    bundle = JSON.parse(text);
+    try {
+      bundle = JSON.parse(text);
+    } catch {
+      return NextResponse.json({ ok: false, error: 'invalid JSON file' }, { status: 400 });
+    }
   } else {
     return NextResponse.json({ ok: false, error: 'unsupported content-type' }, { status: 415 });
   }
@@ -31,4 +43,3 @@ export async function POST(request: Request) {
   }
   return NextResponse.json(result, { headers: { 'cache-control': 'no-store' } });
 }
-

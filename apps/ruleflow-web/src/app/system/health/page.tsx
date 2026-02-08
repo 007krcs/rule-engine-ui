@@ -1,0 +1,401 @@
+'use client';
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule, UISchema } from '@platform/schema';
+import { executeStep } from '@platform/core-runtime';
+import { RenderPage } from '@platform/react-renderer';
+import { registerMaterialAdapters } from '@platform/react-material-adapter';
+import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
+import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
+import { registerD3Adapter } from '@platform/react-d3-adapter';
+import { registerCompanyAdapter } from '@platform/react-company-adapter';
+import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
+import type { ConfigVersion, ConsoleSnapshot } from '@/lib/demo/types';
+import { apiGet, apiPost } from '@/lib/demo/api-client';
+import { useToast } from '@/components/ui/toast';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+type CheckStatus = 'pending' | 'pass' | 'fail';
+
+type Check = {
+  id: string;
+  label: string;
+  status: CheckStatus;
+  detail?: string;
+};
+
+type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
+
+const initialContext: ExecutionContext = {
+  tenantId: 'tenant-1',
+  userId: 'health',
+  role: 'admin',
+  roles: ['admin'],
+  country: 'US',
+  locale: 'en-US',
+  timezone: 'America/New_York',
+  device: 'desktop',
+  permissions: ['read'],
+  featureFlags: { demo: true },
+};
+
+const initialData: Record<string, JSONValue> = {
+  acceptedTerms: true,
+  formValid: true,
+  readyToSubmit: true,
+  orderTotal: 1200,
+  restricted: false,
+  orders: [],
+  revenueSeries: [],
+  customViz: [],
+};
+
+async function demoFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  if (url.includes('api.example.com/orders')) {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const response = {
+      orderId: body.orderId ?? 'demo-1',
+      status: 'submitted',
+      requestId: 'req-health',
+    };
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  return new Response(JSON.stringify({ error: `No local demo handler for ${url}` }), {
+    status: 404,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { method: 'GET', signal: controller.signal, headers: { 'cache-control': 'no-store' } });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+class ErrorBoundary extends React.Component<
+  { onError: (error: Error) => void; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
+export default function HealthPage() {
+  const { toast } = useToast();
+  const [checks, setChecks] = useState<Check[]>([
+    { id: 'routes', label: 'Routes respond (200)', status: 'pending' },
+    { id: 'api', label: 'Console API returns snapshot', status: 'pending' },
+    { id: 'adapters', label: 'Adapters registered (renderer has no missing adapters)', status: 'pending' },
+    { id: 'flow', label: 'Sample flow executes through submit (rules + api)', status: 'pending' },
+  ]);
+
+  const [routeDetails, setRouteDetails] = useState<Array<{ path: string; status: number | null }>>([]);
+  const [adapterError, setAdapterError] = useState<string | null>(null);
+  const [adapterMissingCount, setAdapterMissingCount] = useState<number | null>(null);
+
+  const adapterTestRef = useRef<HTMLDivElement | null>(null);
+
+  const routesToCheck = useMemo(
+    () => [
+      '/',
+      '/console',
+      '/console?tab=governance',
+      '/builder',
+      '/playground',
+      '/docs',
+      '/docs/quickstart',
+      '/integrations',
+      '/system/health',
+      '/system/roadmap',
+    ],
+    [],
+  );
+
+  const adapterTestSchema = useMemo(() => {
+    const components: UISchema['components'] = [
+      {
+        id: 'materialInput',
+        type: 'input',
+        adapterHint: 'material.input',
+        props: {},
+        i18n: { labelKey: 'runtime.filters.customerName.label' },
+        accessibility: { ariaLabelKey: 'runtime.filters.customerName.aria', keyboardNav: true, focusOrder: 1 },
+      },
+      {
+        id: 'ordersTable',
+        type: 'table',
+        adapterHint: 'aggrid.table',
+        props: { columns: [{ field: 'orderId', headerKey: 'runtime.orders.table.columns.orderId' }], rows: [] },
+        i18n: { labelKey: 'runtime.orders.table.label' },
+        accessibility: { ariaLabelKey: 'runtime.orders.table.aria', keyboardNav: true, focusOrder: 2 },
+      },
+      {
+        id: 'chart',
+        type: 'chart',
+        adapterHint: 'highcharts.chart',
+        props: { series: [] },
+        i18n: { labelKey: 'runtime.revenue.chart.label' },
+        accessibility: { ariaLabelKey: 'runtime.revenue.chart.aria', keyboardNav: true, focusOrder: 3 },
+      },
+      {
+        id: 'customViz',
+        type: 'custom',
+        adapterHint: 'd3.custom',
+        props: { height: 120 },
+        i18n: { labelKey: 'runtime.customViz.label' },
+        accessibility: { ariaLabelKey: 'runtime.customViz.aria', keyboardNav: true, focusOrder: 4 },
+      },
+    ];
+
+    return {
+      version: 'health',
+      pageId: 'health-adapters',
+      layout: {
+        id: 'root',
+        type: 'grid',
+        columns: 1,
+        componentIds: ['materialInput', 'ordersTable', 'chart', 'customViz'],
+      },
+      components,
+    } satisfies UISchema;
+  }, []);
+
+  const i18n = useMemo(
+    () =>
+      createProviderFromBundles({
+        locale: 'en',
+        fallbackLocale: 'en',
+        bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
+        mode: 'dev',
+      }),
+    [],
+  );
+
+  const updateCheck = (id: string, patch: Partial<Check>) => {
+    setChecks((current) => current.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
+  const run = async () => {
+    setRouteDetails([]);
+    setAdapterError(null);
+    setAdapterMissingCount(null);
+
+    setChecks((current) => current.map((c) => ({ ...c, status: 'pending', detail: undefined })));
+
+    // Routes
+    try {
+      const origin = window.location.origin;
+      const results = await Promise.all(
+        routesToCheck.map(async (route) => {
+          try {
+            const res = await fetchWithTimeout(`${origin}${route}`, 12_000);
+            return { path: route, status: res.status };
+          } catch {
+            return { path: route, status: null };
+          }
+        }),
+      );
+      setRouteDetails(results);
+      const failed = results.filter((r) => r.status === null || r.status >= 400);
+      updateCheck('routes', {
+        status: failed.length === 0 ? 'pass' : 'fail',
+        detail: failed.length === 0 ? `${results.length}/${results.length}` : `${results.length - failed.length}/${results.length}`,
+      });
+    } catch (error) {
+      updateCheck('routes', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });
+    }
+
+    // API
+    let snap: ConsoleSnapshot | null = null;
+    try {
+      snap = await apiGet<ConsoleSnapshot>('/api/console');
+      updateCheck('api', { status: 'pass', detail: `${snap.packages.length} package(s)` });
+    } catch (error) {
+      updateCheck('api', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });
+    }
+
+    // Adapters
+    try {
+      registerMaterialAdapters();
+      registerAgGridAdapter();
+      registerHighchartsAdapter();
+      registerD3Adapter();
+      registerCompanyAdapter();
+
+      await new Promise((r) => window.setTimeout(r, 0));
+      const missing = adapterTestRef.current?.querySelectorAll('[data-missing-adapter]').length ?? 0;
+      setAdapterMissingCount(missing);
+      updateCheck('adapters', {
+        status: missing === 0 && !adapterError ? 'pass' : 'fail',
+        detail: adapterError ? adapterError : missing === 0 ? 'ok' : `${missing} missing`,
+      });
+    } catch (error) {
+      updateCheck('adapters', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });
+    }
+
+    // Flow execution
+    try {
+      const active = snap?.versions.find((v) => v.status === 'ACTIVE') ?? snap?.versions[0];
+      if (!active) {
+        updateCheck('flow', { status: 'fail', detail: 'No versions found' });
+        return;
+      }
+      const resp = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(active.id)}`);
+      if (!resp.ok) throw new Error(resp.error);
+
+      const flow = resp.version.bundle.flowSchema as unknown as FlowSchema;
+      const uiSchema = resp.version.bundle.uiSchema as unknown as UISchema;
+      const uiSchemasById = Object.fromEntries(Object.values(flow.states).map((s) => [s.uiPageId, uiSchema])) as Record<string, UISchema>;
+      const rules: Rule[] = (((resp.version.bundle.rules as any)?.rules ?? []) as Rule[]) ?? [];
+      const apiMappingsById: Record<string, ApiMapping> = resp.version.bundle.apiMappingsById ?? {};
+
+      const step1 = await executeStep({
+        flow,
+        uiSchemasById,
+        rules,
+        apiMappingsById,
+        stateId: flow.initialState,
+        event: 'next',
+        context: initialContext,
+        data: initialData,
+        fetchFn: demoFetch as any,
+      });
+      const step2 = await executeStep({
+        flow,
+        uiSchemasById,
+        rules,
+        apiMappingsById,
+        stateId: step1.nextStateId,
+        event: 'next',
+        context: step1.updatedContext,
+        data: step1.updatedData,
+        fetchFn: demoFetch as any,
+      });
+      const step3 = await executeStep({
+        flow,
+        uiSchemasById,
+        rules,
+        apiMappingsById,
+        stateId: step2.nextStateId,
+        event: 'submit',
+        context: step2.updatedContext,
+        data: step2.updatedData,
+        fetchFn: demoFetch as any,
+      });
+
+      const ok = step3.trace.flow.reason === 'ok' && (step3.trace.api?.response?.status ?? 0) === 200;
+      updateCheck('flow', { status: ok ? 'pass' : 'fail', detail: ok ? 'ok' : `reason=${step3.trace.flow.reason}` });
+    } catch (error) {
+      updateCheck('flow', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  useEffect(() => {
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const reset = async () => {
+    try {
+      await apiPost('/api/system/reset');
+      toast({ variant: 'success', title: 'Demo store reset' });
+      await run();
+    } catch (error) {
+      toast({ variant: 'error', title: 'Reset failed', description: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  return (
+    <div className="grid gap-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>System Health</CardTitle>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => void run()}>
+                Re-run checks
+              </Button>
+              <Button size="sm" onClick={() => void reset()}>
+                Reset demo store
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {checks.map((check) => (
+            <div key={check.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{check.label}</p>
+                {check.detail ? <p className="mt-1 text-xs text-muted-foreground">{check.detail}</p> : null}
+              </div>
+              <Badge variant={check.status === 'pass' ? 'success' : check.status === 'fail' ? 'warning' : 'muted'}>
+                {check.status.toUpperCase()}
+              </Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <div>
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Routes</p>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              {routeDetails.map((r) => (
+                <div key={r.path} className="rounded-lg border border-border bg-surface p-3">
+                  <p className="font-mono text-xs text-foreground">{r.path}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{r.status === null ? 'timeout/error' : `HTTP ${r.status}`}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Adapters</p>
+            <p className="mt-2 text-xs">
+              Missing adapters: <span className="font-semibold text-foreground">{adapterMissingCount ?? '—'}</span>
+              {adapterError ? (
+                <>
+                  {' '}
+                  · error: <span className="text-rose-400">{adapterError}</span>
+                </>
+              ) : null}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Hidden render to detect missing adapters without impacting layout */}
+      <div className="sr-only" aria-hidden="true">
+        <ErrorBoundary onError={(e) => setAdapterError(e.message)}>
+          <div ref={adapterTestRef}>
+            <RenderPage uiSchema={adapterTestSchema} data={initialData} context={initialContext} i18n={i18n} />
+          </div>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+}

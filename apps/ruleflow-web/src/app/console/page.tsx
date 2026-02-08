@@ -294,7 +294,11 @@ export default function ConsolePage() {
                     const canPromote = version.status === 'APPROVED';
                     const canSubmitReview = version.status === 'DRAFT';
                     return (
-                      <div key={version.id} className="rounded-lg border border-border p-3">
+                      <div
+                        key={version.id}
+                        data-testid={`version-row-${version.id}`}
+                        className="rounded-lg border border-border p-3"
+                      >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">{pkgName}</p>
@@ -569,7 +573,7 @@ function ApprovalRow({
 }) {
   const approving = busyKey === `approve:${item.id}`;
   return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
+    <div data-testid={`approval-row-${item.id}`} className="space-y-2 rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold">{packageName ?? item.packageId}</span>
         <Badge variant={item.risk === 'Medium' ? 'warning' : item.risk === 'High' ? 'warning' : 'muted'}>{item.risk}</Badge>
@@ -587,4 +591,3 @@ function ApprovalRow({
     </div>
   );
 }
-

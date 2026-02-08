@@ -7,7 +7,9 @@ import {
   Activity,
   BookOpen,
   Boxes,
+  HeartPulse,
   LayoutDashboard,
+  ListTodo,
   Menu,
   PackageOpen,
   Plug,
@@ -37,6 +39,8 @@ const systemItems = [
   { href: '/console?tab=governance', label: 'Governance', icon: ShieldCheck },
   { href: '/console?tab=observability', label: 'Observability', icon: Activity },
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
+  { href: '/system/health', label: 'Health', icon: HeartPulse },
+  { href: '/system/roadmap', label: 'Roadmap', icon: ListTodo },
 ];
 
 function getPageTitle(pathname: string, tab?: string | null) {
@@ -104,8 +108,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mt-3 space-y-1">
           {systemItems.map((item) => {
             const Icon = item.icon;
-            const itemTab = item.href.split('tab=')[1] ?? null;
-            const active = pathname === '/console' && itemTab && itemTab === tab;
+            const isConsoleTab = item.href.startsWith('/console?tab=');
+            const itemTab = isConsoleTab ? (item.href.split('tab=')[1] ?? null) : null;
+            const active = isConsoleTab
+              ? pathname === '/console' && itemTab && itemTab === tab
+              : pathname === item.href || pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

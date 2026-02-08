@@ -32,6 +32,23 @@
         "type": { "type": "string" },
         "props": { "type": "object", "additionalProperties": true },
         "componentIds": { "type": "array", "items": { "type": "string" } },
+        "columns": { "type": "integer", "minimum": 1 },
+        "rows": { "type": "integer", "minimum": 1 },
+        "direction": { "type": "string", "enum": ["vertical", "horizontal"] },
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "child"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "child": { "$ref": "#/$defs/layoutNode" }
+            }
+          }
+        },
+        "title": { "type": "string" },
         "children": {
           "type": "array",
           "items": { "$ref": "#/$defs/layoutNode" }
