@@ -82,4 +82,17 @@ describe('flow-engine', () => {
     expect(result.nextStateId).toBe('start');
     expect(result.trace.reason).toBe('no_transition');
   });
+
+  it('returns error when state is unknown', () => {
+    const result = transition({
+      flow,
+      stateId: 'missing',
+      event: 'next',
+      context,
+      data: {},
+    });
+
+    expect(result.trace.reason).toBe('error');
+    expect(result.trace.errorMessage).toContain('Unknown state');
+  });
 });

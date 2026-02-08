@@ -105,4 +105,75 @@ describe('core-runtime', () => {
     expect(result.updatedData.orderId).toBe('o-1');
     expect(result.uiSchema.pageId).toBe('page-done');
   });
+
+  it('fails fast when validation fails', async () => {
+    const invalidSchemas: Record<string, UISchema> = {
+      'page-start': {
+        version: '1.0.0',
+        pageId: 'page-start',
+        layout: { id: 'root', type: 'section', componentIds: ['field'] },
+        components: [
+          {
+            id: 'field',
+            type: 'input',
+            adapterHint: 'material.input',
+            accessibility: {
+              ariaLabelKey: '',
+              keyboardNav: false,
+              focusOrder: 0,
+            },
+          },
+        ],
+      },
+      'page-done': {
+        version: '1.0.0',
+        pageId: 'page-done',
+        layout: { id: 'root', type: 'section', componentIds: [] },
+        components: [],
+      },
+    };
+
+    await expect(
+      executeStep({
+        flow,
+        uiSchemasById: invalidSchemas,
+        rules,
+        apiMappingsById: { submitOrder: apiMapping },
+        stateId: 'start',
+        event: 'submit',
+        context,
+        data: {},
+        validate: true,
+        fetchFn: async () =>
+          new Response(JSON.stringify({ orderId: 'o-2', status: 'submitted' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+      }),
+    ).rejects.toThrow('UISchema validation failed');
+  });
+
+  it('emits trace logs through callback', async () => {
+    let traceSeen = false;
+    const result = await executeStep({
+      flow,
+      uiSchemasById,
+      rules,
+      apiMappingsById: { submitOrder: apiMapping },
+      stateId: 'start',
+      event: 'submit',
+      context,
+      data: {},
+      traceLogger: (trace) => {
+        traceSeen = !!trace.startedAt;
+      },
+      fetchFn: async () =>
+        new Response(JSON.stringify({ orderId: 'o-3', status: 'submitted' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    });
+    expect(traceSeen).toBe(true);
+    expect(result.trace.flow.reason).toBe('ok');
+  });
 });

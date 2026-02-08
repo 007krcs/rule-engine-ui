@@ -1,25 +1,16 @@
-﻿# React Renderer
+# React Renderer
 
-Generic renderer for UISchema with a plugin registry and i18n support.
+Adapter registry and renderer for `UISchema` using React.
 
-## Registering an Adapter
+Purpose
+Resolve `adapterHint` prefixes to registered React render functions and enforce accessibility at runtime.
 
-1. Create a package that depends on `@platform/react-renderer`.
-2. Implement a render function that accepts a `UIComponent` and `AdapterContext`.
-3. Call `registerAdapter('your-prefix.', renderFn)` once at app startup.
-4. Use `adapterHint` values like `your-prefix.widget` in UISchema.
+Exports
+- `registerAdapter` to register a prefix-based renderer
+- `RenderPage` to render a full UI schema
 
-Example:
+When to modify
+Add new adapter registration patterns or layout rendering behavior.
 
-```ts
-import { registerAdapter } from '@platform/react-renderer';
-
-registerAdapter('acme.', (component, ctx) => {
-  const ariaLabel = ctx.i18n.t(component.accessibility.ariaLabelKey);
-  return <div aria-label={ariaLabel}>Acme Widget</div>;
-});
-```
-
-Adapters should respect `component.accessibility.ariaLabelKey`, resolve
-text through `ctx.i18n`, and attach `ctx.events.onClick/onChange/onSubmit`
-to relevant UI events.
+When not to touch
+Do not relax accessibility checks or change adapter prefix resolution without migration.

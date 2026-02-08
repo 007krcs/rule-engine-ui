@@ -10,7 +10,8 @@
     "@platform/observability": "workspace:*",
     "@platform/flow-engine": "workspace:*",
     "@platform/rules-engine": "workspace:*",
-    "@platform/api-orchestrator": "workspace:*"
+    "@platform/api-orchestrator": "workspace:*",
+    "@platform/validator": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

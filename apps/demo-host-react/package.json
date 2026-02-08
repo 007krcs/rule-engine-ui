@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "demo-host-react",
   "version": "0.1.0",
   "private": true,
@@ -21,7 +21,7 @@
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "demo": "tsx scripts/run-demo.ts"
   }
 }

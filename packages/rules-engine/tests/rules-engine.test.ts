@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionContext, Rule } from '@platform/schema';
 import { evaluateRules, evaluateCondition } from '../src/index';
 
@@ -84,5 +84,62 @@ describe('rules-engine', () => {
 
     const result = evaluateCondition(condition, baseContext, { ok: true });
     expect(result).toBe(true);
+  });
+
+  it('records depth errors for overly nested conditions', () => {
+    const nested = { not: { not: { not: { op: 'exists', left: { path: 'data.value' } } } } } as const;
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'DEPTH',
+          when: nested,
+          actions: [{ type: 'setField', path: 'data.ok', value: true }],
+        },
+      ],
+      context: baseContext,
+      data: {},
+      options: { maxDepth: 1 },
+    });
+    expect(result.trace.errors.length).toBeGreaterThan(0);
+    expect(result.data.ok).toBeUndefined();
+  });
+
+  it('invokes trace logger when enabled', () => {
+    let captured = '';
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'LOG',
+          when: { op: 'exists', left: { path: 'context.locale' } },
+        },
+      ],
+      context: baseContext,
+      data: {},
+      options: {
+        traceLogger: (trace) => {
+          captured = trace.startedAt;
+        },
+      },
+    });
+    expect(captured).toBe(result.trace.startedAt);
+  });
+
+  it('logs via provided logger when logTrace is set', () => {
+    const logger = vi.fn();
+    evaluateRules({
+      rules: [
+        {
+          ruleId: 'LOGGING',
+          when: { op: 'exists', left: { path: 'context.locale' } },
+        },
+      ],
+      context: baseContext,
+      data: {},
+      options: {
+        logTrace: true,
+        logger,
+      },
+    });
+    expect(logger).toHaveBeenCalled();
   });
 });

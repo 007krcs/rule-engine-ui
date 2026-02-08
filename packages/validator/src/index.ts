@@ -49,6 +49,34 @@ export function validateApiMapping(value: ApiMapping): ValidationResult {
   return validateWithSchema(validators.api, value);
 }
 
+export function assertExecutionContext(value: ExecutionContext): void {
+  assertValid('ExecutionContext', validateExecutionContext(value));
+}
+
+export function assertUISchema(value: UISchema): void {
+  assertValid('UISchema', validateUISchema(value));
+}
+
+export function assertFlowSchema(value: FlowSchema): void {
+  assertValid('FlowSchema', validateFlowSchema(value));
+}
+
+export function assertRulesSchema(value: RuleSet): void {
+  assertValid('RuleSet', validateRulesSchema(value));
+}
+
+export function assertApiMapping(value: ApiMapping): void {
+  assertValid('ApiMapping', validateApiMapping(value));
+}
+
+export function assertI18nCoverage(uiSchemaValue: UISchema, options: I18nCoverageOptions): void {
+  assertValid('I18nCoverage', validateI18nCoverage(uiSchemaValue, options));
+}
+
+export function assertAccessibility(uiSchemaValue: UISchema): void {
+  assertValid('Accessibility', validateAccessibility(uiSchemaValue));
+}
+
 export interface I18nCoverageOptions {
   locales: string[];
   bundles: TranslationBundle[];
@@ -172,6 +200,12 @@ function pointerToPath(pointer: string): string {
 function mergeResults(...results: ValidationResult[]): ValidationResult {
   const issues = results.flatMap((result) => result.issues);
   return { valid: issues.length === 0, issues };
+}
+
+function assertValid(label: string, result: ValidationResult): void {
+  if (result.valid) return;
+  const details = result.issues.map((issue) => `${issue.path || 'root'}: ${issue.message}`).join('; ');
+  throw new Error(`${label} validation failed: ${details}`);
 }
 
 type I18nKeyRef = {

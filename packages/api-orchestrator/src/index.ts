@@ -274,6 +274,7 @@ function getPath(obj: Record<string, JSONValue>, path: string): JSONValue | unde
       if (!Array.isArray(current)) return undefined;
       current = current[part];
     } else {
+      if (isUnsafeKey(part)) return undefined;
       if (typeof current !== 'object' || Array.isArray(current)) return undefined;
       current = (current as Record<string, JSONValue>)[part];
     }
@@ -292,6 +293,7 @@ function setPath(obj: Record<string, JSONValue>, path: string, value: JSONValue)
       if (typeof part === 'number' && Array.isArray(current)) {
         (current as JSONValue[])[part] = value;
       } else if (typeof part === 'string' && !Array.isArray(current)) {
+        if (isUnsafeKey(part)) return;
         (current as Record<string, JSONValue>)[part] = value;
       }
       return;
@@ -305,6 +307,7 @@ function setPath(obj: Record<string, JSONValue>, path: string, value: JSONValue)
       }
       current = arr[part] as Record<string, JSONValue> | JSONValue[];
     } else {
+      if (isUnsafeKey(part)) return;
       if (Array.isArray(current)) return;
       const objRef = current as Record<string, JSONValue>;
       if (objRef[part] === undefined) {
@@ -316,12 +319,26 @@ function setPath(obj: Record<string, JSONValue>, path: string, value: JSONValue)
 }
 
 function tokenizePath(path: string): Array<string | number> {
+  const cached = pathCache.get(path);
+  if (cached) return cached;
   const normalized = path.replace(/\[(\d+)\]/g, '.$1');
-  return normalized
+  const tokens = normalized
     .split('.')
     .filter((segment) => segment.length > 0)
     .map((segment) => {
       const index = Number(segment);
       return Number.isNaN(index) ? segment : index;
     });
+  pathCache.set(path, tokens);
+  if (pathCache.size > MAX_PATH_CACHE) {
+    pathCache.clear();
+  }
+  return tokens;
+}
+
+const MAX_PATH_CACHE = 500;
+const pathCache = new Map<string, Array<string | number>>();
+
+function isUnsafeKey(value: string): boolean {
+  return value === '__proto__' || value === 'constructor' || value === 'prototype';
 }

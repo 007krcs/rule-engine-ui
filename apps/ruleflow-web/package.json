@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "ruleflow-web",
   "version": "0.1.0",
   "private": true,
@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@platform/core-runtime": "workspace:*",
@@ -20,6 +21,7 @@
     "@platform/react-material-adapter": "workspace:*",
     "@platform/react-renderer": "workspace:*",
     "@platform/schema": "workspace:*",
+    "@platform/validator": "workspace:*",
     "@next/mdx": "^15.1.0",
     "@mdx-js/react": "^3.0.1",
     "class-variance-authority": "^0.7.1",

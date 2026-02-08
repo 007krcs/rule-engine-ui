@@ -8,12 +8,17 @@ dist
 build
 coverage
 .turbo
+.next
+out
+.vercel
+storybook-static
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
 
 # OS
 .DS_Store
@@ -22,6 +27,7 @@ Thumbs.db
 # Env
 .env
 .env.*
+*.local
 
 # Editor
 .vscode
@@ -29,3 +35,9 @@ Thumbs.db
 
 # Misc
 *.tsbuildinfo
+.cache
+.eslintcache
+.stylelintcache
+.swc
+.parcel-cache
+.pnpm-store

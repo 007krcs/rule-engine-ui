@@ -5,10 +5,13 @@
   "files": ["dist", "schemas", "examples"],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "devDependencies": {
+    "@platform/validator": "workspace:*"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   }
 }

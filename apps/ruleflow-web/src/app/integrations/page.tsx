@@ -7,7 +7,7 @@ const snippets = [
   },
   {
     title: 'Angular',
-    code: `import { renderAngular } from '@platform/angular-renderer';\n\nrenderAngular({ uiSchema, hostElement: '#root', i18n });`,
+    code: `import { renderAngular } from '@platform/angular-renderer';\n\nrenderAngular({ uiSchema, target: '#root', i18n });`,
   },
   {
     title: 'Vue',

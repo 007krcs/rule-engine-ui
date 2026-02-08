@@ -1,12 +1,12 @@
-﻿import { notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { docsBySlug, docs } from '@/lib/docs';
 import { Card, CardContent } from '@/components/ui/card';
+import { DocRenderer } from '@/components/docs/doc-renderer';
 
 export default function DocPage({ params }: { params: { slug: string } }) {
   const doc = docsBySlug[params.slug];
   if (!doc) return notFound();
-  const DocComponent = doc.component;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
@@ -24,7 +24,7 @@ export default function DocPage({ params }: { params: { slug: string } }) {
         </CardContent>
       </Card>
       <article className="prose prose-slate max-w-none dark:prose-invert">
-        <DocComponent />
+        <DocRenderer slug={doc.slug} />
       </article>
     </div>
   );

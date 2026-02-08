@@ -1,21 +1,15 @@
-﻿# Flow Engine
+# Flow Engine
 
-Finite State Machine executor based on `FlowSchema`.
+Deterministic finite state machine executor based on `FlowSchema`.
 
-## Usage
+Purpose
+Evaluates transitions, applies guards, and returns the next state and actions.
 
-```ts
-import { transition } from '@platform/flow-engine';
+Exports
+- `transition` to compute the next state
 
-const result = transition({ flow, stateId, event, context, data });
-```
+When to modify
+Add new transition actions or guard evaluation behavior.
 
-## Behavior
-
-- Deterministic transitions
-- Guards evaluated with Rules DSL predicate evaluator
-- Resume-safe: stateId is explicit and never inferred from history
-
-## Output
-
-`transition` returns `{ nextStateId, uiPageId, actionsToRun, trace }`.
+When not to touch
+Do not introduce implicit state changes or history-based inference.

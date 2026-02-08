@@ -47,16 +47,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       );
     }
 
-    if (!component.accessibility?.ariaLabelKey) {
-      if (process.env.NODE_ENV !== 'production') {
-        throw new Error(`ariaLabelKey is required for component ${component.id}`);
-      }
-      return (
-        <div key={component.id} role="alert" style={{ border: '1px solid #c00', padding: 8 }}>
-          Missing ariaLabelKey for component {component.id}
-        </div>
-      );
-    }
+    assertAccessibility(component);
 
     const adapter = resolveAdapter(component.adapterHint);
     if (!adapter) {
@@ -146,6 +137,23 @@ export function RenderPage(props: RendererProps): React.ReactElement {
 
 function resolveAdapter(adapterHint: string): AdapterRenderFn | undefined {
   return registry.find((entry) => adapterHint.startsWith(entry.prefix))?.render;
+}
+
+function assertAccessibility(component: UIComponent): void {
+  const accessibility = component.accessibility;
+  if (!accessibility) {
+    throw new Error(`Accessibility metadata is required for component ${component.id}`);
+  }
+  if (!accessibility.ariaLabelKey || accessibility.ariaLabelKey.trim().length === 0) {
+    throw new Error(`ariaLabelKey is required for component ${component.id}`);
+  }
+  if (accessibility.keyboardNav !== true) {
+    throw new Error(`keyboardNav must be true for component ${component.id}`);
+  }
+  const focusOrder = accessibility.focusOrder;
+  if (typeof focusOrder !== 'number' || !Number.isInteger(focusOrder) || focusOrder < 1) {
+    throw new Error(`focusOrder must be an integer >= 1 for component ${component.id}`);
+  }
 }
 
 function buildEvents(

@@ -49,3 +49,28 @@ export interface RuntimeTrace {
   rules?: RulesTrace;
   api?: ApiTrace;
 }
+
+export type TraceLogger<T> = (message: string, trace: T) => void;
+
+export function formatRulesTrace(trace: RulesTrace): string {
+  return `RulesTrace: ${trace.rulesMatched.length}/${trace.rulesConsidered.length} matched in ${trace.durationMs}ms`;
+}
+
+export function logRulesTrace(trace: RulesTrace, logger: TraceLogger<RulesTrace> = defaultTraceLogger): void {
+  logger(formatRulesTrace(trace), trace);
+}
+
+export function formatRuntimeTrace(trace: RuntimeTrace): string {
+  const rules = trace.rules ? `${trace.rules.rulesMatched.length} rules matched` : 'rules skipped';
+  const api = trace.api ? `api ${trace.api.apiId}` : 'api skipped';
+  return `RuntimeTrace: ${trace.flow.reason} in ${trace.durationMs}ms (${rules}, ${api})`;
+}
+
+export function logRuntimeTrace(trace: RuntimeTrace, logger: TraceLogger<RuntimeTrace> = defaultTraceLogger): void {
+  logger(formatRuntimeTrace(trace), trace);
+}
+
+function defaultTraceLogger(message: string, trace: unknown): void {
+  // eslint-disable-next-line no-console
+  console.info(`[RuleFlow] ${message}`, trace);
+}
