@@ -62,6 +62,9 @@ importers:
 
   apps/builder-web:
     dependencies:
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -69,7 +72,20 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
 
-  apps/demo-host-angular: {}
+  apps/demo-host-angular:
+    dependencies:
+      '@platform/angular-renderer':
+        specifier: workspace:*
+        version: link:../../packages/adapters/angular-renderer
+      '@platform/core-runtime':
+        specifier: workspace:*
+        version: link:../../packages/core-runtime
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
 
   apps/demo-host-react:
     dependencies:
@@ -107,7 +123,20 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
 
-  apps/demo-host-vue: {}
+  apps/demo-host-vue:
+    dependencies:
+      '@platform/core-runtime':
+        specifier: workspace:*
+        version: link:../../packages/core-runtime
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      '@platform/vue-renderer':
+        specifier: workspace:*
+        version: link:../../packages/adapters/vue-renderer
 
   apps/ruleflow-web:
     dependencies:
@@ -144,6 +173,9 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@platform/validator':
+        specifier: workspace:*
+        version: link:../../packages/validator
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -196,6 +228,9 @@ importers:
 
   packages/adapters/angular-renderer:
     dependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
       '@platform/schema':
         specifier: workspace:*
         version: link:../../schema
@@ -292,6 +327,9 @@ importers:
 
   packages/adapters/vue-renderer:
     dependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
       '@platform/schema':
         specifier: workspace:*
         version: link:../../schema
@@ -301,6 +339,12 @@ importers:
       '@platform/observability':
         specifier: workspace:*
         version: link:../observability
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../schema
+
+  packages/config-registry:
+    dependencies:
       '@platform/schema':
         specifier: workspace:*
         version: link:../schema
@@ -322,6 +366,9 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../schema
+      '@platform/validator':
+        specifier: workspace:*
+        version: link:../validator
 
   packages/flow-engine:
     dependencies:
@@ -356,7 +403,11 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
-  packages/schema: {}
+  packages/schema:
+    devDependencies:
+      '@platform/validator':
+        specifier: workspace:*
+        version: link:../validator
 
   packages/validator:
     dependencies:
