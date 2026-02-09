@@ -74,7 +74,6 @@ export default function ConsolePage() {
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const packageNameById = useMemo(() => {
@@ -586,4 +585,3 @@ function ApprovalRow({
     </div>
   );
 }
-

@@ -134,9 +134,9 @@ export function Playground({
     void loadVersion();
   }, [selectedVersionId, toast, version?.id]);
 
-  const flow = (version?.bundle.flowSchema ?? null) as unknown as FlowSchema | null;
-  const uiSchema = (version?.bundle.uiSchema ?? null) as unknown as UISchema | null;
-  const rules: Rule[] = (((version?.bundle.rules as any)?.rules ?? []) as Rule[]) ?? [];
+  const flow: FlowSchema | null = version?.bundle.flowSchema ?? null;
+  const uiSchema: UISchema | null = version?.bundle.uiSchema ?? null;
+  const rules: Rule[] = version?.bundle.rules.rules ?? [];
   const apiMappingsById: Record<string, ApiMapping> = version?.bundle.apiMappingsById ?? {};
 
   const uiSchemasById = useMemo(() => {
@@ -172,7 +172,7 @@ export function Playground({
         event,
         context,
         data,
-        fetchFn: demoFetch as any,
+        fetchFn: demoFetch,
       });
       setStateId(result.nextStateId);
       setContext(result.updatedContext);

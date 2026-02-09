@@ -10,8 +10,9 @@ export class ApiError extends Error {
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as unknown;
-    if (data && typeof data === 'object' && 'error' in data && typeof (data as any).error === 'string') {
-      return (data as any).error;
+    if (data && typeof data === 'object') {
+      const error = (data as { error?: unknown }).error;
+      if (typeof error === 'string') return error;
     }
   } catch {
     // ignore
@@ -59,8 +60,8 @@ export async function downloadFromApi(url: string, fallbackFilename: string): Pr
 
   const blob = await response.blob();
   const disposition = response.headers.get('content-disposition') ?? '';
-  const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
-  const filename = (match?.[1] ?? fallbackFilename).replace(/[\\/:*?\"<>|]+/g, '-');
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const filename = (match?.[1] ?? fallbackFilename).replace(/[\\/:*?"<>|]+/g, '-');
 
   const objectUrl = URL.createObjectURL(blob);
   try {
@@ -72,4 +73,3 @@ export async function downloadFromApi(url: string, fallbackFilename: string): Pr
     URL.revokeObjectURL(objectUrl);
   }
 }
-

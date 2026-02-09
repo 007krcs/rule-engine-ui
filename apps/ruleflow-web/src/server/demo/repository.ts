@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import type { ApiMapping, FlowSchema, RuleSet, UISchema } from '@platform/schema';
 import type {
   ApprovalRequest,
   AuditEvent,
@@ -177,27 +178,29 @@ async function persistState(next: StoreState): Promise<void> {
 }
 
 function seedBundle(variant: 'active' | 'review' | 'deprecated'): ConfigBundle {
-  const uiSchema = deepCloneJson(exampleUi);
-  const flowSchema = deepCloneJson(exampleFlow);
-  const rules = deepCloneJson(exampleRules) as unknown as { version: string; rules: unknown[] };
-  const apiMapping = deepCloneJson(exampleApi);
+  // Imported JSON is structurally compatible with these types, but TS's inferred literal types can be
+  // too specific (e.g. unions with `undefined` props), so we intentionally double-cast via `unknown`.
+  const uiSchema = deepCloneJson(exampleUi) as unknown as UISchema;
+  const flowSchema = deepCloneJson(exampleFlow) as unknown as FlowSchema;
+  const rules = deepCloneJson(exampleRules) as unknown as RuleSet;
+  const apiMapping = deepCloneJson(exampleApi) as unknown as ApiMapping;
 
   if (variant === 'review') {
     // Make the REVIEW bundle meaningfully different for diffing.
-    (flowSchema as any).version = '1.0.1';
-    (uiSchema as any).version = '1.0.1';
+    flowSchema.version = '1.0.1';
+    uiSchema.version = '1.0.1';
   }
   if (variant === 'deprecated') {
-    (flowSchema as any).version = '0.9.9';
-    (uiSchema as any).version = '0.9.9';
+    flowSchema.version = '0.9.9';
+    uiSchema.version = '0.9.9';
   }
 
   return {
-    uiSchema: uiSchema as any,
-    flowSchema: flowSchema as any,
-    rules: rules as any,
+    uiSchema,
+    flowSchema,
+    rules,
     apiMappingsById: {
-      submitOrder: apiMapping as any,
+      submitOrder: apiMapping,
     },
   };
 }

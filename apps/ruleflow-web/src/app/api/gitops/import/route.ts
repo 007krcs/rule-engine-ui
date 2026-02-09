@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { GitOpsBundle } from '@/lib/demo/types';
 import { importGitOpsBundle } from '@/server/demo/repository';
 
 export const runtime = 'nodejs';
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'invalid bundle' }, { status: 400 });
   }
 
-  const result = await importGitOpsBundle({ bundle: bundle as any });
+  const result = await importGitOpsBundle({ bundle: bundle as GitOpsBundle });
   if (!result.ok) {
     return NextResponse.json(result, { status: 400 });
   }

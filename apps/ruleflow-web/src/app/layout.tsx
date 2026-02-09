@@ -1,5 +1,6 @@
 import './globals.css';
 import { Manrope, JetBrains_Mono } from 'next/font/google';
+import { Suspense } from 'react';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { ToastProvider } from '@/components/ui/toast';
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning className={`${manrope.variable} ${jetbrains.variable}`}>
         <ThemeProvider defaultTheme="system">
           <ToastProvider>
-            <AppShell>{children}</AppShell>
+            <Suspense fallback={<div>Loading...</div>}>
+              <AppShell>{children}</AppShell>
+            </Suspense>
           </ToastProvider>
         </ThemeProvider>
       </body>

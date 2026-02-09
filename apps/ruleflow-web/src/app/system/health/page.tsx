@@ -264,10 +264,10 @@ export default function HealthPage() {
       const resp = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(active.id)}`);
       if (!resp.ok) throw new Error(resp.error);
 
-      const flow = resp.version.bundle.flowSchema as unknown as FlowSchema;
-      const uiSchema = resp.version.bundle.uiSchema as unknown as UISchema;
+      const flow: FlowSchema = resp.version.bundle.flowSchema;
+      const uiSchema: UISchema = resp.version.bundle.uiSchema;
       const uiSchemasById = Object.fromEntries(Object.values(flow.states).map((s) => [s.uiPageId, uiSchema])) as Record<string, UISchema>;
-      const rules: Rule[] = (((resp.version.bundle.rules as any)?.rules ?? []) as Rule[]) ?? [];
+      const rules: Rule[] = resp.version.bundle.rules.rules;
       const apiMappingsById: Record<string, ApiMapping> = resp.version.bundle.apiMappingsById ?? {};
 
       const step1 = await executeStep({
@@ -279,7 +279,7 @@ export default function HealthPage() {
         event: 'next',
         context: initialContext,
         data: initialData,
-        fetchFn: demoFetch as any,
+        fetchFn: demoFetch,
       });
       const step2 = await executeStep({
         flow,
@@ -290,7 +290,7 @@ export default function HealthPage() {
         event: 'next',
         context: step1.updatedContext,
         data: step1.updatedData,
-        fetchFn: demoFetch as any,
+        fetchFn: demoFetch,
       });
       const step3 = await executeStep({
         flow,
@@ -301,7 +301,7 @@ export default function HealthPage() {
         event: 'submit',
         context: step2.updatedContext,
         data: step2.updatedData,
-        fetchFn: demoFetch as any,
+        fetchFn: demoFetch,
       });
 
       const ok = step3.trace.flow.reason === 'ok' && (step3.trace.api?.response?.status ?? 0) === 200;
@@ -313,7 +313,6 @@ export default function HealthPage() {
 
   useEffect(() => {
     void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const reset = async () => {

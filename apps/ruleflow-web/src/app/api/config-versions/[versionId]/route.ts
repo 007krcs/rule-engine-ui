@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { UISchema } from '@platform/schema';
 import { getConfigVersion, updateUiSchema } from '@/server/demo/repository';
 
 export const runtime = 'nodejs';
@@ -19,10 +20,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ve
     return NextResponse.json({ ok: false, error: 'uiSchema is required' }, { status: 400 });
   }
 
-  const result = await updateUiSchema({ versionId, uiSchema: body.uiSchema as any });
+  const uiSchema = body.uiSchema as UISchema;
+  const result = await updateUiSchema({ versionId, uiSchema });
   if (!result.ok) {
     return NextResponse.json(result, { status: 404 });
   }
   return NextResponse.json(result, { headers: { 'cache-control': 'no-store' } });
 }
-

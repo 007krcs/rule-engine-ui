@@ -301,8 +301,8 @@ export default function BuilderPage() {
       setSchemaVersion(uiSchema.version ?? '1.0.0');
       setPageId(uiSchema.pageId ?? 'builder-preview');
 
-      const layoutAny = uiSchema.layout as any;
-      setColumns(uiSchema.layout?.type === 'grid' && typeof layoutAny?.columns === 'number' ? layoutAny.columns : 1);
+      const layout = uiSchema.layout;
+      setColumns(layout.type === 'grid' && typeof layout.columns === 'number' ? layout.columns : 1);
       setComponents(normalized);
       setSelectedComponentId(normalized[0]?.id ?? null);
 
@@ -319,7 +319,6 @@ export default function BuilderPage() {
 
   useEffect(() => {
     void loadFromStore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versionId]);
 
   const addComponent = () => {
