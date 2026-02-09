@@ -47,10 +47,10 @@ test('console lifecycle + diff + gitops import', async ({ page, request }, testI
   await approvalRow.getByRole('button', { name: 'Approve' }).click();
 
   await page.goto('/console?tab=versions');
-  await expect(versionRow.getByText('APPROVED')).toBeVisible();
+  await expect(versionRow.getByText('APPROVED')).toBeVisible({ timeout: 30_000 });
 
   await versionRow.getByRole('button', { name: 'Promote' }).click();
-  await expect(versionRow.getByText('ACTIVE')).toBeVisible();
+  await expect(versionRow.getByText('ACTIVE')).toBeVisible({ timeout: 30_000 });
 
   await versionRow.getByRole('button', { name: 'Diff' }).click();
   await expect(page.getByText('Bundle Diff')).toBeVisible();

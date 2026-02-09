@@ -16,10 +16,6 @@ const planned = [
     detail: 'Enforce RBAC in the UI (Author/Approver/Publisher) and block actions with policy explanations.',
   },
   {
-    title: 'Signed GitOps Bundles',
-    detail: 'Add optional signing + verification (local keys) for export/import to simulate regulated workflows.',
-  },
-  {
     title: 'Semantic Diffs',
     detail: 'Upgrade diff viewer to semantic diffs for UI/flow/rules instead of raw deep JSON diffs.',
   },
@@ -66,4 +62,3 @@ export default function RoadmapPage() {
     </div>
   );
 }
-

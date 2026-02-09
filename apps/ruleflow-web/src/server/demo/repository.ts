@@ -28,6 +28,7 @@ type StoreState = {
 
 const STORE_DIR = process.env.RULEFLOW_DEMO_STORE_DIR ?? path.join(process.cwd(), '.ruleflow-demo-data');
 const STORE_FILE = path.join(STORE_DIR, 'store.json');
+const SIGNING_KEY_FILE = path.join(STORE_DIR, 'gitops-signing-key.txt');
 
 const STORE_SEVERITY_FOR_STATUS: Record<ConfigStatus, AuditEvent['severity']> = {
   DRAFT: 'info',
@@ -57,8 +58,86 @@ function deepCloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function stableStringifyJson(value: unknown): string {
+  // Deterministic JSON stringify for signing. Matches JSON.stringify semantics:
+  // - object keys sorted
+  // - undefined/function/symbol omitted from objects, converted to null in arrays
+  // - non-finite numbers serialized as null
+  if (value === null) return 'null';
+
+  const t = typeof value;
+  if (t === 'string') return JSON.stringify(value);
+  if (t === 'boolean') return value ? 'true' : 'false';
+  if (t === 'number') return Number.isFinite(value) ? String(value) : 'null';
+  if (t === 'bigint') throw new Error('Cannot stableStringify bigint');
+  if (t === 'undefined' || t === 'function' || t === 'symbol') return 'null';
+
+  if (Array.isArray(value)) {
+    const items = value.map((item) => {
+      const it = typeof item;
+      if (item === undefined || it === 'function' || it === 'symbol') return 'null';
+      return stableStringifyJson(item);
+    });
+    return `[${items.join(',')}]`;
+  }
+
+  const rec = value as Record<string, unknown>;
+  const keys = Object.keys(rec)
+    .filter((k) => {
+      const v = rec[k];
+      const vt = typeof v;
+      return v !== undefined && vt !== 'function' && vt !== 'symbol';
+    })
+    .sort();
+
+  const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringifyJson(rec[k])}`);
+  return `{${parts.join(',')}}`;
+}
+
 async function ensureDir() {
   await fs.mkdir(STORE_DIR, { recursive: true });
+}
+
+async function loadSigningKey(): Promise<Buffer> {
+  const env = process.env.RULEFLOW_GITOPS_HMAC_KEY;
+  if (env && env.trim().length > 0) {
+    return Buffer.from(env.trim(), 'utf8');
+  }
+
+  try {
+    const existing = (await fs.readFile(SIGNING_KEY_FILE, 'utf8')).trim();
+    if (existing) return Buffer.from(existing, 'base64');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
+      // fall through
+    } else {
+      throw error;
+    }
+  }
+
+  await ensureDir();
+  const key = crypto.randomBytes(32);
+  await fs.writeFile(SIGNING_KEY_FILE, key.toString('base64'), 'utf8');
+  return key;
+}
+
+function signingKeyId(key: Buffer) {
+  return crypto.createHash('sha256').update(key).digest('hex').slice(0, 12);
+}
+
+function hmacSha256Base64(key: Buffer, message: string) {
+  return crypto.createHmac('sha256', key).update(message).digest('base64');
+}
+
+function safeEqualBase64(a: string, b: string) {
+  try {
+    const ab = Buffer.from(a, 'base64');
+    const bb = Buffer.from(b, 'base64');
+    if (ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
 }
 
 async function readStoreFile(): Promise<StoreState | null> {
@@ -598,13 +677,26 @@ export async function diffVersion(input: { versionId: string; againstVersionId?:
 
 export async function exportGitOpsBundle(): Promise<GitOpsBundle> {
   const state = await loadState();
+  const payload = deepCloneJson({
+    packages: state.packages,
+    approvals: state.approvals,
+    audit: state.audit,
+  });
+
+  const key = await loadSigningKey();
+  const keyId = signingKeyId(key);
+  const signatureValue = hmacSha256Base64(key, stableStringifyJson(payload));
+
   return {
     schemaVersion: 1,
     exportedAt: nowIso(),
     tenantId: state.tenantId,
-    packages: state.packages,
-    approvals: state.approvals,
-    audit: state.audit,
+    payload,
+    signature: {
+      alg: 'HMAC-SHA256',
+      keyId,
+      value: signatureValue,
+    },
   };
 }
 
@@ -615,12 +707,26 @@ export async function importGitOpsBundle(input: { bundle: GitOpsBundle }) {
     return { ok: false as const, error: `Unsupported bundle schemaVersion ${String(bundle.schemaVersion)}` };
   }
 
+  if (!bundle.signature || bundle.signature.alg !== 'HMAC-SHA256') {
+    return { ok: false as const, error: 'GitOps bundle must include a HMAC-SHA256 signature (local demo)' };
+  }
+
+  const key = await loadSigningKey();
+  const expectedKeyId = signingKeyId(key);
+  const expectedSig = hmacSha256Base64(key, stableStringifyJson(bundle.payload));
+  if (!safeEqualBase64(expectedSig, bundle.signature.value)) {
+    return {
+      ok: false as const,
+      error: `Signature verification failed (expected keyId=${expectedKeyId}, bundle keyId=${bundle.signature.keyId})`,
+    };
+  }
+
   let next: StoreState = {
     schemaVersion: 1,
     tenantId: bundle.tenantId,
-    packages: bundle.packages,
-    approvals: bundle.approvals,
-    audit: bundle.audit,
+    packages: bundle.payload.packages,
+    approvals: bundle.payload.approvals,
+    audit: bundle.payload.audit,
   };
 
   next = addAudit(next, {
@@ -628,7 +734,7 @@ export async function importGitOpsBundle(input: { bundle: GitOpsBundle }) {
     action: 'Imported GitOps bundle',
     target: `tenant:${bundle.tenantId}`,
     severity: 'info',
-    metadata: { exportedAt: bundle.exportedAt },
+    metadata: { exportedAt: bundle.exportedAt, keyId: bundle.signature.keyId, verified: true },
   });
 
   await persistState(next);

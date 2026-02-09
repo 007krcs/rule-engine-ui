@@ -56,10 +56,11 @@ This report lists the current gaps vs the Principal Engineer requirements and po
   - Evidence:
     - `apps/ruleflow-web/src/server/demo/repository.ts` persists to `.ruleflow-demo-data/store.json`.
 
-- GAP: Bundle signing is missing.
+- RESOLVED (2026-02-09): Signed GitOps bundles (local HMAC) implemented.
   - Evidence:
-    - `apps/ruleflow-web/src/app/api/gitops/export/route.ts` exports JSON without a signature.
-    - `apps/ruleflow-web/src/app/api/gitops/import/route.ts` imports without signature verification.
+    - `apps/ruleflow-web/src/server/demo/repository.ts` signs exports and verifies imports using `gitops-signing-key.txt` under `.ruleflow-demo-data/`.
+    - `apps/ruleflow-web/src/app/api/gitops/export/route.ts` returns a signed bundle payload.
+    - `apps/ruleflow-web/src/app/api/gitops/import/route.ts` rejects invalid/unsigned bundles.
 
 ## 5) Integrations: Angular/Vue Real Examples (Critical)
 
@@ -103,4 +104,3 @@ This report lists the current gaps vs the Principal Engineer requirements and po
 - GAP: No unit tests for date operators.
   - Evidence:
     - `packages/rules-engine/tests` do not include date comparisons/parsing cases.
-

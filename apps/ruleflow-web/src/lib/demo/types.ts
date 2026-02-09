@@ -70,9 +70,16 @@ export type GitOpsBundle = {
   schemaVersion: 1;
   exportedAt: string;
   tenantId: string;
-  packages: ConfigPackage[];
-  approvals: ApprovalRequest[];
-  audit: AuditEvent[];
+  payload: {
+    packages: ConfigPackage[];
+    approvals: ApprovalRequest[];
+    audit: AuditEvent[];
+  };
+  signature: {
+    alg: 'HMAC-SHA256';
+    keyId: string;
+    value: string;
+  };
 };
 
 export type ConsoleSnapshot = {

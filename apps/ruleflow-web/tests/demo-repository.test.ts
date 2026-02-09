@@ -60,13 +60,14 @@ describe('demo repository', () => {
     const exported = await repo.exportGitOpsBundle();
     expect(exported.schemaVersion).toBe(1);
     expect(exported.tenantId).toBeTruthy();
-    expect(exported.packages.length).toBeGreaterThan(0);
+    expect(exported.signature.alg).toBe('HMAC-SHA256');
+    expect(exported.signature.value).toBeTruthy();
+    expect(exported.payload.packages.length).toBeGreaterThan(0);
 
     const importResult = await repo.importGitOpsBundle({ bundle: exported });
     expect(importResult.ok).toBe(true);
 
     const snap = await repo.getConsoleSnapshot();
-    expect(snap.packages.length).toBe(exported.packages.length);
+    expect(snap.packages.length).toBe(exported.payload.packages.length);
   });
 });
-
