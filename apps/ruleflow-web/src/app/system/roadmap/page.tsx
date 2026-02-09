@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import styles from './roadmap.module.css';
 
 const planned = [
   {
@@ -26,24 +27,24 @@ const planned = [
 
 export default function RoadmapPage() {
   return (
-    <div className="grid gap-6">
+    <div className={styles.page}>
       <Card>
         <CardHeader>
           <CardTitle>Local Demo Roadmap</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <CardContent className={styles.content}>
           <p>
             This repo runs as a realistic local product demo: an in-memory config registry (with JSON persistence),
             governance actions, GitOps export/import, a schema builder, and a runtime playground.
           </p>
           <p>
-            Initial findings are documented in <code className="font-mono text-foreground">apps/ruleflow-web/BUG_TRIAGE_REPORT.md</code>.
+            Initial findings are documented in <code className="rfCodeInline">apps/ruleflow-web/BUG_TRIAGE_REPORT.md</code>.
           </p>
           <p>
-            If you see an interactive control that is disabled, it should explain why via tooltip and it should be
-            tracked here.
+            If you see an interactive control that is disabled, it should explain why via tooltip and it should be tracked
+            here.
           </p>
-          <Link className="font-semibold text-primary hover:underline" href="/system/health">
+          <Link className={styles.link} href="/system/health">
             Run system health checks
           </Link>
         </CardContent>
@@ -53,11 +54,11 @@ export default function RoadmapPage() {
         <CardHeader>
           <CardTitle>Planned</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className={styles.planned}>
           {planned.map((item) => (
-            <div key={item.title} className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-sm font-semibold">{item.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+            <div key={item.title} className={styles.plannedItem}>
+              <p className={styles.plannedTitle}>{item.title}</p>
+              <p className={styles.plannedDetail}>{item.detail}</p>
             </div>
           ))}
         </CardContent>

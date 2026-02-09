@@ -1,0 +1,250 @@
+.page {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.muted {
+  color: var(--rf-muted);
+}
+
+.loadingText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.grid3 {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.gridMain {
+  display: grid;
+  gap: var(--rf-space-6);
+  align-items: start;
+}
+
+.grid2 {
+  display: grid;
+  gap: var(--rf-space-6);
+  align-items: start;
+}
+
+.cardHeaderRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.badgeRow {
+  margin-top: var(--rf-space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.stack {
+  display: grid;
+  gap: var(--rf-space-3);
+}
+
+.versionRow {
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  padding: var(--rf-space-3);
+}
+
+.versionTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.versionTitleWrap {
+  min-width: 0;
+}
+
+.pkgName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pkgMeta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--rf-space-2);
+}
+
+.gitopsContent {
+  display: grid;
+  gap: var(--rf-space-3);
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.gitopsActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.gitopsPathBox {
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+  padding: var(--rf-space-3);
+  font-size: 12px;
+  color: var(--rf-fg);
+}
+
+.modalFooter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--rf-space-2);
+}
+
+.formGrid {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.formStackSm {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.errorText {
+  margin: 0;
+  color: var(--rf-danger);
+}
+
+.diffTopText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.diffScroll {
+  max-height: 420px;
+  overflow: auto;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: color-mix(in srgb, var(--rf-surface-2) 40%, transparent);
+  padding: var(--rf-space-3);
+  font-size: 12px;
+}
+
+.diffList {
+  margin: 0;
+  padding-left: var(--rf-space-4);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.diffItem {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.diffPathRow {
+  font-family: var(--rf-font-mono);
+  color: var(--rf-fg);
+  font-size: 12px;
+}
+
+.diffPanel {
+  border-radius: 12px;
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  padding: var(--rf-space-2);
+}
+
+.diffPanelTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--rf-muted);
+}
+
+.diffPre {
+  margin: var(--rf-space-2) 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.approvalRow {
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  padding: var(--rf-space-3);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.approvalTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.approvalName {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.approvalMeta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.approvalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+@media (min-width: 1024px) {
+  .grid3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gridMain {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  .grid2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .diffItem {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .diffPathRow {
+    grid-column: 1 / -1;
+  }
+}
+

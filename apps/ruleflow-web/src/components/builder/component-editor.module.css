@@ -1,0 +1,107 @@
+.cardIssues {
+  border-color: color-mix(in srgb, var(--rf-warning) 45%, var(--rf-border));
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.titleWrap {
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.componentId {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issuesPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--rf-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--rf-warning) 35%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-warning) 12%, transparent);
+  color: var(--rf-warning);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.typeText {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rf-space-2);
+  flex: 0 0 auto;
+}
+
+.adapterBadge {
+  display: none;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.content {
+  display: grid;
+  gap: var(--rf-space-3);
+  font-size: 14px;
+}
+
+.issuesBox {
+  border-radius: var(--rf-radius-md);
+  border: 1px solid color-mix(in srgb, var(--rf-warning) 35%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-warning) 10%, transparent);
+  padding: 10px 12px;
+  color: var(--rf-warning);
+  font-size: 12px;
+}
+
+.issuePath {
+  font-family: var(--rf-font-mono);
+  font-size: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.fieldError {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rf-warning);
+}
+
+.removeRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (min-width: 640px) {
+  .adapterBadge {
+    display: inline-flex;
+  }
+}
+

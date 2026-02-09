@@ -15,7 +15,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${manrope.variable} ${jetbrains.variable} bg-background text-foreground`}>
+      <body suppressHydrationWarning className={`${manrope.variable} ${jetbrains.variable}`}>
         <ThemeProvider defaultTheme="system">
           <ToastProvider>
             <AppShell>{children}</AppShell>
@@ -25,4 +25,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-

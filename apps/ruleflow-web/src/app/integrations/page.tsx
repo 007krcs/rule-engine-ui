@@ -1,4 +1,6 @@
-﻿import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import styles from './integrations.module.css';
+import { cn } from '@/lib/utils';
 
 const snippets = [
   {
@@ -17,25 +19,27 @@ const snippets = [
 
 export default function IntegrationsPage() {
   return (
-    <div className="grid gap-6">
+    <div className={styles.stack}>
       <Card>
         <CardHeader>
           <CardTitle>Integration Hub</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Embed RuleFlow into any host UI with thin adapters. Bring your own components, i18n provider,
-          and observability hooks.
+        <CardContent>
+          <p className={styles.lead}>
+            Embed RuleFlow into any host UI with thin adapters. Bring your own components, i18n provider, and
+            observability hooks.
+          </p>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className={styles.grid}>
         {snippets.map((snippet) => (
           <Card key={snippet.title}>
             <CardHeader>
               <CardTitle>{snippet.title}</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="max-h-[360px] overflow-auto rounded-lg bg-muted/40 p-3 text-xs">{snippet.code}</pre>
+              <pre className={cn(styles.snippet, 'rfScrollbar')}>{snippet.code}</pre>
             </CardContent>
           </Card>
         ))}
@@ -43,3 +47,4 @@ export default function IntegrationsPage() {
     </div>
   );
 }
+

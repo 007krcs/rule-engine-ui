@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import styles from './health.module.css';
 
 type CheckStatus = 'pending' | 'pass' | 'fail';
 
@@ -326,12 +327,12 @@ export default function HealthPage() {
   };
 
   return (
-    <div className="grid gap-6">
+    <div className={styles.stack}>
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className={styles.headerRow}>
             <CardTitle>System Health</CardTitle>
-            <div className="flex flex-wrap gap-2">
+            <div className={styles.buttonRow}>
               <Button size="sm" variant="outline" onClick={() => void run()}>
                 Re-run checks
               </Button>
@@ -341,18 +342,20 @@ export default function HealthPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {checks.map((check) => (
-            <div key={check.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">{check.label}</p>
-                {check.detail ? <p className="mt-1 text-xs text-muted-foreground">{check.detail}</p> : null}
+        <CardContent>
+          <div className={styles.checksList}>
+            {checks.map((check) => (
+              <div key={check.id} className={styles.checkRow}>
+                <div className={styles.checkText}>
+                  <p className={styles.checkLabel}>{check.label}</p>
+                  {check.detail ? <p className={styles.checkDetail}>{check.detail}</p> : null}
+                </div>
+                <Badge variant={check.status === 'pass' ? 'success' : check.status === 'fail' ? 'warning' : 'muted'}>
+                  {check.status.toUpperCase()}
+                </Badge>
               </div>
-              <Badge variant={check.status === 'pass' ? 'success' : check.status === 'fail' ? 'warning' : 'muted'}>
-                {check.status.toUpperCase()}
-              </Badge>
-            </div>
-          ))}
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -360,36 +363,41 @@ export default function HealthPage() {
         <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground">Routes</p>
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              {routeDetails.map((r) => (
-                <div key={r.path} className="rounded-lg border border-border bg-surface p-3">
-                  <p className="font-mono text-xs text-foreground">{r.path}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{r.status === null ? 'timeout/error' : `HTTP ${r.status}`}</p>
-                </div>
-              ))}
+        <CardContent>
+          <div className={styles.detailsStack}>
+            <div>
+              <p className={styles.sectionTitle}>Routes</p>
+              <div className={styles.routesGrid}>
+                {routeDetails.map((r) => (
+                  <div key={r.path} className={styles.routeCard}>
+                    <p className={styles.routePath}>{r.path}</p>
+                    <p className={styles.routeStatus}>{r.status === null ? 'timeout/error' : `HTTP ${r.status}`}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground">Adapters</p>
-            <p className="mt-2 text-xs">
-              Missing adapters: <span className="font-semibold text-foreground">{adapterMissingCount ?? '—'}</span>
-              {adapterError ? (
-                <>
-                  {' '}
-                  · error: <span className="text-rose-400">{adapterError}</span>
-                </>
-              ) : null}
-            </p>
+            <div>
+              <p className={styles.sectionTitle}>Adapters</p>
+              <p className={styles.inlineStat}>
+                Missing adapters:{' '}
+                <span className={styles.inlineStatStrong}>
+                  {adapterMissingCount === null ? '-' : String(adapterMissingCount)}
+                </span>
+                {adapterError ? (
+                  <>
+                    {' '}
+                    - error: <span className={styles.inlineError}>{adapterError}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Hidden render to detect missing adapters without impacting layout */}
-      <div className="sr-only" aria-hidden="true">
+      <div className="rfVisuallyHidden" aria-hidden="true">
         <ErrorBoundary onError={(e) => setAdapterError(e.message)}>
           <div ref={adapterTestRef}>
             <RenderPage uiSchema={adapterTestSchema} data={initialData} context={initialContext} i18n={i18n} />

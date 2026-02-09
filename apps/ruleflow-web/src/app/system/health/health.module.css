@@ -1,0 +1,115 @@
+.stack {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.checksList {
+  display: grid;
+  gap: var(--rf-space-3);
+}
+
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  padding: var(--rf-space-3);
+  background: var(--rf-surface);
+}
+
+.checkText {
+  min-width: 0;
+}
+
+.checkLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.checkDetail {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.detailsStack {
+  display: grid;
+  gap: var(--rf-space-4);
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rf-muted);
+}
+
+.routesGrid {
+  margin-top: var(--rf-space-3);
+  display: grid;
+  gap: var(--rf-space-3);
+}
+
+.routeCard {
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  padding: var(--rf-space-3);
+}
+
+.routePath {
+  margin: 0;
+  font-family: var(--rf-font-mono);
+  font-size: 12px;
+  color: var(--rf-fg);
+}
+
+.routeStatus {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.inlineStat {
+  font-size: 12px;
+  margin: var(--rf-space-2) 0 0;
+}
+
+.inlineStatStrong {
+  font-weight: 850;
+  color: var(--rf-fg);
+}
+
+.inlineError {
+  color: var(--rf-danger);
+  font-weight: 650;
+}
+
+@media (min-width: 768px) {
+  .routesGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+

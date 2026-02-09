@@ -1,37 +1,42 @@
-﻿import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from 'react';
+import styles from './button.module.css';
 import { cn } from '@/lib/utils';
 
-export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none',
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-muted',
-        outline: 'border border-border bg-transparent hover:bg-muted',
-      },
-      size: {
-        sm: 'h-8 px-3',
-        md: 'h-10 px-4',
-        lg: 'h-12 px-6',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'md',
-    },
-  },
-);
+export type ButtonVariant = 'default' | 'secondary' | 'ghost' | 'outline';
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
+export type ButtonClassNameInput = {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+};
+
+export function buttonClassName(input: ButtonClassNameInput = {}): string {
+  const variant = input.variant ?? 'default';
+  const size = input.size ?? 'md';
+
+  return cn(
+    styles.button,
+    size === 'sm' ? styles.sizeSm : size === 'lg' ? styles.sizeLg : styles.sizeMd,
+    variant === 'secondary'
+      ? styles.variantSecondary
+      : variant === 'ghost'
+        ? styles.variantGhost
+        : variant === 'outline'
+          ? styles.variantOutline
+          : styles.variantDefault,
+    input.className,
+  );
+}
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    ButtonClassNameInput {}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant, size, className }))} {...props} />
+    <button ref={ref} className={buttonClassName({ variant, size, className })} {...props} />
   ),
 );
 Button.displayName = 'Button';
+

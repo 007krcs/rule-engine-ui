@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { docsBySlug, docs } from '@/lib/docs';
 import { Card, CardContent } from '@/components/ui/card';
 import { DocRenderer } from '@/components/docs/doc-renderer';
+import styles from '../docs.module.css';
 
 export default async function DocPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -10,23 +11,29 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   if (!doc) return notFound();
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+    <div className={styles.layout}>
       <Card>
-        <CardContent className="space-y-2 p-4 text-sm">
-          {docs.map((item) => (
-            <Link
-              key={item.slug}
-              className={item.slug === doc.slug ? 'font-semibold text-primary' : 'text-muted-foreground'}
-              href={`/docs/${item.slug}`}
-            >
-              {item.title}
-            </Link>
-          ))}
+        <CardContent>
+          <div className={styles.sidebarLinks}>
+            {docs.map((item) => (
+              <Link
+                key={item.slug}
+                className={item.slug === doc.slug ? `${styles.sidebarLink} ${styles.sidebarActive}` : styles.sidebarLink}
+                href={`/docs/${item.slug}`}
+              >
+                {item.title}
+              </Link>
+            ))}
+          </div>
         </CardContent>
       </Card>
-      <article className="prose prose-slate max-w-none dark:prose-invert">
-        <DocRenderer slug={doc.slug} />
-      </article>
+      <Card>
+        <CardContent className={styles.articleWrap}>
+          <article className="rfProse">
+            <DocRenderer slug={doc.slug} />
+          </article>
+        </CardContent>
+      </Card>
     </div>
   );
 }

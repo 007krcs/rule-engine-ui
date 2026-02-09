@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import styles from './audit-item.module.css';
 
 export function AuditItem({
   action,
@@ -16,15 +17,15 @@ export function AuditItem({
   severity?: 'info' | 'warning';
 }) {
   return (
-    <div className="flex items-start justify-between rounded-lg border border-border p-3">
-      <div>
-        <p className="text-sm font-semibold">{action}</p>
-        <p className="text-xs text-muted-foreground">{actor}</p>
+    <div className={styles.row}>
+      <div className={styles.left}>
+        <p className={styles.action}>{action}</p>
+        <p className={styles.meta}>{actor}</p>
       </div>
-      <div className="text-right">
+      <div className={styles.right}>
         <Badge variant={severity === 'warning' ? 'warning' : 'muted'}>{severity}</Badge>
-        <p className="text-xs text-muted-foreground">{target}</p>
-        <p className="text-xs text-muted-foreground">{time}</p>
+        <p className={styles.rightMeta}>{target}</p>
+        <p className={styles.rightMeta}>{time}</p>
       </div>
     </div>
   );

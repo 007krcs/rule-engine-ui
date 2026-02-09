@@ -1,6 +1,6 @@
 ﻿import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+// Intentionally avoid Tailwind-specific class merging; core UI uses first-party CSS.
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return clsx(inputs);
 }

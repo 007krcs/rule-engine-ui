@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import styles from './toast.module.css';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -24,17 +25,6 @@ type ToastContextValue = {
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
-
-function variantStyles(variant: ToastVariant) {
-  switch (variant) {
-    case 'success':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
-    case 'error':
-      return 'border-rose-500/30 bg-rose-500/10 text-rose-200';
-    default:
-      return 'border-border bg-surface text-foreground';
-  }
-}
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
@@ -66,31 +56,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] w-[360px] max-w-[calc(100vw-2rem)] space-y-2">
+      <div className={styles.container} aria-live="polite">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={cn(
-              'pointer-events-auto rounded-xl border p-4 shadow-card backdrop-blur supports-[backdrop-filter]:bg-surface/90',
-              variantStyles(t.variant ?? 'info'),
-            )}
+            className={cn(styles.toast, t.variant === 'success' ? styles.success : t.variant === 'error' ? styles.error : undefined)}
             role="status"
-            aria-live="polite"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{t.title}</p>
-                {t.description ? <p className="mt-1 text-xs text-muted-foreground">{t.description}</p> : null}
+            <div className={styles.header}>
+              <div className={styles.titleWrap}>
+                <p className={styles.title}>{t.title}</p>
+                {t.description ? <p className={styles.description}>{t.description}</p> : null}
               </div>
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-8 w-8 p-0"
                 aria-label="Dismiss toast"
                 onClick={() => setToasts((current) => current.filter((item) => item.id !== t.id))}
               >
-                <X className="h-4 w-4" />
+                <X width={16} height={16} aria-hidden="true" focusable="false" />
               </Button>
             </div>
           </div>

@@ -1,0 +1,84 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--rf-radius-sm);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: filter 120ms ease, background-color 120ms ease, border-color 120ms ease, color 120ms ease,
+    transform 80ms ease;
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--rf-focus);
+}
+
+.sizeSm {
+  height: 32px;
+  padding: 0 12px;
+}
+
+.sizeMd {
+  height: 40px;
+  padding: 0 14px;
+}
+
+.sizeLg {
+  height: 48px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.variantDefault {
+  background: var(--rf-primary);
+  color: var(--rf-primary-fg);
+}
+
+.variantDefault:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.variantSecondary {
+  background: var(--rf-surface-2);
+  color: var(--rf-fg);
+  border-color: var(--rf-border);
+}
+
+.variantSecondary:hover:not(:disabled) {
+  filter: brightness(0.98);
+}
+
+.variantOutline {
+  background: transparent;
+  color: var(--rf-fg);
+  border-color: var(--rf-border);
+}
+
+.variantOutline:hover:not(:disabled) {
+  background: var(--rf-surface-2);
+}
+
+.variantGhost {
+  background: transparent;
+  color: var(--rf-fg);
+}
+
+.variantGhost:hover:not(:disabled) {
+  background: var(--rf-surface-2);
+}
+

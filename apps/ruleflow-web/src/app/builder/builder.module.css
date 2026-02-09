@@ -1,0 +1,121 @@
+.page {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.subtext {
+  margin: var(--rf-space-2) 0 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.metaGrid {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.metaGrid input {
+  margin-top: 6px;
+}
+
+.builderGrid {
+  display: grid;
+  gap: var(--rf-space-6);
+  align-items: start;
+}
+
+.paletteContent {
+  display: grid;
+  gap: var(--rf-space-3);
+  font-size: 14px;
+}
+
+.paletteButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+  padding: 10px 12px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.paletteButton:hover {
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+}
+
+.paletteButtonActive {
+  border-color: color-mix(in srgb, var(--rf-primary) 40%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 8%, var(--rf-surface));
+}
+
+.addSection {
+  padding-top: var(--rf-space-4);
+  border-top: 1px solid var(--rf-border);
+}
+
+.addTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--rf-muted);
+}
+
+.addStack {
+  margin-top: var(--rf-space-2);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.canvasHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.canvasContent {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.emptyText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+@media (min-width: 768px) {
+  .metaGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .builderGrid {
+    grid-template-columns: 260px minmax(0, 1fr) 420px;
+  }
+}
+

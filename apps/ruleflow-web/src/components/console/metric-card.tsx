@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import styles from './metric-card.module.css';
 
 export function MetricCard({
   title,
@@ -18,10 +19,12 @@ export function MetricCard({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm text-muted-foreground">
-        <p className="text-2xl font-semibold text-foreground">{value}</p>
-        {caption && <p>{caption}</p>}
-        {detail && <p className="text-xs">{detail}</p>}
+      <CardContent>
+        <div className={styles.content}>
+          <p className={styles.value}>{value}</p>
+          {caption && <p style={{ margin: 0 }}>{caption}</p>}
+          {detail && <p className={styles.detail} style={{ margin: 0 }}>{detail}</p>}
+        </div>
       </CardContent>
     </Card>
   );

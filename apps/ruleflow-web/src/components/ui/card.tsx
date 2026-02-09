@@ -1,23 +1,20 @@
-﻿import * as React from 'react';
+import * as React from 'react';
+import styles from './card.module.css';
 import { cn } from '@/lib/utils';
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn('rounded-xl border border-border bg-surface shadow-card', className)}
-      {...props}
-    />
-  );
+  return <div className={cn(styles.card, className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('border-b border-border px-6 py-4', className)} {...props} />;
+  return <div className={cn(styles.header, className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn('text-base font-semibold', className)} {...props} />;
+  return <h3 className={cn(styles.title, className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('px-6 py-4', className)} {...props} />;
+  return <div className={cn(styles.content, className)} {...props} />;
 }
+

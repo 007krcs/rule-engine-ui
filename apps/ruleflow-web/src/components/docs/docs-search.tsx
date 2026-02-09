@@ -5,6 +5,7 @@ import lunr from 'lunr';
 import Link from 'next/link';
 import { docs } from '@/lib/docs';
 import { Input } from '@/components/ui/input';
+import styles from './docs-search.module.css';
 
 export function DocsSearch() {
   const [query, setQuery] = useState('');
@@ -28,19 +29,19 @@ export function DocsSearch() {
   }, [index, query]);
 
   return (
-    <div className="space-y-3">
+    <div className={styles.wrap}>
       <Input placeholder="Search docs" value={query} onChange={(event) => setQuery(event.target.value)} />
       {query && (
-        <div className="rounded-xl border border-border bg-surface p-3 text-sm">
-          {results.length === 0 && <p className="text-muted-foreground">No results.</p>}
-          <ul className="space-y-2">
+        <div className={styles.results}>
+          {results.length === 0 && <p className={styles.empty}>No results.</p>}
+          <ul className={styles.list}>
             {results.map((doc) =>
               doc ? (
                 <li key={doc.slug}>
-                  <Link className="font-semibold hover:text-primary" href={`/docs/${doc.slug}`}>
+                  <Link className={styles.link} href={`/docs/${doc.slug}`}>
                     {doc.title}
                   </Link>
-                  <p className="text-xs text-muted-foreground">{doc.description}</p>
+                  <p className={styles.desc}>{doc.description}</p>
                 </li>
               ) : null,
             )}

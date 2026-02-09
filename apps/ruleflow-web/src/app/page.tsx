@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { ArrowRight, ShieldCheck, Workflow, Wand2 } from 'lucide-react';
+import styles from './home.module.css';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 
 const highlights = [
   {
     title: 'Governed Configuration Lifecycle',
-    description: 'DRAFT → REVIEW → APPROVED → ACTIVE → DEPRECATED → RETIRED with RBAC gating.',
+    description: 'DRAFT -> REVIEW -> APPROVED -> ACTIVE -> DEPRECATED -> RETIRED with RBAC gating.',
     icon: ShieldCheck,
   },
   {
@@ -25,58 +25,57 @@ const highlights = [
 
 export default function HomePage() {
   return (
-    <div className="space-y-10">
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-grid bg-surface p-10 shadow-soft">
-        <div className="absolute -right-24 -top-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-        <div className="absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
-        <div className="relative space-y-6">
+    <div className={styles.stack}>
+      <section className={`${styles.hero} rfGridBg`}>
+        <div className={styles.glowA} aria-hidden="true" />
+        <div className={styles.glowB} aria-hidden="true" />
+
+        <div className={styles.heroInner}>
           <Badge variant="default">Enterprise-grade Headless Platform</Badge>
-          <h2 className="text-4xl font-semibold leading-tight">
-            RuleFlow: Configuration-driven UI + Flow + Rules for regulated enterprises
-          </h2>
-          <p className="max-w-2xl text-base text-muted-foreground">
-            Empower business users to build apps without UI development while maintaining auditability,
-            accessibility, and security. Ship controlled configuration versions across tenants with confidence.
+          <h2 className={styles.heroTitle}>RuleFlow: Configuration-driven UI + Flow + Rules for regulated enterprises</h2>
+          <p className={styles.heroText}>
+            Empower business users to build apps without UI development while maintaining auditability, accessibility,
+            and security. Ship controlled configuration versions across tenants with confidence.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/console" className={cn(buttonVariants({ size: 'lg' }))}>
-              Explore Console <ArrowRight className="h-4 w-4" />
+          <div className={styles.heroActions}>
+            <Link href="/console" className={buttonClassName({ size: 'lg' })}>
+              Explore Console <ArrowRight width={16} height={16} aria-hidden="true" focusable="false" />
             </Link>
-            <Link href="/docs/quickstart" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
+            <Link href="/docs/quickstart" className={buttonClassName({ variant: 'outline', size: 'lg' })}>
               Read Quickstart
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
+      <section className={styles.highlights}>
         {highlights.map((item) => {
           const Icon = item.icon;
           return (
             <Card key={item.title}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <span className="rounded-lg bg-primary/10 p-2 text-primary">
-                    <Icon className="h-5 w-5" />
+                <CardTitle className={styles.highlightTitle}>
+                  <span className={styles.iconBadge} aria-hidden="true">
+                    <Icon width={20} height={20} />
                   </span>
                   {item.title}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
+                <p className={styles.cardText}>{item.description}</p>
               </CardContent>
             </Card>
           );
         })}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <section className={styles.twoUp}>
         <Card>
           <CardHeader>
-            <CardTitle>What’s inside</CardTitle>
+            <CardTitle>What's inside</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="grid gap-3 text-sm text-muted-foreground">
+            <ul className={styles.list}>
               <li>Composable runtime: flow engine + rules engine + API orchestrator</li>
               <li>Config registry with GitOps export, version diffs, and rollback</li>
               <li>Builder tools for UI, flow, and rules with validation gates</li>
@@ -89,7 +88,7 @@ export default function HomePage() {
             <CardTitle>Trusted for regulated workflows</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
+            <p className={styles.cardText}>
               Designed for banking, insurance, and public sector workloads where governance, determinism, and
               accessibility cannot be optional.
             </p>

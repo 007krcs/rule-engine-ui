@@ -16,6 +16,9 @@ import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import styles from './playground.module.css';
 
 const initialContext: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -195,16 +198,15 @@ export function Playground({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[340px_1fr_420px]">
+    <div className={styles.grid}>
       <Card>
         <CardHeader>
           <CardTitle>Context Simulator</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground">Config Version</label>
-            <select
-              className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm"
+        <CardContent className={styles.stack}>
+          <div className={styles.field}>
+            <label className="rfFieldLabel">Config Version</label>
+            <Select
               value={selectedVersionId}
               onChange={(event) => setSelectedVersionId(event.target.value)}
               disabled={(snapshot?.versions.length ?? 0) === 0}
@@ -214,40 +216,39 @@ export function Playground({
                   {v.version} ({v.status})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground">Role</label>
+          <div className={styles.formGrid}>
+            <div className={styles.field}>
+              <label className="rfFieldLabel">Role</label>
               <Input value={context.role} onChange={(event) => setContext({ ...context, role: event.target.value })} />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground">Country</label>
+            <div className={styles.field}>
+              <label className="rfFieldLabel">Country</label>
               <Input
                 value={context.country}
                 onChange={(event) => setContext({ ...context, country: event.target.value as ExecutionContext['country'] })}
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground">Device</label>
-              <select
-                className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm"
+            <div className={styles.field}>
+              <label className="rfFieldLabel">Device</label>
+              <Select
                 value={context.device}
                 onChange={(event) => setContext({ ...context, device: event.target.value as ExecutionContext['device'] })}
               >
                 <option value="desktop">Desktop</option>
                 <option value="tablet">Tablet</option>
                 <option value="mobile">Mobile</option>
-              </select>
+              </Select>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground">Locale</label>
+            <div className={styles.field}>
+              <label className="rfFieldLabel">Locale</label>
               <Input value={context.locale} onChange={(event) => setContext({ ...context, locale: event.target.value })} />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className={styles.actions}>
             <Button size="sm" variant="outline" onClick={reset} disabled={busy}>
               Reset
             </Button>
@@ -262,12 +263,12 @@ export function Playground({
             </Button>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-            <p>
-              <span className="font-semibold text-foreground">State:</span> {stateId}
+          <div className={styles.stateBox}>
+            <p className={styles.stateRow}>
+              <span className={styles.stateKey}>State:</span> {stateId}
             </p>
-            <p>
-              <span className="font-semibold text-foreground">Event:</span> {trace?.flow.event ?? '—'}
+            <p className={styles.stateRow}>
+              <span className={styles.stateKey}>Event:</span> {trace?.flow.event ?? '-'}
             </p>
           </div>
         </CardContent>
@@ -279,7 +280,7 @@ export function Playground({
         </CardHeader>
         <CardContent>
           {!currentUiSchema ? (
-            <p className="text-sm text-muted-foreground">Select a config version to render.</p>
+            <p className={styles.emptyText}>Select a config version to render.</p>
           ) : (
             <RenderPage uiSchema={currentUiSchema} data={data} context={context} i18n={i18n} />
           )}
@@ -304,8 +305,8 @@ function TracePanel({
         <CardHeader>
           <CardTitle>Trace</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <p className="text-sm text-muted-foreground">Run Back/Next/Submit to generate a trace.</p>
+        <CardContent className={styles.tracePanel}>
+          <p className={styles.emptyText}>Run Back/Next/Submit to generate a trace.</p>
         </CardContent>
       </Card>
     );
@@ -320,69 +321,67 @@ function TracePanel({
       <CardHeader>
         <CardTitle>Trace</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        <div className="rounded-lg border border-border bg-muted/20 p-3">
-          <p className="text-xs font-semibold uppercase text-muted-foreground">Flow</p>
-          <p className="mt-1">
-            <span className="font-semibold">{flow.event}</span> - {flow.fromStateId} -&gt; {flow.toStateId} -{' '}
-            <span className={flow.reason === 'ok' ? 'text-emerald-400' : 'text-amber-500'}>{flow.reason}</span>
+      <CardContent className={styles.tracePanel}>
+        <div className={styles.traceBox}>
+          <p className={styles.traceTitle}>Flow</p>
+          <p>
+            <strong>{flow.event}</strong> - {flow.fromStateId} -&gt; {flow.toStateId} -{' '}
+            <span className={flow.reason === 'ok' ? styles.ok : styles.warn}>{flow.reason}</span>
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            uiPageId: <span className="font-mono text-foreground">{flow.uiPageId}</span> - actions:{' '}
+          <p className="rfHelperText">
+            uiPageId: <span className={styles.mono}>{flow.uiPageId}</span> - actions:{' '}
             {flow.actionsToRun.length ? flow.actionsToRun.join(', ') : 'none'}
           </p>
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/20 p-3">
-          <p className="text-xs font-semibold uppercase text-muted-foreground">Rules</p>
+        <div className={styles.traceBox}>
+          <p className={styles.traceTitle}>Rules</p>
           {!rules ? (
-            <p className="mt-1 text-xs text-muted-foreground">Skipped</p>
+            <p className="rfHelperText">Skipped</p>
           ) : (
             <>
-              <p className="mt-1">
+              <p>
                 Matched {rules.rulesMatched.length}/{rules.rulesConsidered.length} rules in {rules.durationMs}ms
               </p>
-              {rules.rulesMatched.length > 0 ? (
-                <p className="mt-1 text-xs text-muted-foreground">Hits: {rules.rulesMatched.join(', ')}</p>
-              ) : null}
+              {rules.rulesMatched.length > 0 ? <p className="rfHelperText">Hits: {rules.rulesMatched.join(', ')}</p> : null}
               {rules.actionsApplied.length > 0 ? (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="rfHelperText">
                   Actions: {rules.actionsApplied.map((applied) => `${applied.ruleId}:${applied.action.type}`).join(', ')}
                 </p>
               ) : null}
               {rules.errors.length > 0 ? (
-                <p className="mt-1 text-xs text-rose-400">Errors: {rules.errors.map((err) => err.message).join(' - ')}</p>
+                <p className={cn('rfHelperText', styles.error)}>
+                  Errors: {rules.errors.map((err) => err.message).join(' - ')}
+                </p>
               ) : null}
             </>
           )}
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/20 p-3">
-          <p className="text-xs font-semibold uppercase text-muted-foreground">API</p>
+        <div className={styles.traceBox}>
+          <p className={styles.traceTitle}>API</p>
           {!api ? (
-            <p className="mt-1 text-xs text-muted-foreground">Skipped</p>
+            <p className="rfHelperText">Skipped</p>
           ) : (
             <>
-              <p className="mt-1">
+              <p>
                 {api.method} {api.endpoint}{' '}
-                <span className={api.response?.status && api.response.status < 400 ? 'text-emerald-400' : 'text-amber-500'}>
+                <span className={api.response?.status && api.response.status < 400 ? styles.ok : styles.warn}>
                   {api.response?.status ?? 'error'}
                 </span>{' '}
                 - {api.durationMs}ms
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                mapping: <span className="font-mono text-foreground">{apiMappingsById[api.apiId]?.apiId ?? api.apiId}</span>
+              <p className="rfHelperText">
+                mapping: <span className={styles.mono}>{apiMappingsById[api.apiId]?.apiId ?? api.apiId}</span>
               </p>
-              {api.error ? <p className="mt-1 text-xs text-rose-400">{api.error}</p> : null}
+              {api.error ? <p className={cn('rfHelperText', styles.error)}>{api.error}</p> : null}
             </>
           )}
         </div>
 
-        <details className="rounded-lg border border-border bg-muted/20 p-3">
-          <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">Raw JSON</summary>
-          <pre className="mt-3 max-h-[320px] overflow-auto rounded-lg bg-muted/40 p-3 text-xs text-foreground">
-            {JSON.stringify(trace, null, 2)}
-          </pre>
+        <details className={styles.details}>
+          <summary className={styles.summary}>Raw JSON</summary>
+          <pre className={styles.rawPre}>{JSON.stringify(trace, null, 2)}</pre>
         </details>
       </CardContent>
     </Card>

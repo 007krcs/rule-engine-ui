@@ -1,0 +1,19 @@
+.content {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.value {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--rf-fg);
+}
+
+.detail {
+  font-size: 12px;
+}
+

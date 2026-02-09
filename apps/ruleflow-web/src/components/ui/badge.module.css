@@ -1,0 +1,35 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--rf-radius-pill);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.default {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--rf-primary);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.success {
+  background: rgba(5, 150, 105, 0.12);
+  color: var(--rf-success);
+  border-color: rgba(5, 150, 105, 0.18);
+}
+
+.warning {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--rf-warning);
+  border-color: rgba(217, 119, 6, 0.22);
+}
+
+.muted {
+  background: color-mix(in srgb, var(--rf-surface-2) 92%, transparent);
+  color: var(--rf-muted);
+  border-color: var(--rf-border);
+}
+

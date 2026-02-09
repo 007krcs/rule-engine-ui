@@ -1,73 +1,236 @@
-﻿@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
-  --background: 210 30% 98%;
-  --foreground: 222 47% 11%;
-  --muted: 210 22% 94%;
-  --muted-foreground: 215 15% 35%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 17% 93%;
-  --secondary-foreground: 222 47% 11%;
-  --accent: 262 83% 58%;
-  --accent-foreground: 0 0% 100%;
-  --border: 214 20% 88%;
-  --ring: 221 83% 53%;
-  --surface: 0 0% 100%;
+  color-scheme: light;
+
+  /* Typography */
+  --rf-font-sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  --rf-font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* Spacing */
+  --rf-space-1: 4px;
+  --rf-space-2: 8px;
+  --rf-space-3: 12px;
+  --rf-space-4: 16px;
+  --rf-space-5: 20px;
+  --rf-space-6: 24px;
+  --rf-space-8: 32px;
+  --rf-space-10: 40px;
+
+  /* Radii */
+  --rf-radius-sm: 10px;
+  --rf-radius-md: 14px;
+  --rf-radius-lg: 18px;
+  --rf-radius-pill: 999px;
+
+  /* Colors */
+  --rf-bg: #f7fafc;
+  --rf-fg: #0f172a;
+  --rf-muted: #475569;
+  --rf-surface: #ffffff;
+  --rf-surface-2: #f1f5f9;
+  --rf-border: #e2e8f0;
+  --rf-shadow: rgba(15, 23, 42, 0.08);
+
+  --rf-primary: #2563eb;
+  --rf-primary-fg: #ffffff;
+  --rf-accent: #7c3aed;
+  --rf-accent-fg: #ffffff;
+  --rf-success: #059669;
+  --rf-warning: #d97706;
+  --rf-danger: #e11d48;
+
+  --rf-focus: rgba(37, 99, 235, 0.35);
+
+  /* Shadows */
+  --rf-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 18px 40px rgba(15, 23, 42, 0.08);
+  --rf-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.08), 0 10px 22px rgba(15, 23, 42, 0.10);
 }
 
 .dark {
-  --background: 222 47% 8%;
-  --foreground: 210 40% 96%;
-  --muted: 217 22% 18%;
-  --muted-foreground: 215 15% 65%;
-  --primary: 221 83% 61%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 218 20% 16%;
-  --secondary-foreground: 210 40% 96%;
-  --accent: 262 74% 64%;
-  --accent-foreground: 0 0% 100%;
-  --border: 217 18% 20%;
-  --ring: 221 83% 61%;
-  --surface: 222 45% 12%;
+  color-scheme: dark;
+
+  --rf-bg: #0b1220;
+  --rf-fg: #e5e7eb;
+  --rf-muted: #94a3b8;
+  --rf-surface: #0f1a2b;
+  --rf-surface-2: #101f35;
+  --rf-border: #1f2d43;
+  --rf-shadow: rgba(0, 0, 0, 0.35);
+
+  --rf-primary: #4f8cff;
+  --rf-primary-fg: #06142e;
+  --rf-accent: #a78bfa;
+  --rf-accent-fg: #140628;
+  --rf-success: #34d399;
+  --rf-warning: #fbbf24;
+  --rf-danger: #fb7185;
+
+  --rf-focus: rgba(79, 140, 255, 0.35);
 }
 
-html, body {
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
   height: 100%;
 }
 
 body {
-  @apply bg-background text-foreground antialiased overflow-hidden;
+  margin: 0;
+  font-family: var(--rf-font-sans);
+  background: var(--rf-bg);
+  color: var(--rf-fg);
+  overflow: hidden;
 }
 
-.bg-grid {
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+code,
+pre {
+  font-family: var(--rf-font-mono);
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rfGridBg {
   background-image: linear-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
-.dark .bg-grid {
-  background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+.dark .rfGridBg {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px);
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.rfScrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 999px;
+.rfScrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--rf-border) 75%, transparent);
+  border-radius: var(--rf-radius-pill);
 }
 
-pre {
-  max-width: 100%;
+.rfProse {
+  max-width: 900px;
+  line-height: 1.65;
+  font-size: 15px;
 }
 
-.prose pre {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+.rfProse h1,
+.rfProse h2,
+.rfProse h3 {
+  line-height: 1.2;
+  margin: var(--rf-space-6) 0 var(--rf-space-3);
+}
+
+.rfProse h1 {
+  font-size: 32px;
+}
+
+.rfProse h2 {
+  font-size: 24px;
+}
+
+.rfProse h3 {
+  font-size: 18px;
+}
+
+.rfProse p {
+  margin: var(--rf-space-3) 0;
+  color: var(--rf-muted);
+}
+
+.rfProse a {
+  color: var(--rf-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rfProse code {
+  background: color-mix(in srgb, var(--rf-surface-2) 85%, transparent);
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.rfProse pre {
+  background: var(--rf-surface-2);
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  padding: var(--rf-space-4);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+.rfProse ul,
+.rfProse ol {
+  margin: var(--rf-space-3) 0;
+  padding-left: var(--rf-space-6);
+  color: var(--rf-muted);
+}
+
+.rfProse li {
+  margin: 6px 0;
+}
+
+.rfProse blockquote {
+  border-left: 3px solid var(--rf-border);
+  padding-left: var(--rf-space-4);
+  color: var(--rf-muted);
+  margin: var(--rf-space-4) 0;
+}
+
+.rfVisuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rfFieldLabel {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--rf-muted);
+}
+
+.rfHelperText {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.rfCodeInline {
+  font-family: var(--rf-font-mono);
+  font-size: 12px;
+  background: var(--rf-surface-2);
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--rf-border);
 }

@@ -1,0 +1,39 @@
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.content {
+  display: grid;
+  gap: var(--rf-space-3);
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.issuesList {
+  margin: 0;
+  padding-left: var(--rf-space-5);
+  display: grid;
+  gap: 6px;
+  color: var(--rf-warning);
+  font-size: 13px;
+}
+
+.issuePath {
+  font-family: var(--rf-font-mono);
+}
+
+.code {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+  padding: var(--rf-space-3);
+  font-size: 12px;
+  color: var(--rf-fg);
+}
+

@@ -1,0 +1,26 @@
+.input {
+  height: 40px;
+  width: 100%;
+  border-radius: var(--rf-radius-sm);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--rf-fg);
+}
+
+.input::placeholder {
+  color: color-mix(in srgb, var(--rf-muted) 78%, transparent);
+}
+
+.input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--rf-focus);
+  border-color: color-mix(in srgb, var(--rf-primary) 60%, var(--rf-border));
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

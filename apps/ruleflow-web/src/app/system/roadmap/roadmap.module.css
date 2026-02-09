@@ -1,0 +1,44 @@
+.page {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.content {
+  display: grid;
+  gap: var(--rf-space-3);
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.link {
+  display: inline-flex;
+  font-weight: 850;
+  color: var(--rf-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  width: fit-content;
+}
+
+.planned {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.plannedItem {
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  padding: var(--rf-space-4);
+}
+
+.plannedTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.plannedDetail {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}

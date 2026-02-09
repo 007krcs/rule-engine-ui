@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ComponentEditor } from '@/components/builder/component-editor';
 import { SchemaPreview } from '@/components/builder/schema-preview';
 import { useToast } from '@/components/ui/toast';
+import styles from './builder.module.css';
 
 const palette = [
   { label: 'Text Field', adapterHint: 'material.input' },
@@ -154,11 +155,18 @@ export default function BuilderPage() {
       setLoadedVersion(response.version);
       setSchemaVersion(uiSchema.version ?? '1.0.0');
       setPageId(uiSchema.pageId ?? 'builder-preview');
-      setColumns(uiSchema.layout?.type === 'grid' && typeof (uiSchema.layout as any).columns === 'number' ? (uiSchema.layout as any).columns : 1);
+
+      const layoutAny = uiSchema.layout as any;
+      setColumns(uiSchema.layout?.type === 'grid' && typeof layoutAny?.columns === 'number' ? layoutAny.columns : 1);
+
       setComponents(normalizeFocusOrder(uiSchema.components as UIComponent[]));
       toast({ variant: 'info', title: 'Loaded config', description: response.version.version });
     } catch (error) {
-      toast({ variant: 'error', title: 'Failed to load config', description: error instanceof Error ? error.message : String(error) });
+      toast({
+        variant: 'error',
+        title: 'Failed to load config',
+        description: error instanceof Error ? error.message : String(error),
+      });
       setLoadedVersion(null);
       setComponents(scratchComponents);
     } finally {
@@ -221,22 +229,33 @@ export default function BuilderPage() {
     }
 
     if (!validation.valid) {
-      toast({ variant: 'error', title: 'Fix validation issues before saving', description: `${validation.issues.length} issue(s)` });
+      toast({
+        variant: 'error',
+        title: 'Fix validation issues before saving',
+        description: `${validation.issues.length} issue(s)`,
+      });
       return;
     }
 
     setLoading(true);
     try {
-      const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(`/api/config-versions/${encodeURIComponent(versionId)}`, {
-        uiSchema: schema,
-      });
+      const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(
+        `/api/config-versions/${encodeURIComponent(versionId)}`,
+        {
+          uiSchema: schema,
+        },
+      );
       if (!result.ok) {
         throw new Error(result.error);
       }
       toast({ variant: 'success', title: 'Saved UI schema' });
       await loadFromStore();
     } catch (error) {
-      toast({ variant: 'error', title: 'Save failed', description: error instanceof Error ? error.message : String(error) });
+      toast({
+        variant: 'error',
+        title: 'Save failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setLoading(false);
     }
@@ -252,31 +271,35 @@ export default function BuilderPage() {
       });
       toast({ variant: 'success', title: 'Submitted for review' });
     } catch (error) {
-      toast({ variant: 'error', title: 'Submit failed', description: error instanceof Error ? error.message : String(error) });
+      toast({
+        variant: 'error',
+        title: 'Submit failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="grid gap-6">
+    <div className={styles.page}>
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className={styles.headerRow}>
             <div>
               <CardTitle>Schema Builder</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className={styles.subtext}>
                 {versionId ? (
                   <>
-                    Editing <span className="font-mono text-foreground">{versionId}</span>
-                    {loadedVersion ? ` · ${loadedVersion.status}` : null}
+                    Editing <span className="rfCodeInline">{versionId}</span>
+                    {loadedVersion ? ` - ${loadedVersion.status}` : null}
                   </>
                 ) : (
                   'Scratch schema (not persisted). Use New Config to create a stored package.'
                 )}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className={styles.actions}>
               <Button variant="outline" size="sm" onClick={loadFromStore} disabled={!versionId || loading}>
                 Reload
               </Button>
@@ -284,50 +307,63 @@ export default function BuilderPage() {
                 Submit for review
               </Button>
               <Button size="sm" onClick={saveToStore} disabled={!versionId || loading || !validation.valid}>
-                {loading ? 'Working…' : 'Save'}
+                {loading ? 'Working...' : 'Save'}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className={styles.metaGrid}>
           <div>
-            <label className="text-xs font-semibold uppercase text-muted-foreground">Schema Version</label>
+            <label className="rfFieldLabel">Schema Version</label>
             <Input value={schemaVersion} onChange={(e) => setSchemaVersion(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase text-muted-foreground">Page Id</label>
+            <label className="rfFieldLabel">Page Id</label>
             <Input value={pageId} onChange={(e) => setPageId(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase text-muted-foreground">Columns</label>
+            <label className="rfFieldLabel">Columns</label>
             <Input type="number" value={columns} onChange={(e) => setColumns(Number(e.target.value) || 1)} />
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr_420px]">
+      <div className={styles.builderGrid}>
         <Card>
           <CardHeader>
             <CardTitle>Component Palette</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardContent className={styles.paletteContent}>
             {palette.map((item) => (
               <button
                 key={item.adapterHint}
                 type="button"
-                className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2 text-left hover:bg-muted/40"
+                className={`${styles.paletteButton} ${draft.adapterHint === item.adapterHint ? styles.paletteButtonActive : ''}`}
                 onClick={() => setDraft((current) => ({ ...current, adapterHint: item.adapterHint }))}
               >
                 <span>{item.label}</span>
                 <Badge variant="muted">{item.adapterHint}</Badge>
               </button>
             ))}
-            <div className="pt-4">
-              <p className="text-xs font-semibold uppercase text-muted-foreground">Add Component</p>
-              <div className="mt-2 space-y-2">
-                <Input placeholder="Component id" value={draft.id} onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))} />
-                <Input placeholder="Label key" value={draft.labelKey} onChange={(event) => setDraft((current) => ({ ...current, labelKey: event.target.value }))} />
-                <Input placeholder="Aria label key" value={draft.ariaLabelKey} onChange={(event) => setDraft((current) => ({ ...current, ariaLabelKey: event.target.value }))} />
+
+            <div className={styles.addSection}>
+              <p className={styles.addTitle}>Add Component</p>
+              <div className={styles.addStack}>
+                <Input
+                  placeholder="Component id"
+                  value={draft.id}
+                  onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
+                />
+                <Input
+                  placeholder="Label key"
+                  value={draft.labelKey}
+                  onChange={(event) => setDraft((current) => ({ ...current, labelKey: event.target.value }))}
+                />
+                <Input
+                  placeholder="Aria label key"
+                  value={draft.ariaLabelKey}
+                  onChange={(event) => setDraft((current) => ({ ...current, ariaLabelKey: event.target.value }))}
+                />
                 <Button size="sm" onClick={addComponent}>
                   Add
                 </Button>
@@ -338,14 +374,14 @@ export default function BuilderPage() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className={styles.canvasHeaderRow}>
               <CardTitle>Canvas</CardTitle>
               <Badge variant={validation.valid ? 'success' : 'warning'}>
                 {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className={styles.canvasContent}>
             {components.map((component, index) => (
               <ComponentEditor
                 key={component.id}
@@ -364,7 +400,7 @@ export default function BuilderPage() {
                 }}
               />
             ))}
-            {components.length === 0 ? <p className="text-sm text-muted-foreground">No components yet.</p> : null}
+            {components.length === 0 ? <p className={styles.emptyText}>No components yet.</p> : null}
           </CardContent>
         </Card>
 
@@ -378,3 +414,4 @@ function deriveType(adapterHint: string): string {
   const parts = adapterHint.split('.');
   return parts[parts.length - 1] || adapterHint;
 }
+

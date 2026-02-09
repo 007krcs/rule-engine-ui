@@ -6,14 +6,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApprovalRequest, ConfigStatus, ConsoleSnapshot, JsonDiffItem, RiskLevel } from '@/lib/demo/types';
 import { apiGet, apiPost, downloadFromApi } from '@/lib/demo/api-client';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonClassName } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { AuditItem } from '@/components/console/audit-item';
 import { MetricCard } from '@/components/console/metric-card';
+import styles from './console.module.css';
 
 const statusVariant: Record<ConfigStatus, 'default' | 'success' | 'warning' | 'muted'> = {
   DRAFT: 'muted',
@@ -239,48 +241,48 @@ export default function ConsolePage() {
   const audit = snapshot?.audit ?? [];
 
   return (
-    <div className="grid gap-6">
-      {loading && (
+    <div className={styles.page}>
+      {loading ? (
         <Card>
-          <CardContent className="text-sm text-muted-foreground">Loading console data…</CardContent>
+          <CardContent>
+            <p className={styles.loadingText}>Loading console data...</p>
+          </CardContent>
         </Card>
-      )}
+      ) : null}
 
-      {!loading && snapshot && (showGovernance || showObservability) && (
-        <section className="grid gap-6 lg:grid-cols-3">
+      {!loading && snapshot && (showGovernance || showObservability) ? (
+        <section className={styles.grid3}>
           <Card>
             <CardHeader>
               <CardTitle>Config Lifecycle</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {statusCounts.ACTIVE} active · {statusCounts.REVIEW} in review · {statusCounts.DRAFT} drafts
+              <p className={styles.muted}>
+                {statusCounts.ACTIVE} active - {statusCounts.REVIEW} in review - {statusCounts.DRAFT} drafts
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className={styles.badgeRow}>
                 {(Object.keys(statusCounts) as ConfigStatus[]).map((status) => (
-                  <Badge key={status} variant={status === 'ACTIVE' ? 'success' : status === 'REVIEW' ? 'warning' : 'muted'}>
+                  <Badge
+                    key={status}
+                    variant={status === 'ACTIVE' ? 'success' : status === 'REVIEW' ? 'warning' : 'muted'}
+                  >
                     {status} {statusCounts[status] ? `(${statusCounts[status]})` : ''}
                   </Badge>
                 ))}
               </div>
             </CardContent>
           </Card>
-          <MetricCard
-            title="Governance SLA"
-            value="4h 22m"
-            caption="Average approval time"
-            detail={`Approvals pending: ${approvals.length}`}
-          />
+          <MetricCard title="Governance SLA" value="4h 22m" caption="Average approval time" detail={`Approvals pending: ${approvals.length}`} />
           <MetricCard title="Audit Coverage" value="100%" caption="Traceability across tenants" detail={`Events: ${audit.length}`} />
         </section>
-      )}
+      ) : null}
 
-      {!loading && snapshot && (showVersions || showGovernance) && (
-        <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          {showVersions && (
+      {!loading && snapshot && (showVersions || showGovernance) ? (
+        <section className={styles.gridMain}>
+          {showVersions ? (
             <Card>
               <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className={styles.cardHeaderRow}>
                   <CardTitle>Version Management</CardTitle>
                   <Button variant="outline" size="sm" onClick={refresh} disabled={busyKey !== null}>
                     Refresh
@@ -288,25 +290,21 @@ export default function ConsolePage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className={styles.stack}>
                   {versions.map((version) => {
                     const pkgName = packageNameById.get(version.packageId) ?? version.packageId;
                     const canPromote = version.status === 'APPROVED';
                     const canSubmitReview = version.status === 'DRAFT';
                     return (
-                      <div
-                        key={version.id}
-                        data-testid={`version-row-${version.id}`}
-                        className="rounded-lg border border-border p-3"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{pkgName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {version.version} · {version.createdBy}
+                      <div key={version.id} data-testid={`version-row-${version.id}`} className={styles.versionRow}>
+                        <div className={styles.versionTop}>
+                          <div className={styles.versionTitleWrap}>
+                            <p className={styles.pkgName}>{pkgName}</p>
+                            <p className={styles.pkgMeta}>
+                              {version.version} - {version.createdBy}
                             </p>
                           </div>
-                          <div className="flex flex-wrap items-center justify-end gap-2">
+                          <div className={styles.actionsRow}>
                             <Badge variant={statusVariant[version.status]}>{version.status}</Badge>
                             <Button
                               variant="outline"
@@ -314,10 +312,10 @@ export default function ConsolePage() {
                               onClick={() => openDiff(version.id)}
                               disabled={busyKey === `diff:${version.id}`}
                             >
-                              {busyKey === `diff:${version.id}` ? 'Diff…' : 'Diff'}
+                              {busyKey === `diff:${version.id}` ? 'Diff...' : 'Diff'}
                             </Button>
                             <Link
-                              className="inline-flex h-8 items-center rounded-lg border border-border bg-transparent px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"
+                              className={buttonClassName({ variant: 'outline', size: 'sm' })}
                               href={`/builder?versionId=${encodeURIComponent(version.id)}`}
                             >
                               Edit
@@ -328,7 +326,7 @@ export default function ConsolePage() {
                               disabled={!canPromote || busyKey === `promote:${version.id}`}
                               title={canPromote ? undefined : `Cannot promote a ${version.status} version`}
                             >
-                              {busyKey === `promote:${version.id}` ? 'Promoting…' : 'Promote'}
+                              {busyKey === `promote:${version.id}` ? 'Promoting...' : 'Promote'}
                             </Button>
                             <Button
                               size="sm"
@@ -347,18 +345,19 @@ export default function ConsolePage() {
                       </div>
                     );
                   })}
-                  {versions.length === 0 && <p className="text-sm text-muted-foreground">No versions found.</p>}
+
+                  {versions.length === 0 ? <p className={styles.muted}>No versions found.</p> : null}
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
-          {showGovernance && (
+          {showGovernance ? (
             <Card>
               <CardHeader>
                 <CardTitle>Approval Queue</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className={styles.stack}>
                 {approvals.map((item) => (
                   <ApprovalRow
                     key={item.id}
@@ -373,21 +372,21 @@ export default function ConsolePage() {
                     }}
                   />
                 ))}
-                {approvals.length === 0 && <p className="text-sm text-muted-foreground">No pending approvals.</p>}
+                {approvals.length === 0 ? <p className={styles.muted}>No pending approvals.</p> : null}
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </section>
-      )}
+      ) : null}
 
-      {!loading && snapshot && (showObservability || showVersions) && (
-        <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          {showObservability && (
+      {!loading && snapshot && (showObservability || showVersions) ? (
+        <section className={styles.grid2}>
+          {showObservability ? (
             <Card>
               <CardHeader>
                 <CardTitle>Audit Log</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className={styles.stack}>
                 {audit.map((event) => (
                   <AuditItem
                     key={event.id}
@@ -398,21 +397,21 @@ export default function ConsolePage() {
                     severity={event.severity === 'warning' ? 'warning' : 'info'}
                   />
                 ))}
-                {audit.length === 0 && <p className="text-sm text-muted-foreground">No audit events yet.</p>}
+                {audit.length === 0 ? <p className={styles.muted}>No audit events yet.</p> : null}
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
-          {showVersions && (
+          {showVersions ? (
             <Card>
               <CardHeader>
                 <CardTitle>GitOps Package</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <CardContent className={styles.gitopsContent}>
                 <p>Export/import the full local config registry as a GitOps JSON bundle.</p>
-                <div className="flex flex-wrap gap-2">
+                <div className={styles.gitopsActions}>
                   <Button size="sm" onClick={exportGitOps} disabled={busyKey === 'gitops:export'}>
-                    {busyKey === 'gitops:export' ? 'Exporting…' : 'Export'}
+                    {busyKey === 'gitops:export' ? 'Exporting...' : 'Export'}
                   </Button>
                   <Button
                     variant="outline"
@@ -420,11 +419,11 @@ export default function ConsolePage() {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={busyKey === 'gitops:import'}
                   >
-                    {busyKey === 'gitops:import' ? 'Importing…' : 'Import'}
+                    {busyKey === 'gitops:import' ? 'Importing...' : 'Import'}
                   </Button>
                   <input
                     ref={fileInputRef}
-                    className="hidden"
+                    className="rfVisuallyHidden"
                     type="file"
                     accept="application/json"
                     onChange={(e) => {
@@ -434,14 +433,14 @@ export default function ConsolePage() {
                     }}
                   />
                 </div>
-                <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-foreground">
+                <div className={styles.gitopsPathBox}>
                   gitops://tenant/{snapshot.tenantId}/packages ({snapshot.packages.length})
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </section>
-      )}
+      ) : null}
 
       <Modal
         open={reviewOpen}
@@ -449,32 +448,32 @@ export default function ConsolePage() {
         description="Create an approval request and move this version into REVIEW."
         onClose={() => (busyKey ? null : setReviewOpen(false))}
         footer={
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className={styles.modalFooter}>
             <Button type="button" variant="outline" onClick={() => setReviewOpen(false)} disabled={busyKey !== null}>
               Cancel
             </Button>
-            <Button type="button" onClick={submitReview} disabled={!reviewVersionId || busyKey !== null || reviewScope.trim().length === 0}>
+            <Button
+              type="button"
+              onClick={submitReview}
+              disabled={!reviewVersionId || busyKey !== null || reviewScope.trim().length === 0}
+            >
               Submit
             </Button>
           </div>
         }
       >
-        <div className="grid gap-4">
+        <div className={styles.formGrid}>
           <div>
-            <label className="text-xs font-semibold uppercase text-muted-foreground">Scope</label>
+            <label className="rfFieldLabel">Scope</label>
             <Input value={reviewScope} onChange={(e) => setReviewScope(e.target.value)} placeholder="Tenant: Horizon Bank" />
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase text-muted-foreground">Risk</label>
-            <select
-              className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm"
-              value={reviewRisk}
-              onChange={(e) => setReviewRisk(e.target.value as RiskLevel)}
-            >
+            <label className="rfFieldLabel">Risk</label>
+            <Select value={reviewRisk} onChange={(e) => setReviewRisk(e.target.value as RiskLevel)}>
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
-            </select>
+            </Select>
           </div>
         </div>
       </Modal>
@@ -485,7 +484,7 @@ export default function ConsolePage() {
         description="Send this version back to DRAFT with reviewer notes."
         onClose={() => (busyKey ? null : setRequestChangesOpen(false))}
         footer={
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className={styles.modalFooter}>
             <Button type="button" variant="outline" onClick={() => setRequestChangesOpen(false)} disabled={busyKey !== null}>
               Cancel
             </Button>
@@ -495,8 +494,8 @@ export default function ConsolePage() {
           </div>
         }
       >
-        <div className="grid gap-2">
-          <label className="text-xs font-semibold uppercase text-muted-foreground">Notes</label>
+        <div className={styles.formStackSm}>
+          <label className="rfFieldLabel">Notes</label>
           <Textarea
             value={requestChangesNotes}
             onChange={(e) => setRequestChangesNotes(e.target.value)}
@@ -512,7 +511,7 @@ export default function ConsolePage() {
         description="Deep diff of the config bundle (UI, flow, rules, API)."
         onClose={() => setDiffOpen(false)}
         footer={
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className={styles.modalFooter}>
             <Button type="button" variant="outline" onClick={() => setDiffOpen(false)}>
               Close
             </Button>
@@ -520,36 +519,32 @@ export default function ConsolePage() {
         }
       >
         {!diffData ? (
-          <p className="text-sm text-muted-foreground">Loading diff…</p>
+          <p className={styles.muted}>Loading diff...</p>
         ) : diffData.ok === false ? (
-          <p className="text-sm text-rose-400">{diffData.error}</p>
+          <p className={styles.errorText}>{diffData.error}</p>
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Comparing <span className="font-semibold text-foreground">{diffData.before.version}</span> →{' '}
-              <span className="font-semibold text-foreground">{diffData.after.version}</span> ({diffData.diffs.length} changes)
+          <div className={styles.stack}>
+            <p className={styles.diffTopText}>
+              Comparing <strong>{diffData.before.version}</strong> -&gt; <strong>{diffData.after.version}</strong> (
+              {diffData.diffs.length} changes)
             </p>
-            <div className="max-h-[420px] overflow-auto rounded-lg border border-border bg-muted/20 p-3 text-xs">
-              <ul className="space-y-2">
+            <div className={styles.diffScroll}>
+              <ul className={styles.diffList}>
                 {diffData.diffs.slice(0, 200).map((d) => (
-                  <li key={d.path} className="grid gap-2 md:grid-cols-[1fr_1fr]">
-                    <div className="md:col-span-2">
-                      <span className="font-mono text-foreground">{d.path}</span>
+                  <li key={d.path} className={styles.diffItem}>
+                    <div className={styles.diffPathRow}>{d.path}</div>
+                    <div className={styles.diffPanel}>
+                      <p className={styles.diffPanelTitle}>Before</p>
+                      <pre className={styles.diffPre}>{JSON.stringify(d.before, null, 2)}</pre>
                     </div>
-                    <div className="rounded-md border border-border bg-surface p-2">
-                      <p className="text-[11px] font-semibold text-muted-foreground">Before</p>
-                      <pre className="mt-1 overflow-auto whitespace-pre-wrap">{JSON.stringify(d.before, null, 2)}</pre>
-                    </div>
-                    <div className="rounded-md border border-border bg-surface p-2">
-                      <p className="text-[11px] font-semibold text-muted-foreground">After</p>
-                      <pre className="mt-1 overflow-auto whitespace-pre-wrap">{JSON.stringify(d.after, null, 2)}</pre>
+                    <div className={styles.diffPanel}>
+                      <p className={styles.diffPanelTitle}>After</p>
+                      <pre className={styles.diffPre}>{JSON.stringify(d.after, null, 2)}</pre>
                     </div>
                   </li>
                 ))}
               </ul>
-              {diffData.diffs.length > 200 ? (
-                <p className="mt-3 text-xs text-muted-foreground">Showing first 200 changes.</p>
-              ) : null}
+              {diffData.diffs.length > 200 ? <p className={styles.muted}>Showing first 200 changes.</p> : null}
             </div>
           </div>
         )}
@@ -573,16 +568,16 @@ function ApprovalRow({
 }) {
   const approving = busyKey === `approve:${item.id}`;
   return (
-    <div data-testid={`approval-row-${item.id}`} className="space-y-2 rounded-lg border border-border p-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold">{packageName ?? item.packageId}</span>
+    <div data-testid={`approval-row-${item.id}`} className={styles.approvalRow}>
+      <div className={styles.approvalTop}>
+        <span className={styles.approvalName}>{packageName ?? item.packageId}</span>
         <Badge variant={item.risk === 'Medium' ? 'warning' : item.risk === 'High' ? 'warning' : 'muted'}>{item.risk}</Badge>
       </div>
-      <p className="text-xs text-muted-foreground">Requested by {item.requestedBy}</p>
-      <p className="text-xs text-muted-foreground">{item.scope}</p>
-      <div className="flex gap-2">
+      <p className={styles.approvalMeta}>Requested by {item.requestedBy}</p>
+      <p className={styles.approvalMeta}>{item.scope}</p>
+      <div className={styles.approvalActions}>
         <Button size="sm" onClick={onApprove} disabled={approving}>
-          {approving ? 'Approving…' : 'Approve'}
+          {approving ? 'Approving...' : 'Approve'}
         </Button>
         <Button variant="outline" size="sm" onClick={onRequestChanges} disabled={busyKey !== null}>
           Request changes
@@ -591,3 +586,4 @@ function ApprovalRow({
     </div>
   );
 }
+

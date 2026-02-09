@@ -4,6 +4,7 @@ import type { UISchema } from '@platform/schema';
 import type { ValidationIssue } from '@platform/validator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import styles from './schema-preview.module.css';
 
 export function SchemaPreview({
   schema,
@@ -15,27 +16,26 @@ export function SchemaPreview({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className={styles.headerRow}>
           <CardTitle>Schema Preview</CardTitle>
           <Badge variant={issues.length === 0 ? 'success' : 'warning'}>
             {issues.length === 0 ? 'Valid' : `${issues.length} Issues`}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 text-xs text-muted-foreground">
-        {issues.length > 0 && (
-          <ul className="space-y-1 text-sm text-amber-500">
+      <CardContent className={styles.content}>
+        {issues.length > 0 ? (
+          <ul className={styles.issuesList}>
             {issues.map((issue) => (
               <li key={`${issue.path}-${issue.message}`}>
-                {issue.path}: {issue.message}
+                <span className={styles.issuePath}>{issue.path}</span>: {issue.message}
               </li>
             ))}
           </ul>
-        )}
-        <pre className="max-h-[420px] overflow-auto rounded-lg bg-muted/40 p-3 text-xs text-foreground">
-          {JSON.stringify(schema, null, 2)}
-        </pre>
+        ) : null}
+        <pre className={styles.code}>{JSON.stringify(schema, null, 2)}</pre>
       </CardContent>
     </Card>
   );
 }
+

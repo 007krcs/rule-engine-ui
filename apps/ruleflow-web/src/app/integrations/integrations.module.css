@@ -1,0 +1,32 @@
+.stack {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.grid {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.lead {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.snippet {
+  max-height: 360px;
+  overflow: auto;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface-2);
+  padding: var(--rf-space-4);
+  font-size: 12px;
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+

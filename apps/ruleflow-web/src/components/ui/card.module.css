@@ -1,0 +1,23 @@
+.card {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-lg);
+  background: var(--rf-surface);
+  box-shadow: var(--rf-shadow-card);
+}
+
+.header {
+  padding: var(--rf-space-5) var(--rf-space-6);
+  border-bottom: 1px solid var(--rf-border);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.content {
+  padding: var(--rf-space-5) var(--rf-space-6);
+}
+
