@@ -56,12 +56,18 @@
   border: 1px solid var(--rf-border);
   background: var(--rf-surface);
   text-align: left;
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 .paletteButton:hover {
   background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+}
+
+.paletteButton:active {
+  cursor: grabbing;
 }
 
 .paletteButtonActive {
@@ -101,6 +107,51 @@
   gap: var(--rf-space-4);
 }
 
+.canvasZone {
+  border-radius: var(--rf-radius-lg);
+  border: 1px dashed color-mix(in srgb, var(--rf-border) 70%, var(--rf-primary));
+  background: color-mix(in srgb, var(--rf-surface-2) 35%, transparent);
+  padding: var(--rf-space-4);
+  min-height: 220px;
+  touch-action: none;
+}
+
+.canvasZoneOver {
+  border-color: color-mix(in srgb, var(--rf-primary) 65%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface-2));
+}
+
+.canvasEmptyHint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.canvasHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-muted);
+}
+
+.dragOverlay {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  box-shadow: var(--rf-shadow-soft);
+}
+
+.dragOverlayTitle {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.dragOverlaySub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
 .emptyText {
   margin: 0;
   font-size: 14px;
@@ -118,4 +169,3 @@
     grid-template-columns: 260px minmax(0, 1fr) 420px;
   }
 }
-

@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { UIComponent, UISchema } from '@platform/schema';
+import type { ExecutionContext, JSONValue, UIComponent, UISchema } from '@platform/schema';
 import { validateUISchema, type ValidationIssue } from '@platform/validator';
+import { RenderPage } from '@platform/react-renderer';
+import { registerMaterialAdapters } from '@platform/react-material-adapter';
+import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
+import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
+import { registerD3Adapter } from '@platform/react-d3-adapter';
+import { registerCompanyAdapter } from '@platform/react-company-adapter';
+import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 import { useSearchParams } from 'next/navigation';
 import type { ConfigVersion } from '@/lib/demo/types';
 import { apiGet, apiPatch, apiPost } from '@/lib/demo/api-client';
@@ -12,15 +19,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ComponentEditor } from '@/components/builder/component-editor';
 import { SchemaPreview } from '@/components/builder/schema-preview';
+import { CanvasItem } from '@/components/builder/canvas-item';
 import { useToast } from '@/components/ui/toast';
 import styles from './builder.module.css';
+import { cn } from '@/lib/utils';
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-const palette = [
-  { label: 'Text Field', adapterHint: 'material.input' },
-  { label: 'Button', adapterHint: 'material.button' },
-  { label: 'AG-Grid Table', adapterHint: 'aggrid.table' },
-  { label: 'Highcharts', adapterHint: 'highcharts.chart' },
-  { label: 'D3 Custom', adapterHint: 'd3.custom' },
+type PaletteItemDef = { label: string; adapterHint: string; defaults?: Partial<UIComponent> };
+
+const palette: PaletteItemDef[] = [
+  { label: 'Text Field', adapterHint: 'material.input', defaults: { props: { label: 'Text field', placeholder: 'Type here...' } } },
+  { label: 'Button', adapterHint: 'material.button', defaults: { props: { label: 'Action button' } } },
+  { label: 'AG-Grid Table', adapterHint: 'aggrid.table', defaults: { props: { columns: [{ field: 'id' }, { field: 'status' }], rows: [] } } },
+  { label: 'Highcharts', adapterHint: 'highcharts.chart', defaults: { props: { title: 'Revenue', series: [2, 7, 4, 9] } } },
+  { label: 'D3 Custom', adapterHint: 'd3.custom', defaults: { props: { series: [1, 3, 2, 6, 4] } } },
+  { label: 'Company Lens', adapterHint: 'company.card', defaults: { props: { label: 'Company profile', metrics: [{ label: 'Risk', value: 'Low' }] } } },
 ];
 
 const scratchComponents: UIComponent[] = [
@@ -65,6 +91,24 @@ const scratchComponents: UIComponent[] = [
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
 
+const previewContext: ExecutionContext = {
+  tenantId: 'tenant-1',
+  userId: 'builder',
+  role: 'author',
+  roles: ['author'],
+  country: 'US',
+  locale: 'en-US',
+  timezone: 'America/New_York',
+  device: 'desktop',
+  permissions: ['read'],
+  featureFlags: { demo: true },
+};
+
+const previewData: Record<string, JSONValue> = {
+  orders: [],
+  revenueSeries: [2, 7, 4, 9],
+};
+
 function normalizeFocusOrder(components: UIComponent[]) {
   return components.map((component, index) => ({
     ...component,
@@ -72,7 +116,7 @@ function normalizeFocusOrder(components: UIComponent[]) {
       ...(component.accessibility ?? {}),
       keyboardNav: true,
       focusOrder: index + 1,
-      ariaLabelKey: component.accessibility?.ariaLabelKey ?? 'runtime.aria.missing',
+      ariaLabelKey: component.accessibility?.ariaLabelKey ?? `runtime.builder.${component.id}.aria`,
     },
   }));
 }
@@ -94,6 +138,88 @@ function extractComponentIdFromIssue(path: string, components: UIComponent[]): s
   return exists ? first : null;
 }
 
+function nextId(base: string, existing: Set<string>) {
+  const cleaned = base.replace(/[^a-zA-Z0-9_-]/g, '') || 'component';
+  if (!existing.has(cleaned)) return cleaned;
+  let n = 2;
+  while (existing.has(`${cleaned}${n}`)) n += 1;
+  return `${cleaned}${n}`;
+}
+
+function toTestIdSuffix(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function buildComponentFromPalette(item: PaletteItemDef, id: string): UIComponent {
+  const type = deriveType(item.adapterHint);
+  return {
+    id,
+    type,
+    adapterHint: item.adapterHint,
+    ...(item.defaults ?? {}),
+    accessibility: {
+      ariaLabelKey: `runtime.builder.${id}.aria`,
+      keyboardNav: true,
+      focusOrder: 1,
+    },
+  };
+}
+
+function CanvasDropZone({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
+  const { isOver, setNodeRef, active } = useDroppable({ id: 'canvas', disabled });
+  const highlight = isOver && Boolean(active);
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid="builder-canvas"
+      className={cn(styles.canvasZone, highlight ? styles.canvasZoneOver : undefined)}
+    >
+      {children}
+    </div>
+  );
+}
+
+function PaletteItem({
+  item,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  item: PaletteItemDef;
+  selected: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+}) {
+  const id = `palette:${item.adapterHint}`;
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id,
+    data: { kind: 'palette', adapterHint: item.adapterHint, label: item.label },
+    disabled,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    opacity: isDragging ? 0.55 : 1,
+  };
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      style={style}
+      data-testid={`palette-item-${toTestIdSuffix(item.adapterHint)}`}
+      className={`${styles.paletteButton} ${selected ? styles.paletteButtonActive : ''}`}
+      onClick={onSelect}
+      disabled={disabled}
+      {...attributes}
+      {...listeners}
+    >
+      <span>{item.label}</span>
+      <Badge variant="muted">{item.adapterHint}</Badge>
+    </button>
+  );
+}
+
 export default function BuilderPage() {
   const searchParams = useSearchParams();
   const versionId = searchParams.get('versionId');
@@ -101,17 +227,30 @@ export default function BuilderPage() {
 
   const [loading, setLoading] = useState(false);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
-  const [components, setComponents] = useState<UIComponent[]>(scratchComponents);
+  const [components, setComponents] = useState<UIComponent[]>(() => normalizeFocusOrder(scratchComponents));
   const [schemaVersion, setSchemaVersion] = useState('1.0.0');
   const [pageId, setPageId] = useState('builder-preview');
   const [columns, setColumns] = useState(1);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => scratchComponents[0]?.id ?? null);
 
   const [draft, setDraft] = useState({
     id: '',
     adapterHint: palette[0]?.adapterHint ?? 'material.input',
-    labelKey: 'runtime.filters.customerName.label',
-    ariaLabelKey: 'runtime.filters.customerName.aria',
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+  );
+  const [activeDrag, setActiveDrag] = useState<{ kind: 'palette' | 'component'; label: string } | null>(null);
+
+  useEffect(() => {
+    registerMaterialAdapters();
+    registerAgGridAdapter();
+    registerHighchartsAdapter();
+    registerD3Adapter();
+    registerCompanyAdapter();
+  }, []);
 
   const schema: UISchema = useMemo(
     () => ({
@@ -142,33 +281,37 @@ export default function BuilderPage() {
     return map;
   }, [components, validation.issues]);
 
+  useEffect(() => {
+    if (!selectedComponentId) return;
+    if (components.some((c) => c.id === selectedComponentId)) return;
+    setSelectedComponentId(components[0]?.id ?? null);
+  }, [components, selectedComponentId]);
+
   const loadFromStore = async () => {
     if (!versionId) return;
     setLoading(true);
     try {
       const response = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(versionId)}`);
-      if (!response.ok) {
-        throw new Error(response.error);
-      }
+      if (!response.ok) throw new Error(response.error);
 
       const uiSchema = response.version.bundle.uiSchema;
+      const normalized = normalizeFocusOrder(uiSchema.components as UIComponent[]);
+
       setLoadedVersion(response.version);
       setSchemaVersion(uiSchema.version ?? '1.0.0');
       setPageId(uiSchema.pageId ?? 'builder-preview');
 
       const layoutAny = uiSchema.layout as any;
       setColumns(uiSchema.layout?.type === 'grid' && typeof layoutAny?.columns === 'number' ? layoutAny.columns : 1);
+      setComponents(normalized);
+      setSelectedComponentId(normalized[0]?.id ?? null);
 
-      setComponents(normalizeFocusOrder(uiSchema.components as UIComponent[]));
       toast({ variant: 'info', title: 'Loaded config', description: response.version.version });
     } catch (error) {
-      toast({
-        variant: 'error',
-        title: 'Failed to load config',
-        description: error instanceof Error ? error.message : String(error),
-      });
+      toast({ variant: 'error', title: 'Failed to load config', description: error instanceof Error ? error.message : String(error) });
       setLoadedVersion(null);
-      setComponents(scratchComponents);
+      setComponents(normalizeFocusOrder(scratchComponents));
+      setSelectedComponentId(scratchComponents[0]?.id ?? null);
     } finally {
       setLoading(false);
     }
@@ -190,36 +333,15 @@ export default function BuilderPage() {
       return;
     }
 
-    const nextComponent: UIComponent = {
-      id: trimmedId,
-      type: deriveType(draft.adapterHint),
-      adapterHint: draft.adapterHint,
-      i18n: {
-        labelKey: draft.labelKey,
-      },
-      accessibility: {
-        ariaLabelKey: draft.ariaLabelKey,
-        keyboardNav: true,
-        focusOrder: components.length + 1,
-      },
-    };
+    const item = palette.find((p) => p.adapterHint === draft.adapterHint) ?? palette[0];
+    if (!item) return;
 
-    setComponents((current) => normalizeFocusOrder([...current, nextComponent]));
+    const nextComponent = buildComponentFromPalette(item, trimmedId);
+    const next = normalizeFocusOrder([...components, nextComponent]);
+    setComponents(next);
+    setSelectedComponentId(nextComponent.id);
     setDraft((current) => ({ ...current, id: '' }));
     toast({ variant: 'success', title: 'Component added', description: trimmedId });
-  };
-
-  const moveComponent = (componentId: string, direction: -1 | 1) => {
-    setComponents((current) => {
-      const index = current.findIndex((c) => c.id === componentId);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
-      const next = [...current];
-      const [item] = next.splice(index, 1);
-      if (!item) return current;
-      next.splice(nextIndex, 0, item);
-      return normalizeFocusOrder(next);
-    });
   };
 
   const saveToStore = async () => {
@@ -229,33 +351,20 @@ export default function BuilderPage() {
     }
 
     if (!validation.valid) {
-      toast({
-        variant: 'error',
-        title: 'Fix validation issues before saving',
-        description: `${validation.issues.length} issue(s)`,
-      });
+      toast({ variant: 'error', title: 'Fix validation issues before saving', description: `${validation.issues.length} issue(s)` });
       return;
     }
 
     setLoading(true);
     try {
-      const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(
-        `/api/config-versions/${encodeURIComponent(versionId)}`,
-        {
-          uiSchema: schema,
-        },
-      );
-      if (!result.ok) {
-        throw new Error(result.error);
-      }
+      const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(`/api/config-versions/${encodeURIComponent(versionId)}`, {
+        uiSchema: schema,
+      });
+      if (!result.ok) throw new Error(result.error);
       toast({ variant: 'success', title: 'Saved UI schema' });
       await loadFromStore();
     } catch (error) {
-      toast({
-        variant: 'error',
-        title: 'Save failed',
-        description: error instanceof Error ? error.message : String(error),
-      });
+      toast({ variant: 'error', title: 'Save failed', description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -271,14 +380,75 @@ export default function BuilderPage() {
       });
       toast({ variant: 'success', title: 'Submitted for review' });
     } catch (error) {
-      toast({
-        variant: 'error',
-        title: 'Submit failed',
-        description: error instanceof Error ? error.message : String(error),
-      });
+      toast({ variant: 'error', title: 'Submit failed', description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
+  };
+
+  const selectedComponent = selectedComponentId ? components.find((c) => c.id === selectedComponentId) ?? null : null;
+  const baseLocale = previewContext.locale.split('-')[0] ?? previewContext.locale;
+  const i18n = useMemo(
+    () =>
+      createProviderFromBundles({
+        locale: baseLocale,
+        fallbackLocale: 'en',
+        bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
+        mode: 'dev',
+      }),
+    [baseLocale],
+  );
+
+  const onDragStart = (event: DragStartEvent) => {
+    const activeId = String(event.active.id);
+    if (activeId.startsWith('palette:')) {
+      setActiveDrag({ kind: 'palette', label: String(event.active.data.current?.label ?? 'Palette item') });
+      return;
+    }
+    setActiveDrag({ kind: 'component', label: activeId });
+  };
+
+  const onDragEnd = (event: DragEndEvent) => {
+    setActiveDrag(null);
+    const { active, over } = event;
+    const activeId = String(active.id);
+    if (!over) {
+      if (activeId.startsWith('palette:')) {
+        toast({ variant: 'error', title: 'Drop failed', description: 'Drop onto the canvas to add a component.' });
+      }
+      return;
+    }
+    const overId = String(over.id);
+
+    if (activeId.startsWith('palette:')) {
+      const adapterHint = activeId.slice('palette:'.length);
+      const item = palette.find((p) => p.adapterHint === adapterHint);
+      if (!item) return;
+
+      const existingIds = new Set(components.map((c) => c.id));
+      const base = deriveType(adapterHint);
+      const id = nextId(base, existingIds);
+      const nextComponent = buildComponentFromPalette(item, id);
+
+      const insertIndex = overId === 'canvas' ? components.length : components.findIndex((c) => c.id === overId);
+      const next = normalizeFocusOrder(
+        insertIndex >= 0
+          ? [...components.slice(0, insertIndex), nextComponent, ...components.slice(insertIndex)]
+          : [...components, nextComponent],
+      );
+
+      setComponents(next);
+      setSelectedComponentId(id);
+      toast({ variant: 'success', title: 'Dropped component', description: id });
+      return;
+    }
+
+    if (activeId === overId) return;
+    const oldIndex = components.findIndex((c) => c.id === activeId);
+    const newIndex = components.findIndex((c) => c.id === overId);
+      if (oldIndex < 0 || newIndex < 0) return;
+      const next = normalizeFocusOrder(arrayMove(components, oldIndex, newIndex));
+      setComponents(next);
   };
 
   return (
@@ -312,6 +482,7 @@ export default function BuilderPage() {
             </div>
           </div>
         </CardHeader>
+
         <CardContent className={styles.metaGrid}>
           <div>
             <label className="rfFieldLabel">Schema Version</label>
@@ -328,84 +499,111 @@ export default function BuilderPage() {
         </CardContent>
       </Card>
 
-      <div className={styles.builderGrid}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Component Palette</CardTitle>
-          </CardHeader>
-          <CardContent className={styles.paletteContent}>
-            {palette.map((item) => (
-              <button
-                key={item.adapterHint}
-                type="button"
-                className={`${styles.paletteButton} ${draft.adapterHint === item.adapterHint ? styles.paletteButtonActive : ''}`}
-                onClick={() => setDraft((current) => ({ ...current, adapterHint: item.adapterHint }))}
-              >
-                <span>{item.label}</span>
-                <Badge variant="muted">{item.adapterHint}</Badge>
-              </button>
-            ))}
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <div className={styles.builderGrid}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Component Palette</CardTitle>
+            </CardHeader>
+            <CardContent className={styles.paletteContent}>
+              {palette.map((item) => (
+                <PaletteItem
+                  key={item.adapterHint}
+                  item={item}
+                  selected={draft.adapterHint === item.adapterHint}
+                  disabled={loading}
+                  onSelect={() => setDraft((current) => ({ ...current, adapterHint: item.adapterHint }))}
+                />
+              ))}
 
-            <div className={styles.addSection}>
-              <p className={styles.addTitle}>Add Component</p>
-              <div className={styles.addStack}>
-                <Input
-                  placeholder="Component id"
-                  value={draft.id}
-                  onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
-                />
-                <Input
-                  placeholder="Label key"
-                  value={draft.labelKey}
-                  onChange={(event) => setDraft((current) => ({ ...current, labelKey: event.target.value }))}
-                />
-                <Input
-                  placeholder="Aria label key"
-                  value={draft.ariaLabelKey}
-                  onChange={(event) => setDraft((current) => ({ ...current, ariaLabelKey: event.target.value }))}
-                />
-                <Button size="sm" onClick={addComponent}>
-                  Add
-                </Button>
+              <div className={styles.addSection}>
+                <p className={styles.addTitle}>Quick Add (optional)</p>
+                <div className={styles.addStack}>
+                  <Input
+                    placeholder="Component id"
+                    value={draft.id}
+                    onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
+                  />
+                  <Button size="sm" onClick={addComponent} disabled={loading}>
+                    Add
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <div className={styles.canvasHeaderRow}>
-              <CardTitle>Canvas</CardTitle>
-              <Badge variant={validation.valid ? 'success' : 'warning'}>
-                {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className={styles.canvasContent}>
-            {components.map((component, index) => (
+          <Card>
+            <CardHeader>
+              <div className={styles.canvasHeaderRow}>
+                <CardTitle>Canvas</CardTitle>
+                <Badge variant={validation.valid ? 'success' : 'warning'}>
+                  {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className={styles.canvasContent}>
+              <CanvasDropZone disabled={loading}>
+                {components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
+                <SortableContext items={components.map((c) => c.id)} strategy={rectSortingStrategy}>
+                  <RenderPage
+                    uiSchema={schema}
+                    data={previewData}
+                    context={previewContext}
+                    i18n={i18n}
+                    componentWrapper={(component, rendered) => (
+                      <CanvasItem
+                        component={component}
+                        selected={component.id === selectedComponentId}
+                        disabled={loading}
+                        onSelect={() => setSelectedComponentId(component.id)}
+                      >
+                        {rendered}
+                      </CanvasItem>
+                    )}
+                  />
+                </SortableContext>
+              </CanvasDropZone>
+              <p className={styles.canvasHint}>Drag to reorder. Click a component to edit its properties.</p>
+            </CardContent>
+          </Card>
+
+          <div className={styles.canvasContent}>
+            {selectedComponent ? (
               <ComponentEditor
-                key={component.id}
-                component={component}
-                issues={issuesByComponentId.get(component.id)}
-                canMoveUp={index > 0}
-                canMoveDown={index < components.length - 1}
-                onMoveUp={() => moveComponent(component.id, -1)}
-                onMoveDown={() => moveComponent(component.id, 1)}
+                component={selectedComponent}
+                issues={issuesByComponentId.get(selectedComponent.id)}
                 onChange={(next) =>
                   setComponents((current) => normalizeFocusOrder(current.map((item) => (item.id === next.id ? next : item))))
                 }
                 onRemove={() => {
-                  setComponents((current) => normalizeFocusOrder(current.filter((item) => item.id !== component.id)));
-                  toast({ variant: 'info', title: 'Component removed', description: component.id });
+                  setComponents((current) => normalizeFocusOrder(current.filter((item) => item.id !== selectedComponent.id)));
+                  toast({ variant: 'info', title: 'Component removed', description: selectedComponent.id });
                 }}
               />
-            ))}
-            {components.length === 0 ? <p className={styles.emptyText}>No components yet.</p> : null}
-          </CardContent>
-        </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Properties</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className={styles.emptyText}>Select a component on the canvas to edit its properties.</p>
+                </CardContent>
+              </Card>
+            )}
 
-        <SchemaPreview schema={schema} issues={validation.issues} />
-      </div>
+            <SchemaPreview schema={schema} issues={validation.issues} />
+          </div>
+        </div>
+
+        <DragOverlay>
+          {activeDrag ? (
+            <div className={styles.dragOverlay}>
+              <div className={styles.dragOverlayTitle}>{activeDrag.label}</div>
+              <div className={styles.dragOverlaySub}>{activeDrag.kind === 'palette' ? 'Palette item' : 'Canvas item'}</div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
@@ -414,4 +612,3 @@ function deriveType(adapterHint: string): string {
   const parts = adapterHint.split('.');
   return parts[parts.length - 1] || adapterHint;
 }
-

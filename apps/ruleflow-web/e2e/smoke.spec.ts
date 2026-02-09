@@ -45,6 +45,8 @@ test('console lifecycle + diff + gitops import', async ({ page, request }, testI
   // Find the approval created for the submitted version by matching package name.
   const approvalRow = page.locator('[data-testid^="approval-row-"]').filter({ hasText: 'QA E2E Package' }).first();
   await approvalRow.getByRole('button', { name: 'Approve' }).click();
+  // Wait for the approval mutation to commit before navigating away (page.goto triggers full navigation).
+  await expect(approvalRow).toBeHidden({ timeout: 30_000 });
 
   await page.goto('/console?tab=versions');
   await expect(versionRow.getByText('APPROVED')).toBeVisible({ timeout: 30_000 });
@@ -99,10 +101,47 @@ test('builder adds component and saves', async ({ page, request }) => {
 
   await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
   await expect(page.getByText('Schema Builder')).toBeVisible();
+  await expect(page.getByTestId('canvas-item-customerNameInput')).toBeVisible();
 
   await page.getByPlaceholder('Component id').fill('newField');
   await page.getByRole('button', { name: 'Add' }).click();
   await expect(page.getByRole('heading', { name: 'newField' })).toBeVisible();
+
+  const save = page.getByRole('button', { name: 'Save' });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(page.getByText('Saved UI schema')).toBeVisible();
+});
+
+test('builder drag-drops palette component onto canvas', async ({ page, request }, testInfo) => {
+  const create = await request.post('/api/config-packages', { data: { name: 'QA DragDrop Package' } });
+  const created = (await create.json()) as { ok: true; versionId: string };
+
+  await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+  // Wait for initial persisted schema to load (builder disables drag-drop while loading).
+  await expect(page.getByTestId('canvas-item-customerNameInput')).toBeVisible();
+
+  const paletteItem = page.getByTestId('palette-item-material-input');
+  const canvas = page.getByTestId('builder-canvas');
+
+  await expect(paletteItem).toBeEnabled();
+
+  await paletteItem.scrollIntoViewIfNeeded();
+  await canvas.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(100);
+
+  const paletteBox = await paletteItem.boundingBox();
+  const canvasBox = await canvas.boundingBox();
+  if (!paletteBox || !canvasBox) throw new Error('Missing bounding box for drag-drop test');
+
+  // Playwright's `dragTo` uses HTML5 drag events; dnd-kit listens to pointer/mouse events.
+  await page.mouse.move(paletteBox.x + paletteBox.width / 2, paletteBox.y + paletteBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + Math.min(80, canvasBox.height / 2), { steps: 15 });
+  await page.mouse.up();
+
+  await expect(page.getByTestId('canvas-item-input')).toBeVisible({ timeout: 30_000 });
 
   const save = page.getByRole('button', { name: 'Save' });
   await expect(save).toBeEnabled();

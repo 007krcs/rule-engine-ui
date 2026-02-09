@@ -24,19 +24,19 @@ This report lists the current gaps vs the Principal Engineer requirements and po
 
 ## 2) Builder: Drag/Drop + Canvas + Property Panel (Critical)
 
-- GAP: No real drag/drop exists.
+- RESOLVED (2026-02-09): Real drag/drop exists (palette -> canvas, plus reorder within canvas).
   - Evidence:
-    - `apps/ruleflow-web/src/app/builder/page.tsx` uses click-to-add and move up/down buttons.
+    - `apps/ruleflow-web/src/app/builder/page.tsx` uses `@dnd-kit` with a droppable canvas and sortable canvas items.
+    - E2E coverage: `apps/ruleflow-web/e2e/smoke.spec.ts` ("builder drag-drops palette component onto canvas").
 
-- GAP: No true Canvas rendering of the schema.
+- RESOLVED (2026-02-09): Live Canvas rendering is wired.
   - Evidence:
-    - Builder "Canvas" is a list of `ComponentEditor` cards, not a live render of `UISchema` via `RenderPage`.
-    - File: `apps/ruleflow-web/src/app/builder/page.tsx`
+    - `apps/ruleflow-web/src/app/builder/page.tsx` renders `UISchema` via `RenderPage`.
+    - Renderer respects grid `columns`: `packages/adapters/react-renderer/src/index.tsx`.
 
-- GAP: No select-to-edit property panel.
+- RESOLVED (2026-02-09): Select-to-edit property panel exists.
   - Evidence:
-    - Editing happens inline per component card (`apps/ruleflow-web/src/components/builder/component-editor.tsx`).
-    - There is no dedicated selected-component model and right-side property panel UX.
+    - Clicking a canvas component selects it and renders the editor in the right-side panel (`apps/ruleflow-web/src/app/builder/page.tsx`, `apps/ruleflow-web/src/components/builder/component-editor.tsx`).
 
 ## 3) Rules: Validation + Explainability + Date Support (Critical)
 

@@ -11,7 +11,11 @@ type ColumnDef = {
 
 type RowDef = Record<string, unknown>;
 
+let registered = false;
+
 export function registerAgGridAdapter(): void {
+  if (registered) return;
+  registered = true;
   registerAdapter('aggrid.', (component, ctx) => renderTable(component, ctx));
 }
 

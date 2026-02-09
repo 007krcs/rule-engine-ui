@@ -3,7 +3,11 @@ import type { UIComponent } from '@platform/schema';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
 
+let registered = false;
+
 export function registerMaterialAdapters(): void {
+  if (registered) return;
+  registered = true;
   registerAdapter('material.', (component, ctx) => renderMaterial(component, ctx));
 }
 

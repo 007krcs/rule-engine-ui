@@ -11,6 +11,7 @@ export interface RendererProps {
   context: ExecutionContext;
   i18n?: I18nProvider;
   onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
+  componentWrapper?: (component: UIComponent, rendered: React.ReactElement) => React.ReactElement;
 }
 
 export interface AdapterContext {
@@ -51,26 +52,37 @@ export function RenderPage(props: RendererProps): React.ReactElement {
 
     const adapter = resolveAdapter(component.adapterHint);
     if (!adapter) {
-      return (
-        <div key={component.id} data-missing-adapter>
+      const rendered = (
+        <div data-component-id={component.id} data-missing-adapter>
           No adapter for {component.adapterHint}
         </div>
       );
+      const wrapped = props.componentWrapper ? props.componentWrapper(component, rendered) : rendered;
+      return React.cloneElement(wrapped, { key: component.id });
     }
 
     const events = buildEvents(component, props.onEvent);
-    return (
-      <div key={component.id} data-component-id={component.id}>
+    const rendered = (
+      <div data-component-id={component.id}>
         {adapter(component, { data: props.data, context: props.context, events, i18n })}
       </div>
     );
+    const wrapped = props.componentWrapper ? props.componentWrapper(component, rendered) : rendered;
+    return React.cloneElement(wrapped, { key: component.id });
   };
 
   const renderLayout = (node: UISchema['layout']): React.ReactElement => {
     switch (node.type) {
       case 'grid':
         return (
-          <div data-layout="grid" style={{ display: 'grid', gap: 12 }}>
+          <div
+            data-layout="grid"
+            style={{
+              display: 'grid',
+              gap: 12,
+              gridTemplateColumns: typeof node.columns === 'number' && node.columns > 0 ? `repeat(${node.columns}, minmax(0, 1fr))` : undefined,
+            }}
+          >
             {node.componentIds?.map(renderComponent)}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>

@@ -45,6 +45,7 @@ export function ComponentEditor({
   const focusIssues = pickFieldIssues(issues, (path) => path.endsWith('.accessibility.focusOrder'));
 
   const hasIssues = (issues?.length ?? 0) > 0;
+  const showReorderControls = Boolean(onMoveUp) || Boolean(onMoveDown);
 
   return (
     <Card className={cn(hasIssues ? styles.cardIssues : undefined)}>
@@ -67,30 +68,34 @@ export function ComponentEditor({
             <Badge variant="muted" className={styles.adapterBadge}>
               {component.adapterHint}
             </Badge>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={styles.iconButton}
-              onClick={onMoveUp}
-              disabled={!canMoveUp}
-              aria-label="Move up"
-              title={!canMoveUp ? 'Already at top' : 'Move up'}
-            >
-              <ArrowUp size={16} aria-hidden="true" focusable="false" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={styles.iconButton}
-              onClick={onMoveDown}
-              disabled={!canMoveDown}
-              aria-label="Move down"
-              title={!canMoveDown ? 'Already at bottom' : 'Move down'}
-            >
-              <ArrowDown size={16} aria-hidden="true" focusable="false" />
-            </Button>
+            {showReorderControls ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={styles.iconButton}
+                  onClick={onMoveUp}
+                  disabled={!canMoveUp}
+                  aria-label="Move up"
+                  title={!canMoveUp ? 'Already at top' : 'Move up'}
+                >
+                  <ArrowUp size={16} aria-hidden="true" focusable="false" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={styles.iconButton}
+                  onClick={onMoveDown}
+                  disabled={!canMoveDown}
+                  aria-label="Move down"
+                  title={!canMoveDown ? 'Already at bottom' : 'Move down'}
+                >
+                  <ArrowDown size={16} aria-hidden="true" focusable="false" />
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </CardHeader>
@@ -181,4 +186,3 @@ export function ComponentEditor({
     </Card>
   );
 }
-
