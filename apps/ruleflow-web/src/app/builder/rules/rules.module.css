@@ -1,0 +1,85 @@
+.page {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-4);
+}
+
+.subtext {
+  margin: 6px 0 0;
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.grid2 {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.textarea {
+  font-family: var(--rf-font-mono);
+  font-size: 12px;
+  min-height: 420px;
+}
+
+.issuesBox {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+  padding: var(--rf-space-4);
+  display: grid;
+  gap: 8px;
+}
+
+.issueLine {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.issuePath {
+  font-family: var(--rf-font-mono);
+  font-size: 12px;
+  color: var(--rf-fg);
+}
+
+.hintCard {
+  border: 1px solid color-mix(in srgb, var(--rf-primary) 30%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface));
+}
+
+.hintTitle {
+  margin: 0;
+  font-weight: 850;
+  font-size: 14px;
+}
+
+.hintText {
+  margin: 6px 0 0;
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
+@media (min-width: 1024px) {
+  .grid2 {
+    grid-template-columns: 1.35fr 0.65fr;
+    align-items: start;
+  }
+}
+

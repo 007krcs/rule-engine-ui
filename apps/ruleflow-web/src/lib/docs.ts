@@ -10,7 +10,7 @@ export const docs: DocEntry[] = [
     slug: 'quickstart',
     title: 'Quickstart',
     description: 'Install, render a UI schema, and execute a flow.',
-    body: 'Install and run RuleFlow, render a UI schema with adapters, execute a flow event.',
+    body: 'In-product onboarding wizard, clone a sample config, edit in Builder, add rules, run in Playground, inspect trace. Also: install/run, render a UI schema, execute a flow event.',
   },
   {
     slug: 'concepts',

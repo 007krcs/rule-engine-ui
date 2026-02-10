@@ -1,0 +1,55 @@
+.grid {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.cardHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.desc {
+  margin: 8px 0 0;
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
+.learnList {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
+.learnList li {
+  margin: 6px 0;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: var(--rf-space-4);
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+

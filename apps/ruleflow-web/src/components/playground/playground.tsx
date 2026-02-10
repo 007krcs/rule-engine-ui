@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule, UISchema } from '@platform/schema';
 import { executeStep } from '@platform/core-runtime';
 import { RenderPage } from '@platform/react-renderer';
@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import styles from './playground.module.css';
+import { useSearchParams } from 'next/navigation';
+import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 
 const initialContext: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -85,6 +87,8 @@ export function Playground({
   initialVersion: ConfigVersion | null;
 }) {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const { setActiveVersionId, completeStep } = useOnboarding();
 
   const [snapshot] = useState<ConsoleSnapshot>(initialSnapshot);
   const [selectedVersionId, setSelectedVersionId] = useState<string>(initialVersion?.id ?? '');
@@ -98,6 +102,9 @@ export function Playground({
   const [context, setContext] = useState<ExecutionContext>(initialContext);
   const [data, setData] = useState<Record<string, JSONValue>>(initialData);
   const [trace, setTrace] = useState<RuntimeTrace | null>(null);
+
+  const traceFocusRef = useRef<HTMLDivElement | null>(null);
+  const autoRunRef = useRef(false);
 
   useEffect(() => {
     registerMaterialAdapters();
@@ -133,6 +140,11 @@ export function Playground({
     };
     void loadVersion();
   }, [selectedVersionId, toast, version?.id]);
+
+  useEffect(() => {
+    if (!selectedVersionId) return;
+    setActiveVersionId(selectedVersionId);
+  }, [selectedVersionId, setActiveVersionId]);
 
   const flow: FlowSchema | null = version?.bundle.flowSchema ?? null;
   const uiSchema: UISchema | null = version?.bundle.uiSchema ?? null;
@@ -188,6 +200,31 @@ export function Playground({
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!trace) return;
+    completeStep('runPlayground');
+  }, [completeStep, trace]);
+
+  const focus = searchParams.get('focus');
+  useEffect(() => {
+    if (focus !== 'trace') return;
+    // Allow layout to settle before scrolling.
+    window.setTimeout(() => {
+      traceFocusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, [focus]);
+
+  const autorun = searchParams.get('autorun');
+  useEffect(() => {
+    if (!autorun) return;
+    if (autoRunRef.current) return;
+    if (busy) return;
+    if (!flow || !currentUiSchema) return;
+
+    autoRunRef.current = true;
+    void runEvent(autorun);
+  }, [autorun, busy, currentUiSchema, flow, runEvent]);
 
   const reset = () => {
     if (!flow) return;
@@ -287,7 +324,13 @@ export function Playground({
         </CardContent>
       </Card>
 
-      <TracePanel trace={trace} apiMappingsById={apiMappingsById} />
+      <div ref={traceFocusRef} className={cn(focus === 'trace' ? styles.traceFocus : undefined)}>
+        <TracePanel
+          trace={trace}
+          apiMappingsById={apiMappingsById}
+          defaultExplain={searchParams.get('explain') === '1'}
+        />
+      </div>
     </div>
   );
 }
@@ -295,10 +338,20 @@ export function Playground({
 function TracePanel({
   trace,
   apiMappingsById,
+  defaultExplain,
 }: {
   trace: RuntimeTrace | null;
   apiMappingsById: Record<string, ApiMapping>;
+  defaultExplain?: boolean;
 }) {
+  const { completeStep } = useOnboarding();
+  const [explain, setExplain] = useState<boolean>(() => Boolean(defaultExplain));
+
+  useEffect(() => {
+    if (!explain) return;
+    completeStep('explainTrace');
+  }, [completeStep, explain]);
+
   if (!trace) {
     return (
       <Card>
@@ -323,7 +376,9 @@ function TracePanel({
       </CardHeader>
       <CardContent className={styles.tracePanel}>
         <div className={styles.traceBox}>
-          <p className={styles.traceTitle}>Flow</p>
+          <div className={styles.traceTitleRow}>
+            <p className={styles.traceTitle}>Flow</p>
+          </div>
           <p>
             <strong>{flow.event}</strong> - {flow.fromStateId} -&gt; {flow.toStateId} -{' '}
             <span className={flow.reason === 'ok' ? styles.ok : styles.warn}>{flow.reason}</span>
@@ -335,7 +390,13 @@ function TracePanel({
         </div>
 
         <div className={styles.traceBox}>
-          <p className={styles.traceTitle}>Rules</p>
+          <div className={styles.traceTitleRow}>
+            <p className={styles.traceTitle}>Rules</p>
+            <label className={styles.explainToggle} title="Show per-rule match results">
+              <input type="checkbox" checked={explain} onChange={(e) => setExplain(e.target.checked)} />
+              Explain
+            </label>
+          </div>
           {!rules ? (
             <p className="rfHelperText">Skipped</p>
           ) : (
@@ -354,12 +415,42 @@ function TracePanel({
                   Errors: {rules.errors.map((err) => err.message).join(' - ')}
                 </p>
               ) : null}
+
+              {explain ? (
+                <ul className={styles.ruleList}>
+                  {rules.rulesConsidered.map((ruleId) => {
+                    const result = rules.conditionResults?.[ruleId];
+                    const matched = rules.rulesMatched.includes(ruleId);
+                    return (
+                      <li key={ruleId} className={styles.ruleItem}>
+                        <div className={styles.ruleLeft}>
+                          <span className={styles.mono}>{ruleId}</span>
+                          <span>{matched ? 'Matched' : 'Not matched'}</span>
+                        </div>
+                        <div className={styles.ruleRight}>
+                          <span
+                            className={cn(
+                              styles.pill,
+                              result ? styles.pillOk : styles.pillWarn,
+                            )}
+                            title="Condition result"
+                          >
+                            {result ? 'true' : 'false'}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
             </>
           )}
         </div>
 
         <div className={styles.traceBox}>
-          <p className={styles.traceTitle}>API</p>
+          <div className={styles.traceTitleRow}>
+            <p className={styles.traceTitle}>API</p>
+          </div>
           {!api ? (
             <p className="rfHelperText">Skipped</p>
           ) : (

@@ -14,6 +14,7 @@ import type {
   RiskLevel,
 } from '@/lib/demo/types';
 import { getMockSession } from '@/lib/auth';
+import type { SampleTemplateId } from '@/lib/samples';
 import exampleUi from '@platform/schema/examples/example.ui.json';
 import exampleFlow from '@platform/schema/examples/example.flow.json';
 import exampleRules from '@platform/schema/examples/example.rules.json';
@@ -203,6 +204,69 @@ function seedBundle(variant: 'active' | 'review' | 'deprecated'): ConfigBundle {
       submitOrder: apiMapping,
     },
   };
+}
+
+function seedBundleForTemplate(templateId: SampleTemplateId): ConfigBundle {
+  const bundle = seedBundle('active');
+
+  if (templateId === 'fast-start') {
+    bundle.flowSchema.initialState = 'review';
+    bundle.flowSchema.version = '1.0.0-fast-start';
+
+    // Add a very obvious rule that always matches so Explain mode has something to show immediately.
+    bundle.rules.rules.unshift({
+      ruleId: 'ONBOARDING_FAST_START',
+      description: 'Seed a demo flag so you can see rules/actions in the trace immediately.',
+      priority: 200,
+      when: { op: 'exists', left: { path: 'context.locale' } },
+      actions: [
+        { type: 'setField', path: 'data.onboardingFastStart', value: true },
+        { type: 'emitEvent', event: 'onboardingFastStart' },
+      ],
+    });
+
+    return bundle;
+  }
+
+  if (templateId === 'policy-gates') {
+    bundle.flowSchema.initialState = 'review';
+    bundle.flowSchema.version = '1.0.0-policy-gates';
+
+    bundle.rules = {
+      version: '1.0.0',
+      rules: [
+        {
+          ruleId: 'SET_RESTRICTED_LARGE_ORDER',
+          description: 'Flag large orders as restricted. (Try switching Role to guest in Playground)',
+          priority: 100,
+          when: {
+            op: 'gt',
+            left: { path: 'data.orderTotal' },
+            right: { value: 1000 },
+          },
+          actions: [{ type: 'setField', path: 'data.restricted', value: true }],
+        },
+        {
+          ruleId: 'BLOCK_GUEST_RESTRICTED',
+          description: 'Block guest access to restricted data.',
+          priority: 10,
+          scope: { roles: ['guest'] },
+          when: {
+            op: 'eq',
+            left: { path: 'data.restricted' },
+            right: { value: true },
+          },
+          actions: [{ type: 'throwError', message: 'Guest access not permitted', code: 'GUEST_BLOCK' }],
+        },
+      ],
+    };
+
+    return bundle;
+  }
+
+  // Default: the full baseline bundle.
+  bundle.flowSchema.version = '1.0.0-orders-dashboard';
+  return bundle;
 }
 
 function seedState(): StoreState {
@@ -395,13 +459,15 @@ export async function getConfigVersion(versionId: string): Promise<ConfigVersion
   return null;
 }
 
-export async function createConfigPackage(input: { name: string; description?: string }) {
+export async function createConfigPackage(input: { name: string; description?: string; templateId?: SampleTemplateId }) {
   const session = getMockSession();
   const state = await loadState();
 
   const packageId = id('pkg');
   const versionId = id('ver');
   const createdAt = nowIso();
+
+  const templateId = input.templateId ?? 'orders-dashboard';
 
   const newVersion: ConfigVersion = {
     id: versionId,
@@ -410,7 +476,7 @@ export async function createConfigPackage(input: { name: string; description?: s
     status: 'DRAFT',
     createdAt,
     createdBy: session.user.name,
-    bundle: seedBundle('active'),
+    bundle: seedBundleForTemplate(templateId),
   };
 
   const pkg: ConfigPackage = {
@@ -462,6 +528,37 @@ export async function updateUiSchema(input: { versionId: string; uiSchema: Confi
   next = addAudit(next, {
     actor: session.user.name,
     action: 'Updated UI schema',
+    target: `${input.versionId}`,
+    severity: 'info',
+  });
+  await persistState(next);
+  return { ok: true as const };
+}
+
+export async function updateRules(input: { versionId: string; rules: ConfigBundle['rules'] }) {
+  const session = getMockSession();
+  const state = await loadState();
+
+  let updated = false;
+  const nextPackages = state.packages.map((pkg) => {
+    const version = pkg.versions.find((v) => v.id === input.versionId);
+    if (!version) return pkg;
+
+    updated = true;
+    return updateVersionInPackage(pkg, input.versionId, (v) => ({
+      ...v,
+      bundle: { ...v.bundle, rules: input.rules },
+      updatedAt: nowIso(),
+      updatedBy: session.user.name,
+    }));
+  });
+
+  if (!updated) return { ok: false as const, error: 'Version not found' };
+
+  let next: StoreState = { ...state, packages: nextPackages };
+  next = addAudit(next, {
+    actor: session.user.name,
+    action: 'Updated rule set',
     target: `${input.versionId}`,
     severity: 'info',
   });

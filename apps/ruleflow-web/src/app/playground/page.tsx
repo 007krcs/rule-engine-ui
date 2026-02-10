@@ -4,8 +4,10 @@ import { getConsoleSnapshot } from '@/server/demo/repository';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PlaygroundPage() {
+export default async function PlaygroundPage({ searchParams }: { searchParams: Promise<{ versionId?: string }> }) {
+  const { versionId } = await searchParams;
   const snapshot = await getConsoleSnapshot();
-  const defaultVersion = snapshot.versions.find((v) => v.status === 'ACTIVE') ?? snapshot.versions[0] ?? null;
+  const requested = versionId ? snapshot.versions.find((v) => v.id === versionId) ?? null : null;
+  const defaultVersion = requested ?? snapshot.versions.find((v) => v.status === 'ACTIVE') ?? snapshot.versions[0] ?? null;
   return <Playground initialSnapshot={snapshot} initialVersion={defaultVersion} />;
 }

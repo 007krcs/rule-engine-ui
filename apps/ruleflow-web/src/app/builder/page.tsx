@@ -23,6 +23,7 @@ import { CanvasItem } from '@/components/builder/canvas-item';
 import { useToast } from '@/components/ui/toast';
 import styles from './builder.module.css';
 import { cn } from '@/lib/utils';
+import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 import {
   DndContext,
   DragOverlay,
@@ -224,6 +225,7 @@ export default function BuilderPage() {
   const searchParams = useSearchParams();
   const versionId = searchParams.get('versionId');
   const { toast } = useToast();
+  const onboarding = useOnboarding();
 
   const [loading, setLoading] = useState(false);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
@@ -306,6 +308,7 @@ export default function BuilderPage() {
       setComponents(normalized);
       setSelectedComponentId(normalized[0]?.id ?? null);
 
+      onboarding.setActiveVersionId(versionId);
       toast({ variant: 'info', title: 'Loaded config', description: response.version.version });
     } catch (error) {
       toast({ variant: 'error', title: 'Failed to load config', description: error instanceof Error ? error.message : String(error) });
@@ -361,6 +364,8 @@ export default function BuilderPage() {
       });
       if (!result.ok) throw new Error(result.error);
       toast({ variant: 'success', title: 'Saved UI schema' });
+      onboarding.setActiveVersionId(versionId);
+      onboarding.completeStep('editUi');
       await loadFromStore();
     } catch (error) {
       toast({ variant: 'error', title: 'Save failed', description: error instanceof Error ? error.message : String(error) });

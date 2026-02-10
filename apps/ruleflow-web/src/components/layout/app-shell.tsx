@@ -14,11 +14,14 @@ import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { apiPost, downloadFromApi } from '@/lib/demo/api-client';
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
+import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 
 const navItems = [
   { href: '/console', label: 'Admin Console', icon: LayoutDashboard },
   { href: '/builder', label: 'Builder', icon: Boxes },
   { href: '/playground', label: 'Playground', icon: Sparkles },
+  { href: '/samples', label: 'Samples', icon: PackageOpen },
   { href: '/docs', label: 'Documentation', icon: BookOpen },
   { href: '/integrations', label: 'Integration Hub', icon: Plug },
 ];
@@ -35,6 +38,7 @@ function getPageTitle(pathname: string, tab?: string | null) {
   if (pathname === '/') return 'Overview';
 
   if (pathname.startsWith('/docs')) return 'Documentation';
+  if (pathname.startsWith('/samples')) return 'Samples';
   if (pathname.startsWith('/integrations')) return 'Integration Hub';
   if (pathname.startsWith('/builder')) return 'Builder';
   if (pathname.startsWith('/playground')) return 'Playground';
@@ -56,6 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const onboarding = useOnboarding();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [newConfigOpen, setNewConfigOpen] = useState(false);
   const [newConfigName, setNewConfigName] = useState('');
@@ -194,6 +199,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="outline" size="sm" onClick={exportGitOps}>
               Export GitOps
             </Button>
+            <Button variant="outline" size="sm" onClick={onboarding.open}>
+              Get Started
+            </Button>
             <Button size="sm" onClick={() => setNewConfigOpen(true)}>
               New Config
             </Button>
@@ -232,17 +240,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Breadcrumbs />
                 <h1 className={styles.pageTitle}>{pageTitle}</h1>
               </div>
-              <div className={styles.mobileActions}>
-                <ThemeToggle />
-                <Button size="sm" onClick={() => setNewConfigOpen(true)}>
-                  New
-                </Button>
-              </div>
-            </div>
-            {children}
+          <div className={styles.mobileActions}>
+            <ThemeToggle />
+            <Button size="sm" variant="outline" onClick={onboarding.open}>
+              Help
+            </Button>
+            <Button size="sm" onClick={() => setNewConfigOpen(true)}>
+              New
+            </Button>
           </div>
-        </main>
+        </div>
+        {children}
       </div>
+    </main>
+  </div>
 
       <Modal
         open={newConfigOpen}
@@ -274,6 +285,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </p>
         </div>
       </Modal>
+
+      <OnboardingWizard />
     </div>
   );
 }

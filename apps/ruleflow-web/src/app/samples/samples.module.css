@@ -1,0 +1,18 @@
+.page {
+  display: grid;
+  gap: var(--rf-space-6);
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-4);
+}
+
+.heroText {
+  margin: 6px 0 0;
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
