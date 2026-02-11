@@ -1,5 +1,3 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
 import type { ApiMapping, FlowSchema, LayoutNode, RuleSet, UIComponent, UISchema } from '@platform/schema';
 import type { ComponentDefinition, ComponentRegistryManifest, RegistryScope } from '@platform/component-registry';
@@ -34,23 +32,16 @@ import exampleUi from '@platform/schema/examples/example.ui.json';
 import exampleFlow from '@platform/schema/examples/example.flow.json';
 import exampleRules from '@platform/schema/examples/example.rules.json';
 import exampleApi from '@platform/schema/examples/example.api.json';
-
-type StoreState = {
-  schemaVersion: 1;
-  tenantId: string;
-  packages: ConfigPackage[];
-  approvals: ApprovalRequest[];
-  audit: AuditEvent[];
-  componentRegistry: {
-    schemaVersion: 1;
-    global: ComponentDefinition[];
-    tenants: Record<string, ComponentDefinition[]>;
-  };
-};
-
-const STORE_DIR = process.env.RULEFLOW_DEMO_STORE_DIR ?? path.join(process.cwd(), '.ruleflow-demo-data');
-const STORE_FILE = path.join(STORE_DIR, 'store.json');
-const SIGNING_KEY_FILE = path.join(STORE_DIR, 'gitops-signing-key.txt');
+import {
+  createConfigStore,
+  createConfigStoreManager,
+  isPersistenceUnavailableError,
+  PersistenceUnavailableError,
+  type ConfigStore,
+  type ConfigStoreDiagnostics,
+  type ConfigStoreFactoryOptions,
+  type StoreState,
+} from './store';
 
 const STORE_SEVERITY_FOR_STATUS: Record<ConfigStatus, AuditEvent['severity']> = {
   DRAFT: 'info',
@@ -60,9 +51,10 @@ const STORE_SEVERITY_FOR_STATUS: Record<ConfigStatus, AuditEvent['severity']> = 
   DEPRECATED: 'warning',
   RETIRED: 'warning',
 };
-
-let memory: StoreState | null = null;
-let writeChain: Promise<void> = Promise.resolve();
+const storeManager = createConfigStoreManager({
+  seedState,
+  normalizeState,
+});
 
 function nowIso() {
   return new Date().toISOString();
@@ -133,31 +125,8 @@ function stableStringifyJson(value: unknown): string {
   return `{${parts.join(',')}}`;
 }
 
-async function ensureDir() {
-  await fs.mkdir(STORE_DIR, { recursive: true });
-}
-
 async function loadSigningKey(): Promise<Buffer> {
-  const env = process.env.RULEFLOW_GITOPS_HMAC_KEY;
-  if (env && env.trim().length > 0) {
-    return Buffer.from(env.trim(), 'utf8');
-  }
-
-  try {
-    const existing = (await fs.readFile(SIGNING_KEY_FILE, 'utf8')).trim();
-    if (existing) return Buffer.from(existing, 'base64');
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
-      // fall through
-    } else {
-      throw error;
-    }
-  }
-
-  await ensureDir();
-  const key = crypto.randomBytes(32);
-  await fs.writeFile(SIGNING_KEY_FILE, key.toString('base64'), 'utf8');
-  return key;
+  return await storeManager.loadSigningKey();
 }
 
 function signingKeyId(key: Buffer) {
@@ -179,43 +148,12 @@ function safeEqualBase64(a: string, b: string) {
   }
 }
 
-async function readStoreFile(): Promise<unknown | null> {
-  try {
-    const raw = await fs.readFile(STORE_FILE, 'utf8');
-    return JSON.parse(raw) as unknown;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-}
-
-async function writeStoreFile(state: StoreState): Promise<void> {
-  await ensureDir();
-  await fs.writeFile(STORE_FILE, JSON.stringify(state, null, 2), 'utf8');
-}
-
 async function loadState(): Promise<StoreState> {
-  if (memory) return memory;
-  const existing = await readStoreFile();
-  if (existing) {
-    const normalized = normalizeState(existing);
-    memory = normalized;
-    // Self-heal missing fields on disk so the demo stays stable as schema evolves.
-    await writeStoreFile(normalized);
-    return normalized;
-  }
-  const seeded = seedState();
-  memory = seeded;
-  await writeStoreFile(seeded);
-  return seeded;
+  return await storeManager.readState();
 }
 
 async function persistState(next: StoreState): Promise<void> {
-  memory = next;
-  writeChain = writeChain.then(() => writeStoreFile(next));
-  await writeChain;
+  await storeManager.replaceState(next);
 }
 
 function seedBundle(variant: 'active' | 'review' | 'deprecated'): ConfigBundle {
@@ -1205,3 +1143,31 @@ export async function resetDemoStore() {
   await persistState(seeded);
   return { ok: true as const };
 }
+
+export async function getStoreDiagnostics(): Promise<ConfigStoreDiagnostics> {
+  return await storeManager.getDiagnostics();
+}
+
+export function isPersistenceError(error: unknown): boolean {
+  return isPersistenceUnavailableError(error);
+}
+
+export async function getConfigStore(): Promise<ConfigStore> {
+  return await storeManager.getStore();
+}
+
+export async function createConfigStoreForTests(
+  options: Omit<ConfigStoreFactoryOptions, 'seedState' | 'normalizeState'>,
+): Promise<ConfigStore> {
+  return await createConfigStore({
+    ...options,
+    seedState,
+    normalizeState,
+  });
+}
+
+export function resetConfigStoreManagerForTests() {
+  storeManager.resetForTests();
+}
+
+export { PersistenceUnavailableError };

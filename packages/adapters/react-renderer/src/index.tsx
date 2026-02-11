@@ -1,9 +1,33 @@
-﻿import React from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import type { I18nProvider } from '@platform/i18n';
 import { createFallbackI18nProvider } from '@platform/i18n';
 import type { ExecutionContext, JSONValue, UIComponent, UIEventAction, UISchema } from '@platform/schema';
 
 export type UIEventName = 'onChange' | 'onClick' | 'onSubmit';
+
+export type BindingTarget = 'data' | 'context' | 'computed';
+
+export type BindingValue = {
+  target: BindingTarget;
+  path: string;
+  value: JSONValue | undefined;
+};
+
+export type BindingGroupValues = {
+  data: Record<string, BindingValue>;
+  context: Record<string, BindingValue>;
+  computed: Record<string, BindingValue>;
+};
+
+export type ChangeEventPayload = {
+  componentId: string;
+  value: JSONValue;
+  bindingPath: string;
+};
+
+export type ClickEventPayload = {
+  componentId: string;
+};
 
 export interface RendererProps {
   uiSchema: UISchema;
@@ -11,6 +35,10 @@ export interface RendererProps {
   context: ExecutionContext;
   i18n?: I18nProvider;
   onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
+  onAdapterEvent?: (event: UIEventName, payload: ChangeEventPayload | ClickEventPayload, component: UIComponent) => void;
+  onDataChange?: (data: Record<string, JSONValue>) => void;
+  onContextChange?: (context: ExecutionContext) => void;
+  mode?: 'controlled' | 'internal';
   componentWrapper?: (component: UIComponent, rendered: React.ReactElement) => React.ReactElement;
 }
 
@@ -18,10 +46,11 @@ export interface AdapterContext {
   data: Record<string, JSONValue>;
   context: ExecutionContext;
   i18n: I18nProvider;
+  bindings: BindingGroupValues;
   events: {
-    onChange?: () => void;
-    onClick?: () => void;
-    onSubmit?: () => void;
+    onChange?: (payload: ChangeEventPayload) => void;
+    onClick?: (payload: ClickEventPayload) => void;
+    onSubmit?: (payload: ClickEventPayload) => void;
   };
 }
 
@@ -35,6 +64,37 @@ export function registerAdapter(prefix: string, render: AdapterRenderFn): void {
 }
 
 export function RenderPage(props: RendererProps): React.ReactElement {
+  const mode = props.mode ?? 'controlled';
+  const [localData, setLocalData] = useState(props.data);
+  const [localContext, setLocalContext] = useState(props.context);
+
+  useEffect(() => {
+    if (mode !== 'internal') return;
+    setLocalData(props.data);
+  }, [mode, props.data]);
+
+  useEffect(() => {
+    if (mode !== 'internal') return;
+    setLocalContext(props.context);
+  }, [mode, props.context]);
+
+  const currentData = mode === 'internal' ? localData : props.data;
+  const currentContext = mode === 'internal' ? localContext : props.context;
+
+  const applyDataChange = (next: Record<string, JSONValue>) => {
+    if (mode === 'internal') {
+      setLocalData(next);
+    }
+    props.onDataChange?.(next);
+  };
+
+  const applyContextChange = (next: ExecutionContext) => {
+    if (mode === 'internal') {
+      setLocalContext(next);
+    }
+    props.onContextChange?.(next);
+  };
+
   const componentMap = new Map(props.uiSchema.components.map((component) => [component.id, component]));
   const i18n = props.i18n ?? createFallbackI18nProvider();
 
@@ -61,10 +121,18 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       return React.cloneElement(wrapped, { key: component.id });
     }
 
-    const events = buildEvents(component, props.onEvent);
+    const bindings = resolveBindings(component, currentData, currentContext);
+    const events = buildEvents(component, {
+      onEvent: props.onEvent,
+      onAdapterEvent: props.onAdapterEvent,
+      onDataChange: applyDataChange,
+      onContextChange: applyContextChange,
+      data: currentData,
+      context: currentContext,
+    });
     const rendered = (
       <div data-component-id={component.id}>
-        {adapter(component, { data: props.data, context: props.context, events, i18n })}
+        {adapter(component, { data: currentData, context: currentContext, events, i18n, bindings })}
       </div>
     );
     const wrapped = props.componentWrapper ? props.componentWrapper(component, rendered) : rendered;
@@ -80,7 +148,8 @@ export function RenderPage(props: RendererProps): React.ReactElement {
             style={{
               display: 'grid',
               gap: 12,
-              gridTemplateColumns: typeof node.columns === 'number' && node.columns > 0 ? `repeat(${node.columns}, minmax(0, 1fr))` : undefined,
+              gridTemplateColumns:
+                typeof node.columns === 'number' && node.columns > 0 ? `repeat(${node.columns}, minmax(0, 1fr))` : undefined,
             }}
           >
             {node.componentIds?.map(renderComponent)}
@@ -91,10 +160,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
         );
       case 'stack':
         return (
-          <div
-            data-layout="stack"
-            style={{ display: 'flex', flexDirection: node.direction === 'horizontal' ? 'row' : 'column', gap: 12 }}
-          >
+          <div data-layout="stack" style={{ display: 'flex', flexDirection: node.direction === 'horizontal' ? 'row' : 'column', gap: 12 }}>
             {node.componentIds?.map(renderComponent)}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
@@ -122,21 +188,20 @@ export function RenderPage(props: RendererProps): React.ReactElement {
             ))}
           </section>
         );
-      default:
-        {
-          const fallback = node as {
-            componentIds?: string[];
-            children?: UISchema['layout'][];
-          };
-          return (
-            <div data-layout="unknown">
-              {fallback.componentIds?.map(renderComponent)}
-              {fallback.children?.map((child) => (
-                <div key={child.id}>{renderLayout(child)}</div>
-              ))}
-            </div>
-          );
-        }
+      default: {
+        const fallback = node as {
+          componentIds?: string[];
+          children?: UISchema['layout'][];
+        };
+        return (
+          <div data-layout="unknown">
+            {fallback.componentIds?.map(renderComponent)}
+            {fallback.children?.map((child) => (
+              <div key={child.id}>{renderLayout(child)}</div>
+            ))}
+          </div>
+        );
+      }
     }
   };
 
@@ -170,18 +235,166 @@ function assertAccessibility(component: UIComponent): void {
 
 function buildEvents(
   component: UIComponent,
-  onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void,
+  options: {
+    onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
+    onAdapterEvent?: (event: UIEventName, payload: ChangeEventPayload | ClickEventPayload, component: UIComponent) => void;
+    onDataChange: (next: Record<string, JSONValue>) => void;
+    onContextChange: (next: ExecutionContext) => void;
+    data: Record<string, JSONValue>;
+    context: ExecutionContext;
+  },
 ): AdapterContext['events'] {
-  if (!onEvent || !component.events) return {};
-  return {
-    onChange: component.events.onChange
-      ? () => onEvent('onChange', component.events?.onChange ?? [], component)
-      : undefined,
-    onClick: component.events.onClick
-      ? () => onEvent('onClick', component.events?.onClick ?? [], component)
-      : undefined,
-    onSubmit: component.events.onSubmit
-      ? () => onEvent('onSubmit', component.events?.onSubmit ?? [], component)
-      : undefined,
+  const hasSchemaEvents = Boolean(component.events);
+  if (!hasSchemaEvents && !options.onAdapterEvent) return {};
+
+  const emitSchemaEvent = (event: UIEventName) => {
+    const actions = component.events?.[event];
+    if (actions && actions.length > 0) {
+      options.onEvent?.(event, actions, component);
+    }
   };
+
+  return {
+    onChange: (payload) => {
+      const parsed = parseBindingPath(payload.bindingPath, 'data');
+      if (parsed) {
+        if (parsed.target === 'data') {
+          const next = setPath(options.data, parsed.path, payload.value);
+          options.onDataChange(next);
+        } else if (parsed.target === 'context') {
+          const next = setPath(options.context as unknown as Record<string, JSONValue>, parsed.path, payload.value);
+          options.onContextChange(next as ExecutionContext);
+        }
+      }
+      options.onAdapterEvent?.('onChange', payload, component);
+      emitSchemaEvent('onChange');
+    },
+    onClick: (payload) => {
+      options.onAdapterEvent?.('onClick', payload, component);
+      emitSchemaEvent('onClick');
+    },
+    onSubmit: (payload) => {
+      options.onAdapterEvent?.('onSubmit', payload, component);
+      emitSchemaEvent('onSubmit');
+    },
+  };
+}
+
+function resolveBindings(
+  component: UIComponent,
+  data: Record<string, JSONValue>,
+  context: ExecutionContext,
+): BindingGroupValues {
+  const bindings = component.bindings;
+  const out: BindingGroupValues = { data: {}, context: {}, computed: {} };
+  if (!bindings) return out;
+
+  if (bindings.data) {
+    for (const [key, path] of Object.entries(bindings.data)) {
+      if (typeof path !== 'string' || path.trim().length === 0) continue;
+      const normalized = normalizeBindingPath(path, 'data');
+      const parsed = parseBindingPath(normalized, 'data');
+      if (!parsed) continue;
+      out.data[key] = {
+        target: 'data',
+        path: normalized,
+        value: getPath(data, parsed.path),
+      };
+    }
+  }
+
+  if (bindings.context) {
+    for (const [key, path] of Object.entries(bindings.context)) {
+      if (typeof path !== 'string' || path.trim().length === 0) continue;
+      const normalized = normalizeBindingPath(path, 'context');
+      const parsed = parseBindingPath(normalized, 'context');
+      if (!parsed) continue;
+      out.context[key] = {
+        target: 'context',
+        path: normalized,
+        value: getPath(context as unknown as Record<string, JSONValue>, parsed.path),
+      };
+    }
+  }
+
+  if (bindings.computed) {
+    for (const [key, path] of Object.entries(bindings.computed)) {
+      if (typeof path !== 'string' || path.trim().length === 0) continue;
+      const normalized = normalizeBindingPath(path, 'data');
+      const parsed = parseBindingPath(normalized, 'data');
+      if (!parsed) continue;
+      const source = parsed.target === 'context' ? (context as unknown as Record<string, JSONValue>) : data;
+      out.computed[key] = {
+        target: 'computed',
+        path: normalized,
+        value: getPath(source, parsed.path),
+      };
+    }
+  }
+
+  return out;
+}
+
+function normalizeBindingPath(path: string, target: 'data' | 'context'): string {
+  const trimmed = path.trim();
+  if (trimmed.startsWith('data.') || trimmed.startsWith('context.')) return trimmed;
+  return `${target}.${trimmed}`;
+}
+
+function parseBindingPath(
+  bindingPath: string,
+  defaultTarget: 'data' | 'context',
+): { target: 'data' | 'context'; path: string } | null {
+  const raw = bindingPath.trim();
+  if (!raw) return null;
+  if (raw.startsWith('data.')) return { target: 'data', path: raw.slice('data.'.length) };
+  if (raw.startsWith('context.')) return { target: 'context', path: raw.slice('context.'.length) };
+  return { target: defaultTarget, path: raw };
+}
+
+function getPath(obj: Record<string, JSONValue>, path: string): JSONValue | undefined {
+  if (!path) return obj as unknown as JSONValue;
+  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+  let current: JSONValue | undefined = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    const index = Number(part);
+    if (!Number.isNaN(index) && Array.isArray(current)) {
+      current = current[index];
+      continue;
+    }
+    if (typeof current !== 'object' || Array.isArray(current)) return undefined;
+    if (isUnsafeKey(part)) return undefined;
+    current = (current as Record<string, JSONValue>)[part];
+  }
+  return current;
+}
+
+function setPath(obj: Record<string, JSONValue>, path: string, value: JSONValue): Record<string, JSONValue> {
+  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+  return setAtPath(obj, parts, value) as Record<string, JSONValue>;
+}
+
+function setAtPath(current: JSONValue | undefined, parts: string[], value: JSONValue): JSONValue {
+  if (parts.length === 0) return value;
+  const [head, ...rest] = parts;
+  const index = Number(head);
+  const isIndex = !Number.isNaN(index);
+
+  const base: JSONValue = current && typeof current === 'object' ? current : isIndex ? [] : {};
+  const next = Array.isArray(base) ? [...base] : ({ ...base } as Record<string, JSONValue>);
+
+  if (isIndex && Array.isArray(next)) {
+    next[index] = setAtPath(next[index] as JSONValue | undefined, rest, value) as JSONValue;
+    return next;
+  }
+
+  if (typeof next !== 'object' || Array.isArray(next)) return next;
+  if (isUnsafeKey(head)) return next;
+  next[head] = setAtPath(next[head], rest, value) as JSONValue;
+  return next;
+}
+
+function isUnsafeKey(value: string): boolean {
+  return value === '__proto__' || value === 'constructor' || value === 'prototype';
 }

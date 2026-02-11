@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
 import { resetDemoStore } from '@/server/demo/repository';
+import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
 export async function POST() {
-  const result = await resetDemoStore();
-  return NextResponse.json(result, { headers: { 'cache-control': 'no-store' } });
+  return withApiErrorHandling(async () => {
+    const result = await resetDemoStore();
+    return noStoreJson(result);
+  });
 }
-

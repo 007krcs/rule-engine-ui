@@ -1,32 +1,34 @@
-import { NextResponse } from 'next/server';
 import { createConfigPackage } from '@/server/demo/repository';
 import { sampleTemplateById, type SampleTemplateId } from '@/lib/samples';
+import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as null | {
-    name?: string;
-    description?: string;
-    templateId?: string;
-    tenantId?: string;
-    configId?: string;
-  };
-  if (!body || typeof body.name !== 'string') {
-    return NextResponse.json({ ok: false, error: 'name is required' }, { status: 400 });
-  }
+  return withApiErrorHandling(async () => {
+    const body = (await request.json().catch(() => null)) as null | {
+      name?: string;
+      description?: string;
+      templateId?: string;
+      tenantId?: string;
+      configId?: string;
+    };
+    if (!body || typeof body.name !== 'string') {
+      return noStoreJson({ ok: false, error: 'name is required' }, 400);
+    }
 
-  const templateId = body.templateId?.trim();
-  if (templateId && !(templateId in sampleTemplateById)) {
-    return NextResponse.json({ ok: false, error: `unknown templateId: ${templateId}` }, { status: 400 });
-  }
+    const templateId = body.templateId?.trim();
+    if (templateId && !(templateId in sampleTemplateById)) {
+      return noStoreJson({ ok: false, error: `unknown templateId: ${templateId}` }, 400);
+    }
 
-  const result = await createConfigPackage({
-    name: body.name,
-    description: body.description,
-    templateId: templateId ? (templateId as SampleTemplateId) : undefined,
-    tenantId: body.tenantId,
-    configId: body.configId,
+    const result = await createConfigPackage({
+      name: body.name,
+      description: body.description,
+      templateId: templateId ? (templateId as SampleTemplateId) : undefined,
+      tenantId: body.tenantId,
+      configId: body.configId,
+    });
+    return noStoreJson({ ok: true, ...result });
   });
-  return NextResponse.json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
 }

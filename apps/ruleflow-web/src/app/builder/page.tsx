@@ -404,9 +404,12 @@ export default function BuilderPage() {
 
     setLoading(true);
     try {
-      const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(`/api/config-versions/${encodeURIComponent(versionId)}`, {
-        uiSchema: schema,
-      });
+      const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(
+        `/api/config-versions/${encodeURIComponent(versionId)}/ui-schema`,
+        {
+          uiSchema: schema,
+        },
+      );
       if (!result.ok) throw new Error(result.error);
       toast({ variant: 'success', title: 'Saved UI schema' });
       setActiveVersionId(versionId);

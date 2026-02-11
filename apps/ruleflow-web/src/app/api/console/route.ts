@@ -1,14 +1,11 @@
-import { NextResponse } from 'next/server';
 import { getConsoleSnapshot } from '@/server/demo/repository';
+import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const snapshot = await getConsoleSnapshot();
-  return NextResponse.json(snapshot, {
-    headers: {
-      'cache-control': 'no-store',
-    },
+  return withApiErrorHandling(async () => {
+    const snapshot = await getConsoleSnapshot();
+    return noStoreJson(snapshot);
   });
 }
-

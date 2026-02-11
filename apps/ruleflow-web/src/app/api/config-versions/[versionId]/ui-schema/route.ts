@@ -1,19 +1,8 @@
 ﻿import type { UISchema } from '@platform/schema';
-import { getConfigVersion, updateUiSchema } from '@/server/demo/repository';
+import { updateUiSchema } from '@/server/demo/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
-
-export async function GET(_request: Request, { params }: { params: Promise<{ versionId: string }> }) {
-  return withApiErrorHandling(async () => {
-    const { versionId } = await params;
-    const version = await getConfigVersion(versionId);
-    if (!version) {
-      return noStoreJson({ ok: false, error: 'not_found' }, 404);
-    }
-    return noStoreJson({ ok: true, version });
-  });
-}
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ versionId: string }> }) {
   return withApiErrorHandling(async () => {

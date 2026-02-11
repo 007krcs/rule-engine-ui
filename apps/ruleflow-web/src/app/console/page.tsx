@@ -222,7 +222,19 @@ export default function ConsolePage() {
       form.append('file', file);
       const response = await fetch('/api/gitops/import', { method: 'POST', body: form });
       if (!response.ok) {
-        const message = await response.text();
+        const raw = await response.text();
+        let message = raw;
+        try {
+          const parsed = JSON.parse(raw) as { error?: unknown };
+          if (typeof parsed.error === 'string') {
+            message = parsed.error;
+          }
+        } catch {
+          // fall back to plain text payload
+        }
+        if (response.status >= 500 && !message.includes('Persistence unavailable, check store provider')) {
+          message = `${message || `${response.status} ${response.statusText}`}. Persistence unavailable, check store provider`;
+        }
         throw new Error(message || `${response.status} ${response.statusText}`);
       }
       toast({ variant: 'success', title: 'Imported GitOps bundle' });

@@ -7,11 +7,20 @@ export class ApiError extends Error {
   }
 }
 
+const PERSISTENCE_UNAVAILABLE_MESSAGE = 'Persistence unavailable, check store provider';
+
+function withPersistenceHint(message: string, status: number): string {
+  if (status >= 500 && !message.toLowerCase().includes(PERSISTENCE_UNAVAILABLE_MESSAGE.toLowerCase())) {
+    return `${message}. ${PERSISTENCE_UNAVAILABLE_MESSAGE}`;
+  }
+  return message;
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as unknown;
     if (data && typeof data === 'object') {
-      const rec = data as { error?: unknown; issues?: unknown };
+      const rec = data as { error?: unknown; issues?: unknown; diagnostics?: unknown };
       const error = rec.error;
       if (typeof error === 'string') {
         const issues = rec.issues;
@@ -20,15 +29,23 @@ async function parseErrorMessage(response: Response): Promise<string> {
           const path = typeof first?.path === 'string' ? first.path : 'root';
           const message = typeof first?.message === 'string' ? first.message : 'invalid';
           const suffix = issues.length > 1 ? ` (+${issues.length - 1} more)` : '';
-          return `${error}: ${path}: ${message}${suffix}`;
+          return withPersistenceHint(`${error}: ${path}: ${message}${suffix}`, response.status);
         }
-        return error;
+
+        if (error === PERSISTENCE_UNAVAILABLE_MESSAGE && rec.diagnostics && typeof rec.diagnostics === 'object') {
+          const provider = (rec.diagnostics as { provider?: unknown }).provider;
+          if (typeof provider === 'string') {
+            return `${error} (provider: ${provider})`;
+          }
+        }
+
+        return withPersistenceHint(error, response.status);
       }
     }
   } catch {
     // ignore
   }
-  return `${response.status} ${response.statusText}`.trim();
+  return withPersistenceHint(`${response.status} ${response.statusText}`.trim(), response.status);
 }
 
 export async function apiGet<T>(url: string): Promise<T> {

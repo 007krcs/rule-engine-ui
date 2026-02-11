@@ -1,16 +1,14 @@
-import { NextResponse } from 'next/server';
 import { exportGitOpsBundle } from '@/server/demo/repository';
+import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const bundle = await exportGitOpsBundle();
-  const filename = `ruleflow-gitops-${bundle.tenantId}-${bundle.exportedAt.slice(0, 10)}.json`;
-  return NextResponse.json(bundle, {
-    headers: {
-      'cache-control': 'no-store',
-      'content-disposition': `attachment; filename="${filename}"`,
-    },
+  return withApiErrorHandling(async () => {
+    const bundle = await exportGitOpsBundle();
+    const filename = `ruleflow-gitops-${bundle.tenantId}-${bundle.exportedAt.slice(0, 10)}.json`;
+    const response = noStoreJson(bundle);
+    response.headers.set('content-disposition', `attachment; filename="${filename}"`);
+    return response;
   });
 }
-

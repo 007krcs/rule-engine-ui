@@ -28,6 +28,17 @@ type Check = {
 };
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
+type SystemHealthResponse = {
+  ok: true;
+  checkedAt: string;
+  canWriteToStore: boolean;
+  store: {
+    provider: string;
+    baseDir: string | null;
+    canWriteToStore: boolean;
+    warning?: string;
+  };
+};
 
 const initialContext: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -106,11 +117,13 @@ export default function HealthPage() {
   const [checks, setChecks] = useState<Check[]>([
     { id: 'routes', label: 'Routes respond (200)', status: 'pending' },
     { id: 'api', label: 'Console API returns snapshot', status: 'pending' },
+    { id: 'store', label: 'Store persistence is writable', status: 'pending' },
     { id: 'adapters', label: 'Adapters registered (renderer has no missing adapters)', status: 'pending' },
     { id: 'flow', label: 'Sample flow executes through submit (rules + api)', status: 'pending' },
   ]);
 
   const [routeDetails, setRouteDetails] = useState<Array<{ path: string; status: number | null }>>([]);
+  const [storeHealth, setStoreHealth] = useState<SystemHealthResponse | null>(null);
   const [adapterError, setAdapterError] = useState<string | null>(null);
   const [adapterMissingCount, setAdapterMissingCount] = useState<number | null>(null);
 
@@ -198,6 +211,7 @@ export default function HealthPage() {
 
   const run = async () => {
     setRouteDetails([]);
+    setStoreHealth(null);
     setAdapterError(null);
     setAdapterMissingCount(null);
 
@@ -233,6 +247,18 @@ export default function HealthPage() {
       updateCheck('api', { status: 'pass', detail: `${snap.packages.length} package(s)` });
     } catch (error) {
       updateCheck('api', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });
+    }
+
+    // Store
+    try {
+      const store = await apiGet<SystemHealthResponse>('/api/system/health');
+      setStoreHealth(store);
+      updateCheck('store', {
+        status: store.canWriteToStore ? 'pass' : 'fail',
+        detail: `${store.store.provider}${store.canWriteToStore ? '' : ' (fallback/no durable writes)'}`,
+      });
+    } catch (error) {
+      updateCheck('store', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });
     }
 
     // Adapters
@@ -390,6 +416,23 @@ export default function HealthPage() {
                   </>
                 ) : null}
               </p>
+            </div>
+
+            <div>
+              <p className={styles.sectionTitle}>Store</p>
+              <p className={styles.inlineStat}>
+                canWriteToStore:{' '}
+                <span className={styles.inlineStatStrong}>
+                  {storeHealth ? (storeHealth.canWriteToStore ? 'true' : 'false') : '-'}
+                </span>
+              </p>
+              <p className={styles.inlineStat}>
+                provider: <span className={styles.inlineStatStrong}>{storeHealth?.store.provider ?? '-'}</span>
+              </p>
+              <p className={styles.inlineStat}>
+                baseDir: <span className={styles.inlineStatStrong}>{storeHealth?.store.baseDir ?? '-'}</span>
+              </p>
+              {storeHealth?.store.warning ? <p className={styles.inlineError}>{storeHealth.store.warning}</p> : null}
             </div>
           </div>
         </CardContent>
