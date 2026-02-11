@@ -30,6 +30,7 @@ import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   MouseSensor,
   PointerSensor,
   useDraggable,
@@ -39,7 +40,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 const scratchComponents: UIComponent[] = [
@@ -250,6 +251,7 @@ export default function BuilderPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [activeDrag, setActiveDrag] = useState<{ kind: 'palette' | 'component'; label: string } | null>(null);
 
@@ -518,9 +520,18 @@ export default function BuilderPage() {
     if (activeId === overId) return;
     const oldIndex = components.findIndex((c) => c.id === activeId);
     const newIndex = components.findIndex((c) => c.id === overId);
-      if (oldIndex < 0 || newIndex < 0) return;
-      const next = normalizeFocusOrder(arrayMove(components, oldIndex, newIndex));
-      setComponents(next);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = normalizeFocusOrder(arrayMove(components, oldIndex, newIndex));
+    setComponents(next);
+  };
+
+  const moveComponent = (componentId: string, direction: 'up' | 'down') => {
+    const index = components.findIndex((c) => c.id === componentId);
+    if (index < 0) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= components.length) return;
+    const next = normalizeFocusOrder(arrayMove(components, index, targetIndex));
+    setComponents(next);
   };
 
   return (
@@ -675,6 +686,10 @@ export default function BuilderPage() {
                         selected={component.id === selectedComponentId}
                         disabled={loading}
                         onSelect={() => setSelectedComponentId(component.id)}
+                        canMoveUp={components[0]?.id !== component.id}
+                        canMoveDown={components[components.length - 1]?.id !== component.id}
+                        onMoveUp={() => moveComponent(component.id, 'up')}
+                        onMoveDown={() => moveComponent(component.id, 'down')}
                       >
                         {rendered}
                       </CanvasItem>

@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import type { UIComponent } from '@platform/schema';
+import type { JSONValue, UIComponent } from '@platform/schema';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
 
@@ -9,7 +9,7 @@ type ColumnDef = {
   headerKey?: string;
 };
 
-type RowDef = Record<string, unknown>;
+type RowDef = Record<string, JSONValue>;
 
 let registered = false;
 
@@ -36,7 +36,9 @@ function renderTable(component: UIComponent, ctx: AdapterContext): React.ReactEl
         .filter((col): col is ColumnDef => col !== null)
     : [];
 
-  const rows = Array.isArray(rowsSource) ? rowsSource.filter(isPlainRecord) : [];
+  const rows: RowDef[] = Array.isArray(rowsSource)
+    ? rowsSource.filter((value): value is RowDef => isPlainRecord(value))
+    : [];
   const ariaLabel = ctx.i18n.t(component.accessibility.ariaLabelKey);
   const label = component.i18n?.labelKey ? ctx.i18n.t(component.i18n.labelKey) : '';
 
@@ -64,7 +66,7 @@ function renderTable(component: UIComponent, ctx: AdapterContext): React.ReactEl
               </td>
             </tr>
           )}
-          {rows.map((row: any, rowIndex) => {
+          {rows.map((row, rowIndex) => {
             const rowId = row.id;
             const rowKey = typeof rowId === 'string' || typeof rowId === 'number' ? rowId : rowIndex;
             return (
@@ -83,6 +85,6 @@ function renderTable(component: UIComponent, ctx: AdapterContext): React.ReactEl
   );
 }
 
-function isPlainRecord(value: unknown): value is RowDef {
+function isPlainRecord(value: JSONValue): value is RowDef {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

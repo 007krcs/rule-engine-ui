@@ -221,6 +221,9 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function assertNever(value: never): never {
-  const nodeType = typeof value === 'object' && value !== null && 'type' in value ? (value as any).type : undefined;
+  const nodeType =
+    typeof value === 'object' && value !== null && 'type' in value
+      ? (value as { type?: unknown }).type
+      : undefined;
   throw new Error(`Unsupported layout node type: ${String(nodeType ?? value)}`);
 }

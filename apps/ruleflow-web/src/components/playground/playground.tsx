@@ -438,7 +438,15 @@ export function Playground({
           {!currentUiSchema ? (
             <p className={styles.emptyText}>Select a config version to render.</p>
           ) : (
-            <RenderPage uiSchema={currentUiSchema} data={data} context={context} i18n={i18n} />
+            <RenderPage
+              uiSchema={currentUiSchema}
+              data={data}
+              context={context}
+              i18n={i18n}
+              mode="controlled"
+              onDataChange={setData}
+              onContextChange={setContext}
+            />
           )}
         </CardContent>
       </Card>

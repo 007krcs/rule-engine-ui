@@ -38,6 +38,7 @@ describe('rules-engine', () => {
       rules,
       context: baseContext,
       data: { total: 120 },
+      options: { timeoutMs: 1000 },
     });
 
     expect(result.trace.rulesConsidered).toEqual(['A_RULE', 'B_RULE']);
@@ -174,5 +175,29 @@ describe('rules-engine', () => {
         (d) => d.target === 'data' && d.path === 'segment' && d.before === undefined && d.after === 'vip' && d.action.type === 'setField',
       ),
     ).toBe(true);
+  });
+
+  it('evaluates date operators', () => {
+    const rules: Rule[] = [
+      {
+        ruleId: 'DATE_AFTER',
+        when: { op: 'dateAfter', left: { path: 'data.orderDate' }, right: { value: '2024-01-01' } },
+        actions: [{ type: 'setField', path: 'data.after', value: true }],
+      },
+      {
+        ruleId: 'DATE_BETWEEN',
+        when: { op: 'dateBetween', left: { path: 'data.orderDate' }, right: { value: ['2024-01-01', '2024-12-31'] } },
+        actions: [{ type: 'setField', path: 'data.between', value: true }],
+      },
+    ];
+
+    const result = evaluateRules({
+      rules,
+      context: baseContext,
+      data: { orderDate: '2024-06-15' },
+    });
+
+    expect(result.data.after).toBe(true);
+    expect(result.data.between).toBe(true);
   });
 });

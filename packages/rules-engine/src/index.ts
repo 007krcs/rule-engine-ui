@@ -206,6 +206,12 @@ function evalConditionExplain(
     case 'lte':
       result = typeof leftValue === 'number' && typeof rightValue === 'number' && leftValue <= rightValue;
       break;
+    case 'dateEq':
+    case 'dateBefore':
+    case 'dateAfter':
+    case 'dateBetween':
+      result = compareDates(condition.op, leftValue, rightValue);
+      break;
     case 'in':
       result = Array.isArray(rightValue) && rightValue.some((item) => deepEqual(item, leftValue));
       break;
@@ -297,6 +303,11 @@ function evalCondition(
       return typeof left === 'number' && typeof right === 'number' && left < right;
     case 'lte':
       return typeof left === 'number' && typeof right === 'number' && left <= right;
+    case 'dateEq':
+    case 'dateBefore':
+    case 'dateAfter':
+    case 'dateBetween':
+      return compareDates(condition.op, left, right);
     case 'in':
       return Array.isArray(right) && right.some((item) => deepEqual(item, left));
     case 'contains':
@@ -613,6 +624,74 @@ function deepEqual(a: JSONValue | undefined, b: JSONValue | undefined): boolean 
     return aKeys.every((key) => deepEqual((a as Record<string, JSONValue>)[key], (b as Record<string, JSONValue>)[key]));
   }
   return false;
+}
+
+function compareDates(
+  op: 'dateEq' | 'dateBefore' | 'dateAfter' | 'dateBetween',
+  left: JSONValue | undefined,
+  right: JSONValue | undefined,
+): boolean {
+  const leftMs = coerceDateMs(left);
+  if (leftMs === null) return false;
+  if (op === 'dateBetween') {
+    const range = coerceDateRange(right);
+    if (!range) return false;
+    return leftMs >= range.start && leftMs <= range.end;
+  }
+  const rightMs = coerceDateMs(right);
+  if (rightMs === null) return false;
+  switch (op) {
+    case 'dateEq':
+      return leftMs === rightMs;
+    case 'dateBefore':
+      return leftMs < rightMs;
+    case 'dateAfter':
+      return leftMs > rightMs;
+    default:
+      return false;
+  }
+}
+
+function coerceDateRange(value: JSONValue | undefined): { start: number; end: number } | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const start = coerceDateMs(value[0] as JSONValue);
+  const end = coerceDateMs(value[1] as JSONValue);
+  if (start === null || end === null) return null;
+  return { start, end };
+}
+
+function coerceDateMs(value: JSONValue | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (dateOnlyMatch) {
+    const year = Number(dateOnlyMatch[1]);
+    const month = Number(dateOnlyMatch[2]) - 1;
+    const day = Number(dateOnlyMatch[3]);
+    return Date.UTC(year, month, day);
+  }
+
+  const localMatch = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (localMatch) {
+    const year = Number(localMatch[1]);
+    const month = Number(localMatch[2]) - 1;
+    const day = Number(localMatch[3]);
+    const hour = Number(localMatch[4]);
+    const minute = Number(localMatch[5]);
+    const second = localMatch[6] ? Number(localMatch[6]) : 0;
+    return Date.UTC(year, month, day, hour, minute, second);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
 }
 
 class RuleActionError extends Error {}

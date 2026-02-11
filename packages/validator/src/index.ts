@@ -1,6 +1,6 @@
 import Ajv2020, { type ErrorObject, type ValidateFunction } from 'ajv/dist/2020';
 import type { TranslationBundle } from '@platform/i18n';
-import type { ApiMapping, ExecutionContext, FlowSchema, RuleSet, UISchema } from '@platform/schema';
+import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, RuleSet, UISchema } from '@platform/schema';
 import {
   apiMappingSchema,
   executionContextSchema,
@@ -42,7 +42,7 @@ export function validateFlowSchema(value: FlowSchema): ValidationResult {
 }
 
 export function validateRulesSchema(value: RuleSet): ValidationResult {
-  return validateWithSchema(validators.rules, value);
+  return mergeResults(validateWithSchema(validators.rules, value), validateDateOperators(value));
 }
 
 export function validateApiMapping(value: ApiMapping): ValidationResult {
@@ -259,5 +259,82 @@ function hasMessage(bundles: TranslationBundle[], locale: string, namespace: str
     if (bundle.locale !== locale || bundle.namespace !== namespace) continue;
     if (bundle.messages[key] !== undefined) return true;
   }
+  return false;
+}
+
+function validateDateOperators(value: RuleSet): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!value || typeof value !== 'object' || !Array.isArray(value.rules)) {
+    return { valid: true, issues };
+  }
+
+  value.rules.forEach((rule, ruleIndex) => {
+    collectDateIssues(rule.when, `rules.${ruleIndex}.when`, issues);
+  });
+
+  return { valid: issues.length === 0, issues };
+}
+
+function collectDateIssues(condition: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!condition || typeof condition !== 'object') return;
+  const rec = condition as Record<string, unknown>;
+  if (Array.isArray(rec.all)) {
+    rec.all.forEach((child, index) => collectDateIssues(child, `${path}.all.${index}`, issues));
+    return;
+  }
+  if (Array.isArray(rec.any)) {
+    rec.any.forEach((child, index) => collectDateIssues(child, `${path}.any.${index}`, issues));
+    return;
+  }
+  if (rec.not) {
+    collectDateIssues(rec.not, `${path}.not`, issues);
+    return;
+  }
+
+  const op = rec.op;
+  if (op !== 'dateEq' && op !== 'dateBefore' && op !== 'dateAfter' && op !== 'dateBetween') return;
+  const left = rec.left as Record<string, unknown> | undefined;
+  const right = rec.right as Record<string, unknown> | undefined;
+
+  if (!right) {
+    issues.push({ path, message: 'date comparisons require a right operand', severity: 'error' });
+    return;
+  }
+
+  if (!isValidDateOperand(left, false)) {
+    issues.push({ path: `${path}.left`, message: 'date operands must be a path or ISO date string', severity: 'error' });
+  }
+
+  if (!isValidDateOperand(right, op === 'dateBetween')) {
+    const message = op === 'dateBetween'
+      ? 'dateBetween requires a path or [start, end] ISO date array'
+      : 'date operands must be a path or ISO date string';
+    issues.push({ path: `${path}.right`, message, severity: 'error' });
+  }
+}
+
+function isValidDateOperand(operand: Record<string, unknown> | undefined, allowRange: boolean): boolean {
+  if (!operand || typeof operand !== 'object') return false;
+  if ('path' in operand && typeof operand.path === 'string' && operand.path.length > 0) {
+    return true;
+  }
+  if (!('value' in operand)) return false;
+  const value = operand.value as JSONValue;
+  if (allowRange && Array.isArray(value)) {
+    if (value.length < 2) return false;
+    return isValidDateLiteral(value[0] as JSONValue) && isValidDateLiteral(value[1] as JSONValue);
+  }
+  return isValidDateLiteral(value);
+}
+
+function isValidDateLiteral(value: JSONValue): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'number' && Number.isFinite(value)) return true;
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return true;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) return true;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(trimmed)) return true;
   return false;
 }

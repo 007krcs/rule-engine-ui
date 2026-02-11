@@ -125,6 +125,24 @@ test('playground executes flow and shows trace', async ({ page }) => {
   await expect(ruleDetails.getByText('setField data.discount', { exact: true })).toBeVisible();
 });
 
+test('playground input updates rule outcomes', async ({ page }) => {
+  await page.goto('/playground');
+  await waitForClientReady(page);
+
+  const orderTotalInput = page.getByLabel('Order total filter');
+  await expect(orderTotalInput).toBeVisible();
+  await orderTotalInput.fill('500');
+
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('State: submitted')).toBeVisible();
+
+  await page.getByLabel('Explain').check();
+  const ruleDetails = page.getByTestId('rule-explain-US_ADMIN_DISCOUNT');
+  await ruleDetails.locator('summary').click();
+  await expect(ruleDetails.getByText('data.orderTotal=500', { exact: true })).toBeVisible();
+  await expect(ruleDetails.getByText('Not matched', { exact: true })).toBeVisible();
+});
+
 test('builder adds component and saves', async ({ page, request }) => {
   const create = await request.post('/api/config-packages', { data: { name: 'QA Builder Package' } });
   const created = (await create.json()) as { ok: true; versionId: string };
@@ -179,6 +197,89 @@ test('builder drag-drops palette component onto canvas', async ({ page, request 
   await expect(save).toBeEnabled();
   await save.click();
   await expect(page.getByText('Saved UI schema')).toBeVisible();
+});
+
+test('builder keyboard reorder uses move controls', async ({ page, request }) => {
+  const create = await request.post('/api/config-packages', { data: { name: 'QA Keyboard Reorder' } });
+  const created = (await create.json()) as { ok: true; versionId: string };
+
+  await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+  await expect(page.locator('[data-testid^=\"canvas-item-\"]').first()).toBeVisible();
+
+  const beforeOrder = await page.$$eval('[data-testid^="canvas-item-"]', (items) =>
+    items.map((item) => item.getAttribute('data-testid')),
+  );
+
+  const secondId = beforeOrder[1]?.replace('canvas-item-', '');
+  if (!secondId) throw new Error('Missing second canvas item');
+
+  const moveUp = page.getByTestId(`canvas-move-up-${secondId}`);
+  await moveUp.focus();
+  await moveUp.press('Enter');
+
+  const afterOrder = await page.$$eval('[data-testid^="canvas-item-"]', (items) =>
+    items.map((item) => item.getAttribute('data-testid')),
+  );
+
+  expect(afterOrder[0]).toBe(`canvas-item-${secondId}`);
+});
+
+test('builder date field + date rule flow works end-to-end', async ({ page, request }) => {
+  const create = await request.post('/api/config-packages', { data: { name: 'QA Date Rule' } });
+  const created = (await create.json()) as { ok: true; versionId: string };
+  const versionId = created.versionId;
+
+  await page.goto(`/builder?versionId=${encodeURIComponent(versionId)}`);
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+
+  await page.getByPlaceholder('Component id').fill('orderDate');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await expect(page.getByRole('heading', { name: 'orderDate' })).toBeVisible();
+
+  const inputTypeField = page.locator('label.rfFieldLabel', { hasText: 'Input Type' }).locator('..').getByRole('combobox');
+  await inputTypeField.selectOption('date');
+
+  const dataValueField = page.locator('label.rfFieldLabel', { hasText: 'data.value' }).locator('..').getByRole('textbox');
+  await dataValueField.fill('data.orderDate');
+
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Saved UI schema')).toBeVisible();
+
+  await page.goto(`/builder/rules?versionId=${encodeURIComponent(versionId)}`);
+  await waitForClientReady(page);
+  const rulesJson = {
+    version: '1.0.0',
+    rules: [
+      {
+        ruleId: 'DATE_AFTER_TEST',
+        description: 'Date rule for E2E',
+        priority: 100,
+        when: { op: 'dateAfter', left: { path: 'data.orderDate' }, right: { value: '2024-01-01' } },
+        actions: [{ type: 'setField', path: 'data.dateRuleFired', value: true }],
+      },
+    ],
+  };
+  await page.getByLabel('RuleSet JSON').fill(JSON.stringify(rulesJson, null, 2));
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Saved rule set')).toBeVisible();
+
+  await page.goto(`/playground?versionId=${encodeURIComponent(versionId)}`);
+  await waitForClientReady(page);
+
+  const orderDateInput = page.getByLabel('runtime.builder.orderDate.aria');
+  await orderDateInput.fill('2024-06-15');
+
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('State: submitted')).toBeVisible();
+  await page.getByLabel('Explain').check();
+
+  const ruleDetails = page.getByTestId('rule-explain-DATE_AFTER_TEST');
+  await ruleDetails.locator('summary').click();
+  await expect(ruleDetails.getByText('dateAfter', { exact: true })).toBeVisible();
+  await expect(ruleDetails.getByText('Matched', { exact: true })).toBeVisible();
 });
 
 test('visual snapshots (no assertion)', async ({ page }, testInfo) => {

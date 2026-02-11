@@ -244,9 +244,6 @@ function buildEvents(
     context: ExecutionContext;
   },
 ): AdapterContext['events'] {
-  const hasSchemaEvents = Boolean(component.events);
-  if (!hasSchemaEvents && !options.onAdapterEvent) return {};
-
   const emitSchemaEvent = (event: UIEventName) => {
     const actions = component.events?.[event];
     if (actions && actions.length > 0) {
@@ -256,14 +253,15 @@ function buildEvents(
 
   return {
     onChange: (payload) => {
-      const parsed = parseBindingPath(payload.bindingPath, 'data');
+      const bindingPath = payload?.bindingPath || component.bindings?.data?.value || 'data.value';
+      const parsed = parseBindingPath(bindingPath, 'data');
       if (parsed) {
         if (parsed.target === 'data') {
           const next = setPath(options.data, parsed.path, payload.value);
           options.onDataChange(next);
         } else if (parsed.target === 'context') {
           const next = setPath(options.context as unknown as Record<string, JSONValue>, parsed.path, payload.value);
-          options.onContextChange(next as ExecutionContext);
+          options.onContextChange(next as unknown as ExecutionContext);
         }
       }
       options.onAdapterEvent?.('onChange', payload, component);
@@ -378,6 +376,7 @@ function setPath(obj: Record<string, JSONValue>, path: string, value: JSONValue)
 function setAtPath(current: JSONValue | undefined, parts: string[], value: JSONValue): JSONValue {
   if (parts.length === 0) return value;
   const [head, ...rest] = parts;
+  if (head === undefined) return value;
   const index = Number(head);
   const isIndex = !Number.isNaN(index);
 

@@ -178,7 +178,12 @@ export function builtinComponentDefinitions(): ComponentDefinition[] {
           label: { type: 'string', title: 'Label', default: 'Text field' },
           placeholder: { type: 'string', title: 'Placeholder', default: 'Type here...' },
           helperText: { type: 'string', title: 'Helper Text' },
-          inputType: { type: 'string', title: 'Input Type', enum: ['text', 'number', 'email', 'date'], default: 'text' },
+          inputType: {
+            type: 'string',
+            title: 'Input Type',
+            enum: ['text', 'number', 'email', 'date', 'datetime-local'],
+            default: 'text',
+          },
         },
         additionalProperties: true,
       },

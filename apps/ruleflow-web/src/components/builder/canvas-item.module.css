@@ -13,6 +13,11 @@
   border-color: color-mix(in srgb, var(--rf-border) 60%, var(--rf-primary));
 }
 
+.item:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--rf-primary) 40%, transparent);
+  outline-offset: 2px;
+}
+
 .selected {
   border-color: color-mix(in srgb, var(--rf-primary) 55%, var(--rf-border));
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--rf-primary) 20%, transparent);
@@ -55,6 +60,11 @@
   cursor: grabbing;
 }
 
+.handle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--rf-primary) 45%, transparent);
+  outline-offset: 2px;
+}
+
 .meta {
   min-width: 0;
 }
@@ -83,6 +93,35 @@
   letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--rf-muted);
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.moveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface-2);
+  color: var(--rf-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.moveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.moveButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--rf-primary) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .body {
