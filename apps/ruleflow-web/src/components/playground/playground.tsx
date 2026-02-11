@@ -10,6 +10,7 @@ import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
 import { registerD3Adapter } from '@platform/react-d3-adapter';
 import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
+import type { ConditionExplain, ExplainOperand, RuleActionDiff, RuleRead } from '@platform/observability';
 import type { ConfigVersion, ConsoleSnapshot } from '@/lib/demo/types';
 import { apiGet } from '@/lib/demo/api-client';
 import { useToast } from '@/components/ui/toast';
@@ -40,6 +41,8 @@ const initialData: Record<string, JSONValue> = {
   formValid: true,
   readyToSubmit: true,
   orderTotal: 1200,
+  loanAmount: 250000,
+  riskLevel: 'Medium',
   restricted: false,
   orders: [],
   revenueSeries: [],
@@ -79,6 +82,119 @@ type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; er
 
 type RuntimeTrace = Awaited<ReturnType<typeof executeStep>>['trace'];
 
+function renderValue(value: JSONValue | undefined): string {
+  if (value === undefined) return 'undefined';
+  // JSON.stringify gives quotes for strings and readable output for arrays/objects.
+  return JSON.stringify(value);
+}
+
+function OperandView({ operand }: { operand: ExplainOperand }) {
+  if (operand.kind === 'path') {
+    return (
+      <span className={styles.mono}>
+        {operand.path}={renderValue(operand.value)}
+      </span>
+    );
+  }
+  return <span className={styles.mono}>{renderValue(operand.value)}</span>;
+}
+
+function ExplainNode({ explain, depth }: { explain: ConditionExplain; depth: number }) {
+  const indent = Math.min(8, depth) * 14;
+
+  if (explain.kind === 'compare') {
+    return (
+      <div className={styles.explainRow} style={{ paddingLeft: indent }}>
+        <div className={styles.explainLeft}>
+          <span className={styles.explainKind}>COMPARE</span>
+          <span className={styles.mono}>{explain.op}</span>
+          <OperandView operand={explain.left} />
+          {explain.right ? <OperandView operand={explain.right} /> : null}
+        </div>
+        <span className={cn(styles.pill, explain.result ? styles.pillOk : styles.pillWarn)}>{String(explain.result)}</span>
+      </div>
+    );
+  }
+
+  if (explain.kind === 'not') {
+    return (
+      <>
+        <div className={styles.explainRow} style={{ paddingLeft: indent }}>
+          <div className={styles.explainLeft}>
+            <span className={styles.explainKind}>NOT</span>
+          </div>
+          <span className={cn(styles.pill, explain.result ? styles.pillOk : styles.pillWarn)}>{String(explain.result)}</span>
+        </div>
+        <ExplainNode explain={explain.child} depth={depth + 1} />
+      </>
+    );
+  }
+
+  if (explain.kind === 'all' || explain.kind === 'any') {
+    const kindLabel = explain.kind === 'all' ? 'ALL' : 'ANY';
+    return (
+      <>
+        <div className={styles.explainRow} style={{ paddingLeft: indent }}>
+          <div className={styles.explainLeft}>
+            <span className={styles.explainKind}>{kindLabel}</span>
+            <span className="rfHelperText" style={{ margin: 0 }}>
+              ({explain.children.length} clause{explain.children.length === 1 ? '' : 's'})
+            </span>
+          </div>
+          <span className={cn(styles.pill, explain.result ? styles.pillOk : styles.pillWarn)}>{String(explain.result)}</span>
+        </div>
+        <div className={styles.explainChildren}>
+          {explain.children.map((child, idx) => (
+            <ExplainNode key={`${kindLabel}-${idx}`} explain={child} depth={depth + 1} />
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  return null;
+}
+
+function ExplainTree({ explain }: { explain: ConditionExplain }) {
+  return (
+    <div className={styles.explainTree}>
+      <ExplainNode explain={explain} depth={0} />
+    </div>
+  );
+}
+
+function ReadsList({ reads }: { reads: RuleRead[] }) {
+  if (!reads.length) return <p className="rfHelperText">No field reads recorded.</p>;
+  return (
+    <ul className={styles.kvList}>
+      {reads.map((read) => (
+        <li key={read.path} className={styles.kvItem}>
+          <span className={styles.mono}>{read.path}</span>
+          <span className={styles.kvValue}>{renderValue(read.value)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ActionDiffsList({ diffs }: { diffs: RuleActionDiff[] }) {
+  if (!diffs.length) return <p className="rfHelperText">No data/context changes recorded for this rule.</p>;
+  return (
+    <ul className={styles.kvList}>
+      {diffs.map((diff, idx) => (
+        <li key={`${diff.ruleId}-${diff.path}-${idx}`} className={styles.kvItem}>
+          <span className={styles.mono}>
+            {diff.action.type} {diff.target}.{diff.path}
+          </span>
+          <span className={styles.kvValue}>
+            {renderValue(diff.before)} {'->'} {renderValue(diff.after)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function Playground({
   initialSnapshot,
   initialVersion,
@@ -88,7 +204,9 @@ export function Playground({
 }) {
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const { setActiveVersionId, completeStep } = useOnboarding();
+  const onboarding = useOnboarding();
+  const activeVersionId = onboarding.state.activeVersionId;
+  const { setActiveVersionId, completeStep } = onboarding;
 
   const [snapshot] = useState<ConsoleSnapshot>(initialSnapshot);
   const [selectedVersionId, setSelectedVersionId] = useState<string>(initialVersion?.id ?? '');
@@ -143,8 +261,9 @@ export function Playground({
 
   useEffect(() => {
     if (!selectedVersionId) return;
+    if (activeVersionId === selectedVersionId) return;
     setActiveVersionId(selectedVersionId);
-  }, [selectedVersionId, setActiveVersionId]);
+  }, [activeVersionId, selectedVersionId, setActiveVersionId]);
 
   const flow: FlowSchema | null = version?.bundle.flowSchema ?? null;
   const uiSchema: UISchema | null = version?.bundle.uiSchema ?? null;
@@ -348,9 +467,9 @@ function TracePanel({
   const [explain, setExplain] = useState<boolean>(() => Boolean(defaultExplain));
 
   useEffect(() => {
-    if (!explain) return;
-    completeStep('explainTrace');
-  }, [completeStep, explain]);
+    if (!trace) return;
+    completeStep('inspectTrace');
+  }, [completeStep, trace]);
 
   if (!trace) {
     return (
@@ -419,25 +538,57 @@ function TracePanel({
               {explain ? (
                 <ul className={styles.ruleList}>
                   {rules.rulesConsidered.map((ruleId) => {
-                    const result = rules.conditionResults?.[ruleId];
+                    const result = rules.conditionResults?.[ruleId] ?? false;
                     const matched = rules.rulesMatched.includes(ruleId);
+                    const conditionExplain = rules.conditionExplains?.[ruleId];
+                    const reads = rules.readsByRuleId?.[ruleId] ?? [];
+                    const diffs = (rules.actionDiffs ?? []).filter((diff) => diff.ruleId === ruleId);
+                    const applied = rules.actionsApplied.filter((applied) => applied.ruleId === ruleId);
+                    const testId = `rule-explain-${ruleId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
                     return (
                       <li key={ruleId} className={styles.ruleItem}>
-                        <div className={styles.ruleLeft}>
-                          <span className={styles.mono}>{ruleId}</span>
-                          <span>{matched ? 'Matched' : 'Not matched'}</span>
-                        </div>
-                        <div className={styles.ruleRight}>
-                          <span
-                            className={cn(
-                              styles.pill,
-                              result ? styles.pillOk : styles.pillWarn,
-                            )}
-                            title="Condition result"
-                          >
-                            {result ? 'true' : 'false'}
-                          </span>
-                        </div>
+                        <details data-testid={testId} className={styles.ruleDetails}>
+                          <summary className={styles.ruleSummary}>
+                            <div className={styles.ruleLeft}>
+                              <span className={styles.mono}>{ruleId}</span>
+                              <span>{matched ? 'Matched' : 'Not matched'}</span>
+                            </div>
+                            <div className={styles.ruleRight}>
+                              <span
+                                className={cn(styles.pill, result ? styles.pillOk : styles.pillWarn)}
+                                title="Condition result"
+                              >
+                                {result ? 'true' : 'false'}
+                              </span>
+                            </div>
+                          </summary>
+
+                          <div className={styles.ruleBody}>
+                            <div className={styles.ruleSection}>
+                              <p className={styles.ruleSectionTitle}>Condition</p>
+                              {conditionExplain ? (
+                                <ExplainTree explain={conditionExplain} />
+                              ) : (
+                                <p className="rfHelperText">Explain details not available for this trace.</p>
+                              )}
+                            </div>
+
+                            <div className={styles.ruleSection}>
+                              <p className={styles.ruleSectionTitle}>Reads</p>
+                              <ReadsList reads={reads} />
+                            </div>
+
+                            <div className={styles.ruleSection}>
+                              <p className={styles.ruleSectionTitle}>Changes</p>
+                              <ActionDiffsList diffs={diffs} />
+                              {applied.length > 0 ? (
+                                <p className="rfHelperText" style={{ marginTop: 10 }}>
+                                  Applied actions: <span className={styles.mono}>{applied.map((a) => a.action.type).join(', ')}</span>
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </details>
                       </li>
                     );
                   })}

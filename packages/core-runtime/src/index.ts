@@ -39,7 +39,9 @@ export interface ExecuteStepResult {
 
 export async function executeStep(input: ExecuteStepInput): Promise<ExecuteStepResult> {
   const started = Date.now();
-  const shouldValidate = input.validate ?? process.env.RULEFLOW_VALIDATE !== '0';
+  // `executeStep` runs in both Node and browsers. Guard `process.env` for client bundles.
+  const validateEnv = typeof process !== 'undefined' ? process.env.RULEFLOW_VALIDATE : undefined;
+  const shouldValidate = input.validate ?? validateEnv !== '0';
 
   if (shouldValidate) {
     assertFlowSchema(input.flow);
@@ -113,7 +115,8 @@ export async function executeStep(input: ExecuteStepInput): Promise<ExecuteStepR
   if (input.traceLogger) {
     input.traceLogger(trace);
   }
-  if (input.logTraces || process.env.RULEFLOW_TRACE === '1') {
+  const traceEnv = typeof process !== 'undefined' ? process.env.RULEFLOW_TRACE : undefined;
+  if (input.logTraces || traceEnv === '1') {
     logRuntimeTrace(trace);
   }
 

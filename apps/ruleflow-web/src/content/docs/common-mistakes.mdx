@@ -1,0 +1,26 @@
+# Common Mistakes
+
+## Builder / UISchema
+
+- Missing `accessibility.ariaLabelKey`
+- Missing or duplicate `accessibility.focusOrder`
+- Layout references a component id that doesn't exist
+- Adapter hint not registered in the host (renders as "No adapter for ...")
+
+## Component Registry
+
+- `adapterHint` not namespaced (`company.currencyInput` is good, `currencyInput` is not)
+- `propsSchema` missing or not an object
+- Duplicated `adapterHint` entries across manifests
+
+## Rules
+
+- Using paths that do not exist (`data.foo.bar` when `data.foo` is missing)
+- Expecting UI inputs to update data automatically (host/event wiring is required)
+- Throwing errors without handling them in the host
+
+## i18n / WCAG
+
+- Adding new i18n keys without providing bundles in the host
+- Hard-coding strings instead of using `i18n.labelKey` and friends
+

@@ -1,7 +1,22 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import type { ApiMapping, FlowSchema, RuleSet, UISchema } from '@platform/schema';
+import type { ApiMapping, FlowSchema, LayoutNode, RuleSet, UIComponent, UISchema } from '@platform/schema';
+import type { ComponentDefinition, ComponentRegistryManifest, RegistryScope } from '@platform/component-registry';
+import {
+  builtinComponentDefinitions,
+  mergeComponentDefinitions,
+  validateComponentRegistryManifest,
+} from '@platform/component-registry';
+import { EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
+import type { ValidationIssue } from '@platform/validator';
+import {
+  validateApiMapping,
+  validateFlowSchema,
+  validateI18nCoverage,
+  validateRulesSchema,
+  validateUISchema,
+} from '@platform/validator';
 import type {
   ApprovalRequest,
   AuditEvent,
@@ -26,6 +41,11 @@ type StoreState = {
   packages: ConfigPackage[];
   approvals: ApprovalRequest[];
   audit: AuditEvent[];
+  componentRegistry: {
+    schemaVersion: 1;
+    global: ComponentDefinition[];
+    tenants: Record<string, ComponentDefinition[]>;
+  };
 };
 
 const STORE_DIR = process.env.RULEFLOW_DEMO_STORE_DIR ?? path.join(process.cwd(), '.ruleflow-demo-data');
@@ -54,6 +74,23 @@ function withClockSkew(isoNow: string, msDelta: number) {
 
 function id(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function sanitizeId(raw: string): string {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return 'config';
+  const slug = trimmed
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || 'config';
+}
+
+function ensureUniqueId(base: string, existing: Set<string>): string {
+  if (!existing.has(base)) return base;
+  let n = 2;
+  while (existing.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
 }
 
 function deepCloneJson<T>(value: T): T {
@@ -142,10 +179,10 @@ function safeEqualBase64(a: string, b: string) {
   }
 }
 
-async function readStoreFile(): Promise<StoreState | null> {
+async function readStoreFile(): Promise<unknown | null> {
   try {
     const raw = await fs.readFile(STORE_FILE, 'utf8');
-    return JSON.parse(raw) as StoreState;
+    return JSON.parse(raw) as unknown;
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
       return null;
@@ -163,8 +200,11 @@ async function loadState(): Promise<StoreState> {
   if (memory) return memory;
   const existing = await readStoreFile();
   if (existing) {
-    memory = existing;
-    return existing;
+    const normalized = normalizeState(existing);
+    memory = normalized;
+    // Self-heal missing fields on disk so the demo stays stable as schema evolves.
+    await writeStoreFile(normalized);
+    return normalized;
   }
   const seeded = seedState();
   memory = seeded;
@@ -209,6 +249,88 @@ function seedBundle(variant: 'active' | 'review' | 'deprecated'): ConfigBundle {
 function seedBundleForTemplate(templateId: SampleTemplateId): ConfigBundle {
   const bundle = seedBundle('active');
 
+  const withCompanyComponents = (params: {
+    amountBindingPath: string;
+    amountComponentId: string;
+    riskComponentId: string;
+    title: string;
+    versionSuffix: string;
+  }) => {
+    const ui = bundle.uiSchema;
+    const existingIds = new Set(ui.components.map((c) => c.id));
+
+    const currencyId = ensureUniqueId(params.amountComponentId, existingIds);
+    existingIds.add(currencyId);
+    const riskId = ensureUniqueId(params.riskComponentId, existingIds);
+
+    const currencyComponent: UIComponent = {
+      id: currencyId,
+      type: 'currencyInput',
+      adapterHint: 'company.currencyInput',
+      props: { label: params.title, currency: 'USD' },
+      i18n: {
+        labelKey: `runtime.company.${currencyId}.label`,
+      },
+      bindings: {
+        data: {
+          value: params.amountBindingPath,
+        },
+      },
+      accessibility: {
+        ariaLabelKey: `runtime.company.${currencyId}.aria`,
+        keyboardNav: true,
+        focusOrder: ui.components.length + 1,
+      },
+    };
+
+    const riskComponent: UIComponent = {
+      id: riskId,
+      type: 'riskBadge',
+      adapterHint: 'company.riskBadge',
+      props: { label: 'Risk', level: 'Medium' },
+      i18n: {
+        labelKey: `runtime.company.${riskId}.label`,
+      },
+      bindings: {
+        data: {
+          level: 'data.riskLevel',
+        },
+      },
+      accessibility: {
+        ariaLabelKey: `runtime.company.${riskId}.aria`,
+        keyboardNav: true,
+        focusOrder: ui.components.length + 2,
+      },
+    };
+
+    ui.components.push(currencyComponent, riskComponent);
+
+    const section: LayoutNode = {
+      id: 'company',
+      type: 'section',
+      title: 'Company Components',
+      componentIds: [currencyId, riskId],
+    };
+
+    const children = ui.layout.children;
+    if (Array.isArray(children)) {
+      ui.layout = { ...ui.layout, children: [...children, section] };
+    } else if (ui.layout.type === 'stack') {
+      ui.layout = { ...ui.layout, children: [section] };
+    } else {
+      // Fallback: wrap existing layout and the new section in a stack.
+      ui.layout = {
+        id: 'root',
+        type: 'stack',
+        direction: 'vertical',
+        children: [ui.layout, section],
+      } as LayoutNode;
+    }
+
+    ui.version = `1.0.0-${params.versionSuffix}`;
+    bundle.flowSchema.version = `1.0.0-${params.versionSuffix}`;
+  };
+
   if (templateId === 'fast-start') {
     bundle.flowSchema.initialState = 'review';
     bundle.flowSchema.version = '1.0.0-fast-start';
@@ -224,6 +346,64 @@ function seedBundleForTemplate(templateId: SampleTemplateId): ConfigBundle {
         { type: 'emitEvent', event: 'onboardingFastStart' },
       ],
     });
+
+    return bundle;
+  }
+
+  if (templateId === 'checkout-flow') {
+    withCompanyComponents({
+      amountBindingPath: 'data.orderTotal',
+      amountComponentId: 'orderTotal',
+      riskComponentId: 'riskBadge',
+      title: 'Order total',
+      versionSuffix: 'checkout-flow',
+    });
+
+    bundle.rules.rules.unshift(
+      {
+        ruleId: 'SET_RISK_HIGH',
+        description: 'If the order is large, mark risk as High.',
+        priority: 120,
+        when: { op: 'gt', left: { path: 'data.orderTotal' }, right: { value: 1000 } },
+        actions: [{ type: 'setField', path: 'data.riskLevel', value: 'High' }],
+      },
+      {
+        ruleId: 'SET_RISK_LOW',
+        description: 'Otherwise mark risk as Low.',
+        priority: 110,
+        when: { op: 'lte', left: { path: 'data.orderTotal' }, right: { value: 1000 } },
+        actions: [{ type: 'setField', path: 'data.riskLevel', value: 'Low' }],
+      },
+    );
+
+    return bundle;
+  }
+
+  if (templateId === 'loan-onboarding') {
+    withCompanyComponents({
+      amountBindingPath: 'data.loanAmount',
+      amountComponentId: 'loanAmount',
+      riskComponentId: 'riskBadge',
+      title: 'Loan amount',
+      versionSuffix: 'loan-onboarding',
+    });
+
+    bundle.rules.rules.unshift(
+      {
+        ruleId: 'SET_RISK_HIGH_LOAN',
+        description: 'If the loan amount is above 250k, mark risk as High.',
+        priority: 120,
+        when: { op: 'gt', left: { path: 'data.loanAmount' }, right: { value: 250000 } },
+        actions: [{ type: 'setField', path: 'data.riskLevel', value: 'High' }],
+      },
+      {
+        ruleId: 'SET_RISK_MED_LOAN',
+        description: 'If loan amount is above 100k, mark risk as Medium.',
+        priority: 115,
+        when: { op: 'gt', left: { path: 'data.loanAmount' }, right: { value: 100000 } },
+        actions: [{ type: 'setField', path: 'data.riskLevel', value: 'Medium' }],
+      },
+    );
 
     return bundle;
   }
@@ -310,6 +490,8 @@ function seedState(): StoreState {
 
   const pkg: ConfigPackage = {
     id: packageId,
+    tenantId: session.tenantId,
+    configId: 'orders-bundle',
     name: 'Orders Bundle',
     description: 'UI + flow + rules + API mapping for order workflows (demo).',
     createdAt: withClockSkew(seededAt, -90 * 24 * 60 * 60 * 1000),
@@ -373,7 +555,54 @@ function seedState(): StoreState {
     packages: [pkg],
     approvals,
     audit,
+    componentRegistry: {
+      schemaVersion: 1,
+      global: builtinComponentDefinitions(),
+      tenants: {},
+    },
   };
+}
+
+function normalizeState(raw: unknown): StoreState {
+  const session = getMockSession();
+
+  if (!isPlainRecord(raw)) {
+    return seedState();
+  }
+
+  const tenantId = typeof raw.tenantId === 'string' && raw.tenantId.trim().length > 0 ? raw.tenantId : session.tenantId;
+  const packages = Array.isArray(raw.packages)
+    ? (raw.packages as Array<Partial<ConfigPackage>>).map((pkg) => ({
+        ...(pkg as ConfigPackage),
+        tenantId: typeof pkg.tenantId === 'string' && pkg.tenantId.trim().length > 0 ? pkg.tenantId : tenantId,
+        configId: typeof pkg.configId === 'string' && pkg.configId.trim().length > 0 ? pkg.configId : pkg.id ?? 'config',
+      }))
+    : [];
+  const approvals = Array.isArray(raw.approvals) ? (raw.approvals as ApprovalRequest[]) : [];
+  const audit = Array.isArray(raw.audit) ? (raw.audit as AuditEvent[]) : [];
+
+  const crRaw = raw.componentRegistry;
+  const rawGlobal =
+    isPlainRecord(crRaw) && Array.isArray(crRaw.global) ? (crRaw.global as ComponentDefinition[]) : builtinComponentDefinitions();
+  const global = mergeComponentDefinitions(builtinComponentDefinitions(), rawGlobal);
+  const tenants = isPlainRecord(crRaw) && isPlainRecord(crRaw.tenants) ? (crRaw.tenants as Record<string, ComponentDefinition[]>) : {};
+
+  return {
+    schemaVersion: 1,
+    tenantId,
+    packages,
+    approvals,
+    audit,
+    componentRegistry: {
+      schemaVersion: 1,
+      global,
+      tenants,
+    },
+  };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function flattenVersions(packages: ConfigPackage[]): ConfigVersion[] {
@@ -437,6 +666,36 @@ function updateVersionInPackage(pkg: ConfigPackage, versionId: string, updater: 
   };
 }
 
+function validateConfigBundle(
+  bundle: ConfigBundle,
+  options?: { requireI18nCoverage?: boolean },
+): { ok: true } | { ok: false; issues: ValidationIssue[] } {
+  const issues: ValidationIssue[] = [];
+
+  issues.push(...validateUISchema(bundle.uiSchema).issues);
+  issues.push(...validateFlowSchema(bundle.flowSchema).issues);
+  issues.push(...validateRulesSchema(bundle.rules).issues);
+  for (const mapping of Object.values(bundle.apiMappingsById ?? {})) {
+    issues.push(...validateApiMapping(mapping).issues);
+  }
+
+  if (options?.requireI18nCoverage) {
+    const i18nCoverage = validateI18nCoverage(bundle.uiSchema, {
+      locales: ['en'],
+      bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
+      defaultNamespace: 'runtime',
+    });
+    issues.push(...i18nCoverage.issues);
+  }
+
+  const deduped = new Map<string, ValidationIssue>();
+  for (const issue of issues) {
+    deduped.set(`${issue.path}::${issue.message}`, issue);
+  }
+  const out = Array.from(deduped.values());
+  return out.length === 0 ? { ok: true } : { ok: false, issues: out };
+}
+
 export async function getConsoleSnapshot() {
   const state = await loadState();
   const versions = sortByCreatedDesc(flattenVersions(state.packages));
@@ -459,11 +718,21 @@ export async function getConfigVersion(versionId: string): Promise<ConfigVersion
   return null;
 }
 
-export async function createConfigPackage(input: { name: string; description?: string; templateId?: SampleTemplateId }) {
+export async function createConfigPackage(input: {
+  name: string;
+  description?: string;
+  templateId?: SampleTemplateId;
+  tenantId?: string;
+  configId?: string;
+}) {
   const session = getMockSession();
   const state = await loadState();
 
-  const packageId = id('pkg');
+  const nextTenantId = input.tenantId?.trim() || state.tenantId || session.tenantId;
+  const desiredConfigId = input.configId?.trim().length ? input.configId!.trim() : input.name;
+  const baseConfigId = sanitizeId(desiredConfigId);
+  const existingIds = new Set(state.packages.map((pkg) => pkg.id));
+  const packageId = ensureUniqueId(baseConfigId, existingIds);
   const versionId = id('ver');
   const createdAt = nowIso();
 
@@ -472,7 +741,7 @@ export async function createConfigPackage(input: { name: string; description?: s
   const newVersion: ConfigVersion = {
     id: versionId,
     packageId,
-    version: new Date(createdAt).toISOString().slice(0, 10).replace(/-/g, '.') + '-draft',
+    version: '0.1.0',
     status: 'DRAFT',
     createdAt,
     createdBy: session.user.name,
@@ -481,6 +750,8 @@ export async function createConfigPackage(input: { name: string; description?: s
 
   const pkg: ConfigPackage = {
     id: packageId,
+    tenantId: nextTenantId,
+    configId: packageId,
     name: input.name.trim() || 'Untitled Package',
     description: input.description?.trim() || undefined,
     createdAt,
@@ -490,6 +761,7 @@ export async function createConfigPackage(input: { name: string; description?: s
 
   let next: StoreState = {
     ...state,
+    tenantId: nextTenantId,
     packages: [pkg, ...state.packages],
   };
   next = addAudit(next, {
@@ -566,22 +838,90 @@ export async function updateRules(input: { versionId: string; rules: ConfigBundl
   return { ok: true as const };
 }
 
+export async function getComponentRegistrySnapshot(input?: { tenantId?: string }) {
+  const state = await loadState();
+  const tenantId = input?.tenantId?.trim() || state.tenantId;
+  const global = state.componentRegistry.global ?? [];
+  const tenant = state.componentRegistry.tenants[tenantId] ?? [];
+  const effective = mergeComponentDefinitions(global, tenant);
+  return { ok: true as const, tenantId, global, tenant, effective };
+}
+
+export async function registerComponentRegistryManifest(input: {
+  scope: RegistryScope;
+  tenantId?: string;
+  manifest: ComponentRegistryManifest;
+}) {
+  const session = getMockSession();
+  const state = await loadState();
+
+  const validation = validateComponentRegistryManifest(input.manifest);
+  if (!validation.valid) {
+    return { ok: false as const, error: 'manifest_invalid', issues: validation.issues };
+  }
+
+  const defs = input.manifest.components;
+  let nextRegistry = state.componentRegistry;
+
+  if (input.scope === 'global') {
+    nextRegistry = {
+      ...nextRegistry,
+      global: mergeComponentDefinitions(nextRegistry.global, defs),
+    };
+  } else {
+    const tenantId = input.tenantId?.trim() || state.tenantId;
+    const current = nextRegistry.tenants[tenantId] ?? [];
+    nextRegistry = {
+      ...nextRegistry,
+      tenants: {
+        ...nextRegistry.tenants,
+        [tenantId]: mergeComponentDefinitions(current, defs),
+      },
+    };
+  }
+
+  let next: StoreState = { ...state, componentRegistry: nextRegistry };
+  next = addAudit(next, {
+    actor: session.user.name,
+    action: 'Registered component manifest',
+    target: `${input.scope}:${input.scope === 'tenant' ? input.tenantId?.trim() || state.tenantId : 'global'}`,
+    severity: 'info',
+    metadata: { count: defs.length },
+  });
+
+  await persistState(next);
+  return { ok: true as const, count: defs.length };
+}
+
 export async function submitForReview(input: { versionId: string; scope: string; risk: RiskLevel }) {
   const session = getMockSession();
   const state = await loadState();
 
   let packageId: string | null = null;
   let versionLabel: string | null = null;
+  let foundVersion: ConfigVersion | null = null;
+
+  for (const pkg of state.packages) {
+    const version = pkg.versions.find((v) => v.id === input.versionId);
+    if (!version) continue;
+    packageId = pkg.id;
+    versionLabel = version.version;
+    foundVersion = version;
+    break;
+  }
+
+  if (!packageId || !foundVersion) return { ok: false as const, error: 'Version not found' };
+
+  const validation = validateConfigBundle(foundVersion.bundle);
+  if (!validation.ok) {
+    return { ok: false as const, error: 'validation_failed', issues: validation.issues };
+  }
 
   const nextPackages = state.packages.map((pkg) => {
     const version = pkg.versions.find((v) => v.id === input.versionId);
     if (!version) return pkg;
-    packageId = pkg.id;
-    versionLabel = version.version;
     return updateVersionInPackage(pkg, input.versionId, (v) => ({ ...v, status: 'REVIEW', updatedAt: nowIso(), updatedBy: session.user.name }));
   });
-
-  if (!packageId) return { ok: false as const, error: 'Version not found' };
 
   const approval: ApprovalRequest = {
     id: id('apr'),
@@ -706,6 +1046,11 @@ export async function promoteVersion(input: { versionId: string }) {
     return { ok: false as const, error: `Cannot promote version in status ${found.version.status}` };
   }
 
+  const validation = validateConfigBundle(found.version.bundle, { requireI18nCoverage: true });
+  if (!validation.ok) {
+    return { ok: false as const, error: 'validation_failed', issues: validation.issues };
+  }
+
   const nextPackages = state.packages.map((pkg) => {
     if (pkg.id !== found!.pkg.id) return pkg;
     return {
@@ -781,6 +1126,7 @@ export async function exportGitOpsBundle(): Promise<GitOpsBundle> {
     packages: state.packages,
     approvals: state.approvals,
     audit: state.audit,
+    componentRegistry: state.componentRegistry,
   });
 
   const key = await loadSigningKey();
@@ -821,12 +1167,25 @@ export async function importGitOpsBundle(input: { bundle: GitOpsBundle }) {
     };
   }
 
+  const normalizedComponentRegistry: StoreState['componentRegistry'] = bundle.payload.componentRegistry
+    ? {
+        schemaVersion: 1,
+        global: bundle.payload.componentRegistry.global,
+        tenants: bundle.payload.componentRegistry.tenants,
+      }
+    : {
+        schemaVersion: 1,
+        global: builtinComponentDefinitions(),
+        tenants: {},
+      };
+
   let next: StoreState = {
     schemaVersion: 1,
     tenantId: bundle.tenantId,
     packages: bundle.payload.packages,
     approvals: bundle.payload.approvals,
     audit: bundle.payload.audit,
+    componentRegistry: normalizedComponentRegistry,
   };
 
   next = addAudit(next, {

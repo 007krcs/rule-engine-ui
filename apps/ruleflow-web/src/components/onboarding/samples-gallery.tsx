@@ -29,7 +29,7 @@ export function SamplesGallery({ onCloned }: { onCloned?: (versionId: string) =>
         templateId: template.id,
       });
       onboarding.setActiveVersionId(result.versionId);
-      onboarding.completeStep('cloneSample');
+      onboarding.completeStep('createConfig');
       toast({ variant: 'success', title: 'Cloned sample config', description: result.versionId });
       onCloned?.(result.versionId);
       router.push(`/builder?versionId=${encodeURIComponent(result.versionId)}`);
@@ -76,4 +76,3 @@ export function SamplesGallery({ onCloned }: { onCloned?: (versionId: string) =>
     </div>
   );
 }
-

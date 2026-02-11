@@ -5,6 +5,15 @@
   background: var(--rf-bg);
 }
 
+.clientReady {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
 .header {
   height: 64px;
   flex: 0 0 auto;
@@ -177,6 +186,14 @@
   transition: background-color 120ms ease, color 120ms ease;
 }
 
+.navButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
 .navItem:hover {
   background: var(--rf-surface-2);
   color: var(--rf-fg);
@@ -291,6 +308,41 @@
 .modalBody {
   display: grid;
   gap: var(--rf-space-4);
+}
+
+.commandBody {
+  display: grid;
+  gap: var(--rf-space-3);
+}
+
+.commandList {
+  display: grid;
+  gap: 6px;
+}
+
+.commandItem {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  border-radius: var(--rf-radius-md);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--rf-fg);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.commandItem:hover {
+  background: var(--rf-surface-2);
+  border-color: color-mix(in srgb, var(--rf-primary) 25%, var(--rf-border));
+}
+
+.commandEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-muted);
 }
 
 @media (min-width: 900px) {

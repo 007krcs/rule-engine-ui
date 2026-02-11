@@ -64,6 +64,12 @@ export const PLATFORM_BUNDLES: TranslationBundle[] = [
       'revenue.chart.aria': 'Revenue chart',
       'customViz.label': 'Custom visualization',
       'customViz.aria': 'Custom visualization',
+      'company.orderTotal.label': 'Order total',
+      'company.orderTotal.aria': 'Order total input',
+      'company.loanAmount.label': 'Loan amount',
+      'company.loanAmount.aria': 'Loan amount input',
+      'company.riskBadge.label': 'Risk',
+      'company.riskBadge.aria': 'Risk level badge',
     },
   },
   {

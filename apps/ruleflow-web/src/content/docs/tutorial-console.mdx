@@ -1,0 +1,54 @@
+# Tutorial: Console + Versioning
+
+The Console is where admins manage the lifecycle of a config package: DRAFT -> REVIEW -> APPROVED -> ACTIVE.
+
+It also includes:
+- an audit log (who did what, when)
+- a schema diff viewer (what changed between versions)
+- GitOps export/import (signed bundle for promotion across environments)
+
+## Step-by-step (10 minutes)
+
+1. Create a new config
+- Click **New Config** in the header.
+- Give it a name (and optionally tenantId/configId in the Getting Started wizard).
+
+2. Edit the config
+- Open **Builder** and make a change.
+- Open **Rules Builder** and add a starter rule.
+
+3. Submit for review
+- Go to **Console** -> **Versions**.
+- Find your version in **DRAFT**, click **Submit**.
+
+4. Approve
+- Go to **Console** -> **Governance**.
+- Click **Approve** on the pending request.
+
+5. Promote to ACTIVE
+- Back in **Console** -> **Versions**, click **Promote**.
+- The previous ACTIVE version is automatically deprecated.
+
+6. Diff the bundle
+- Click **Diff** to see a JSON-level diff of (UI schema + flow + rules + API mappings).
+
+7. Export GitOps
+- In **Console** -> **Versions**, use **Export** under GitOps Package.
+
+8. Import GitOps
+- Use **Import** to load a GitOps bundle back into the demo store.
+
+## Validator Gate (no dead buttons)
+
+Submitting and promoting are blocked if validation fails:
+- schema validity
+- WCAG basics (ariaLabelKey + focus order)
+- i18n coverage for required keys
+
+If validation fails, fix issues in Builder/Rules and try again.
+
+## Screenshot placeholders
+
+- [TODO screenshot: Console -> Versions list]
+- [TODO screenshot: Console -> Bundle Diff modal]
+

@@ -1,0 +1,56 @@
+# Tutorial: Create UI Upfront (Builder)
+
+Builder is a schema authoring surface for `UISchema`:
+- palette is driven by the **Component Registry**
+- property panel is generated from **JSON Schema**
+- validation gates block Save until issues are rectified
+
+## Goal
+
+Create a UI schema that renders correctly, is accessible, and is ready to run in the Playground.
+
+## Step-by-step (15 minutes)
+
+1. Open Builder
+- Use **Getting Started** -> Step 2, or navigate to `/builder?versionId=...`.
+
+2. Drag/drop components
+- Drag a component from the palette onto the canvas.
+- Drag canvas items to reorder.
+- Click a canvas item to edit it.
+
+3. Edit props (schema-driven)
+- In the right panel, use the **Props** form generated from the component's `propsSchema`.
+- If you need advanced fields, use **Edit as JSON**.
+
+4. Add bindings (optional)
+- Bindings connect component props to runtime data paths (ex: `data.orderTotal`).
+- In the demo, some adapters read bindings for display in Preview/Playground.
+
+5. Fix validation issues (Rectify & Save)
+- If Save is disabled, scroll to **Schema Preview** and click an issue to focus the offending component.
+- Fix missing `ariaLabelKey` / invalid focus order / missing required keys.
+
+6. Preview mode (responsive canvas)
+- Click **Preview** in the Builder header, or open `/builder?versionId=...&preview=1`.
+- Switch breakpoints (Desktop/Tablet/Mobile) to verify layout.
+
+7. Save
+- Click **Save**. Saving updates the DRAFT version in the demo store.
+
+## How palette + property panel work
+
+Builder reads component definitions from `/api/component-registry`.
+
+Each `ComponentDefinition` includes:
+- `adapterHint` (how the renderer chooses the adapter)
+- `propsSchema` (JSON Schema subset used to generate form fields)
+- `defaultProps` (starter values)
+- `bindings` (keys the component supports)
+
+## Screenshot placeholders
+
+- [TODO screenshot: Builder palette + canvas]
+- [TODO screenshot: Props panel generated from JSON schema]
+- [TODO screenshot: Preview mode breakpoints]
+

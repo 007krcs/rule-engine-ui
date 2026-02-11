@@ -1,8 +1,12 @@
-﻿[F] .eslintrc.cjs
+[F] .eslintrc.cjs
 [F] .gitignore
 [F] .prettierrc.cjs
+[F] DELIVERABLES.md
 [F] eslint.config.js
+[F] GAP_REPORT.md
+[F] NEW_USER_WALKTHROUGH.md
 [F] package.json
+[F] playwright.config.ts
 [F] pnpm-lock.yaml
 [F] pnpm-workspace.yaml
 [F] README.md
@@ -19,7 +23,6 @@
     [F] README.md
     [F] tsconfig.json
     [D] src
-      [F] .gitkeep
       [F] index.tsx
     [D] tests
       [F] builder.test.tsx
@@ -28,7 +31,6 @@
     [F] README.md
     [F] tsconfig.json
     [D] src
-      [F] .gitkeep
       [F] index.ts
     [D] tests
       [F] demo-host-angular.test.ts
@@ -50,77 +52,183 @@
     [F] README.md
     [F] tsconfig.json
     [D] src
-      [F] .gitkeep
       [F] index.ts
     [D] tests
       [F] demo-host-vue.test.ts
   [D] ruleflow-web
-    [F] next.config.mjs
+    [F] BUG_TRIAGE_REPORT.md
     [F] next-env.d.ts
+    [F] next.config.mjs
     [F] package.json
     [F] postcss.config.cjs
     [F] README.md
-    [F] tailwind.config.ts
     [F] tsconfig.json
+    [F] vitest.config.ts
+    [D] e2e
+      [F] smoke.spec.ts
     [D] src
       [F] mdx.d.ts
       [D] app
         [F] globals.css
+        [F] home.module.css
         [F] layout.tsx
         [F] page.tsx
+        [D] api
+          [D] approvals
+            [D] [approvalId]
+              [D] approve
+                [F] route.ts
+              [D] request-changes
+                [F] route.ts
+          [D] component-registry
+            [F] route.ts
+          [D] config-packages
+            [F] route.ts
+          [D] config-versions
+            [D] [versionId]
+              [F] route.ts
+              [D] diff
+                [F] route.ts
+              [D] promote
+                [F] route.ts
+              [D] rules
+                [F] route.ts
+              [D] submit-review
+                [F] route.ts
+          [D] console
+            [F] route.ts
+          [D] gitops
+            [D] export
+              [F] route.ts
+            [D] import
+              [F] route.ts
+          [D] system
+            [D] reset
+              [F] route.ts
         [D] builder
+          [F] builder.module.css
           [F] page.tsx
+          [D] rules
+            [F] page.tsx
+            [F] rules.module.css
+        [D] component-registry
+          [F] page.tsx
+          [F] registry.module.css
         [D] console
+          [F] console.module.css
           [F] page.tsx
         [D] docs
+          [F] docs.module.css
           [F] page.tsx
           [D] [slug]
             [F] page.tsx
         [D] integrations
+          [F] integrations.module.css
           [F] page.tsx
         [D] playground
           [F] page.tsx
+        [D] samples
+          [F] page.tsx
+          [F] samples.module.css
+        [D] system
+          [D] health
+            [F] health.module.css
+            [F] page.tsx
+          [D] layout-check
+            [F] layout-check.module.css
+            [F] page.tsx
+          [D] roadmap
+            [F] page.tsx
+            [F] roadmap.module.css
       [D] components
         [D] builder
+          [F] canvas-item.module.css
+          [F] canvas-item.tsx
+          [F] component-editor.module.css
           [F] component-editor.tsx
+          [F] schema-preview.module.css
           [F] schema-preview.tsx
         [D] console
+          [F] audit-item.module.css
           [F] audit-item.tsx
+          [F] metric-card.module.css
           [F] metric-card.tsx
         [D] docs
           [F] doc-renderer.tsx
+          [F] docs-search.module.css
           [F] docs-search.tsx
         [D] layout
+          [F] app-shell.module.css
           [F] app-shell.tsx
+          [F] breadcrumbs.module.css
           [F] breadcrumbs.tsx
           [F] theme-provider.tsx
           [F] theme-toggle.tsx
+        [D] onboarding
+          [F] onboarding-provider.tsx
+          [F] onboarding-wizard.module.css
+          [F] onboarding-wizard.tsx
+          [F] samples-gallery.module.css
+          [F] samples-gallery.tsx
         [D] playground
+          [F] playground.module.css
           [F] playground.tsx
         [D] ui
+          [F] badge.module.css
           [F] badge.tsx
+          [F] button.module.css
           [F] button.tsx
+          [F] card.module.css
           [F] card.tsx
+          [F] input.module.css
           [F] input.tsx
+          [F] modal.module.css
+          [F] modal.tsx
+          [F] select.module.css
+          [F] select.tsx
+          [F] textarea.module.css
+          [F] textarea.tsx
+          [F] toast.module.css
+          [F] toast.tsx
       [D] content
         [D] docs
           [F] adapters.mdx
+          [F] common-mistakes.mdx
           [F] concepts.mdx
+          [F] debugging.mdx
           [F] deployment.mdx
+          [F] glossary.mdx
           [F] i18n.mdx
           [F] quickstart.mdx
           [F] schemas.mdx
           [F] security.mdx
+          [F] tutorial-builder.mdx
+          [F] tutorial-company-adapter.mdx
+          [F] tutorial-component-registry.mdx
+          [F] tutorial-console.mdx
+          [F] tutorial-integrations.mdx
+          [F] tutorial-playground.mdx
+          [F] tutorial-rules.mdx
+          [F] tutorial-theming.mdx
           [F] wcag.mdx
       [D] lib
         [F] auth.ts
         [F] docs.ts
         [F] mock-data.ts
+        [F] samples.ts
         [F] utils.ts
+        [D] demo
+          [F] api-client.ts
+          [F] types.ts
+      [D] server
+        [D] demo
+          [F] repository.ts
     [D] tests
+      [F] demo-repository.test.ts
       [F] docs.test.ts
 [D] packages
   [D] adapters
+    [F] README.md
     [D] angular-renderer
       [F] package.json
       [F] README.md
@@ -193,6 +301,14 @@
       [F] index.ts
     [D] tests
       [F] api-orchestrator.test.ts
+  [D] component-registry
+    [F] package.json
+    [F] README.md
+    [F] tsconfig.json
+    [D] src
+      [F] index.ts
+    [D] tests
+      [F] component-registry.test.ts
   [D] config-registry
     [F] package.json
     [F] README.md
@@ -265,7 +381,7 @@
       [F] index.ts
       [F] types.ts
     [D] tests
-      [F] schema.test.ts
+      [F] assets.test.ts
   [D] validator
     [F] package.json
     [F] README.md

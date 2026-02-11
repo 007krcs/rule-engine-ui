@@ -21,6 +21,27 @@
   font-size: 13px;
 }
 
+.issueItem {
+  margin: 0;
+}
+
+.issueButton {
+  width: 100%;
+  display: block;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.issueButton:hover {
+  background: color-mix(in srgb, var(--rf-warning) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rf-warning) 25%, var(--rf-border));
+}
+
 .issuePath {
   font-family: var(--rf-font-mono);
 }
@@ -36,4 +57,3 @@
   font-size: 12px;
   color: var(--rf-fg);
 }
-

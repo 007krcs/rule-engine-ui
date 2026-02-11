@@ -1,0 +1,48 @@
+# Tutorial: Embed In React / Angular / Vue
+
+RuleFlow is headless:
+- the runtime is framework-agnostic
+- UI rendering is done through thin adapters selected via `adapterHint`
+
+## React (recommended)
+
+```tsx
+import { RenderPage } from '@platform/react-renderer';
+import { registerMaterialAdapters } from '@platform/react-material-adapter';
+import { registerCompanyAdapter } from '@platform/react-company-adapter';
+
+registerMaterialAdapters();
+registerCompanyAdapter();
+
+<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />
+```
+
+## Angular (HTML renderer)
+
+The Angular demo renderer returns a HTML string and can mount to a target:
+
+```ts
+import { renderAngular } from '@platform/angular-renderer';
+
+renderAngular({ uiSchema, data, context, i18n, target: '#root' });
+```
+
+## Vue (HTML renderer)
+
+```ts
+import { renderVue } from '@platform/vue-renderer';
+
+renderVue({ uiSchema, data, context, i18n, target: '#app' });
+```
+
+## Integration checklist
+
+- Register adapters that match your `adapterHint` prefixes
+- Validate schemas before running (`@platform/validator`)
+- Capture runtime traces for auditability (`@platform/observability`)
+- Keep host-specific styling in your adapter layer (or inject CSS variables)
+
+## Screenshot placeholders
+
+- [TODO screenshot: Integration Hub page]
+

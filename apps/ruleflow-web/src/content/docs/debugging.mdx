@@ -1,0 +1,29 @@
+# Debugging
+
+## Validation failures (Save/Submit blocked)
+
+1. Open Builder and scroll to **Schema Preview**
+2. Click the issue to focus the offending component
+3. Fix `ariaLabelKey` / focus order / missing required fields
+
+Tip: if you're stuck, temporarily switch to **Edit as JSON** and compare against a working sample.
+
+## Runtime issues (Playground)
+
+1. Open Playground and run **Submit**
+2. In Trace:
+   - Flow: check `reason` and guard results
+   - Rules: check `errors` and which rules matched
+   - API: check status code and endpoint
+
+## Rules don't match
+
+- Confirm scope filters (role/country/tenant)
+- Confirm operands point at the right paths (`context.*` vs `data.*`)
+- Toggle Explain mode to see per-rule match results
+
+## API mapping errors
+
+- Ensure the flow transition includes `callApi` and `apiId`
+- Inspect Trace -> API for the request payload and response body
+

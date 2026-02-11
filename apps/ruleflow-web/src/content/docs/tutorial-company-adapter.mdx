@@ -1,0 +1,81 @@
+# Tutorial: Add Your Company Component In 10 Minutes
+
+This tutorial shows the full "bring your own components" loop:
+- implement a React adapter for `company.*` components
+- register the adapter in the host
+- register component manifests so Builder can edit props intelligently
+- drag/drop the custom components in Builder and preview them
+
+## 1) Implement the adapter (React)
+
+In this repo, the demo adapter lives here:
+- `packages/adapters/react-company-adapter/src/index.tsx`
+
+It registers a prefix and renders based on `adapterHint`:
+
+```ts
+import { registerAdapter } from '@platform/react-renderer';
+
+registerAdapter('company.', (component, ctx) => {
+  // render based on component.adapterHint
+});
+```
+
+The demo includes:
+- `company.currencyInput`
+- `company.riskBadge`
+
+## 2) Register the adapter in the product UI
+
+The product app registers adapters at runtime:
+- Builder: `apps/ruleflow-web/src/app/builder/page.tsx`
+- Playground: `apps/ruleflow-web/src/components/playground/playground.tsx`
+
+Look for:
+
+```ts
+registerCompanyAdapter();
+```
+
+## 3) Register the manifest (so Builder can edit props)
+
+Open:
+- `/component-registry`
+
+Paste a manifest (example):
+
+```json
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "adapterHint": "company.riskBadge",
+      "displayName": "Risk Badge",
+      "category": "Company",
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string" },
+          "level": { "type": "string", "enum": ["Low", "Medium", "High"] }
+        }
+      },
+      "defaultProps": { "label": "Risk", "level": "Low" },
+      "bindings": { "data": ["level"] }
+    }
+  ]
+}
+```
+
+## 4) Use it in Builder
+
+1. Open Builder for your version
+2. Drag **Currency Input** / **Risk Badge** onto the canvas
+3. Edit props in the right panel
+4. Click **Preview** and switch breakpoints
+5. **Save**
+
+## Screenshot placeholders
+
+- [TODO screenshot: Builder palette showing company components]
+- [TODO screenshot: Property panel generated from company props schema]
+

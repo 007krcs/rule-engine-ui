@@ -123,6 +123,26 @@ function renderComponent(
         <table style="width:100%;border-collapse:collapse"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>
       </div>`;
     }
+    case 'company.currencyInput': {
+      const currency = typeof component.props?.currency === 'string' ? component.props.currency : 'USD';
+      const labelText = component.i18n?.labelKey
+        ? ctx.i18n.t(component.i18n.labelKey)
+        : String(component.props?.label ?? 'Amount');
+      return `<label style="display:flex;flex-direction:column;gap:4px">
+        <span>${escapeHtml(labelText)} (${escapeHtml(currency)})</span>
+        <input aria-label="${escapeHtml(ariaLabel)}" type="number" placeholder="0.00" />
+      </label>`;
+    }
+    case 'company.riskBadge': {
+      const level = typeof component.props?.level === 'string' ? component.props.level : 'Low';
+      const labelText = component.i18n?.labelKey
+        ? ctx.i18n.t(component.i18n.labelKey)
+        : String(component.props?.label ?? 'Risk');
+      return `<div aria-label="${escapeHtml(ariaLabel)}" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span>${escapeHtml(labelText)}</span>
+        <span style="padding:4px 10px;border-radius:999px;border:1px solid #ddd">${escapeHtml(level)}</span>
+      </div>`;
+    }
     case 'highcharts.chart':
     case 'd3.chart':
     case 'company.card': {

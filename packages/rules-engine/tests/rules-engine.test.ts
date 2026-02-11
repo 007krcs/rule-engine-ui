@@ -142,4 +142,37 @@ describe('rules-engine', () => {
     });
     expect(logger).toHaveBeenCalled();
   });
+
+  it('captures explain details (per-clause results, reads, action diffs)', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'EXPLAIN',
+          when: { op: 'gt', left: { path: 'data.total' }, right: { value: 100 } },
+          actions: [{ type: 'setField', path: 'data.segment', value: 'vip' }],
+        },
+      ],
+      context: baseContext,
+      data: { total: 120 },
+    });
+
+    const explain = result.trace.conditionExplains?.EXPLAIN;
+    expect(explain).toBeTruthy();
+    expect(explain?.kind).toBe('compare');
+    expect(explain && 'result' in explain ? explain.result : null).toBe(true);
+    expect(explain && 'left' in explain ? explain.left.kind : null).toBe('path');
+    expect(explain && 'left' in explain && explain.left.kind === 'path' ? explain.left.path : null).toBe('data.total');
+    expect(explain && 'left' in explain && explain.left.kind === 'path' ? explain.left.value : null).toBe(120);
+
+    const reads = result.trace.readsByRuleId?.EXPLAIN ?? [];
+    expect(reads.some((r) => r.path === 'data.total' && r.value === 120)).toBe(true);
+
+    const diffs = (result.trace.actionDiffs ?? []).filter((d) => d.ruleId === 'EXPLAIN');
+    expect(diffs.length).toBeGreaterThan(0);
+    expect(
+      diffs.some(
+        (d) => d.target === 'data' && d.path === 'segment' && d.before === undefined && d.after === 'vip' && d.action.type === 'setField',
+      ),
+    ).toBe(true);
+  });
 });

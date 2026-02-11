@@ -1,106 +1,116 @@
 # Gap Report (RuleFlow Platform Monorepo)
 
-Date: 2026-02-09
+Date: 2026-02-10
 
-This report lists the current gaps vs the Principal Engineer requirements and points to the exact code locations.
+This report lists remaining gaps vs the Principal Engineer requirements, plus evidence for what is already implemented.
 
-## 1) Styling / UI Independence (Critical)
+## What Now Works End-To-End (New User Success)
 
-- RESOLVED (2026-02-09): Removed Tailwind from the product app (`apps/ruleflow-web`); UI uses first-party CSS variables + CSS modules.
-  - Evidence:
-    - `apps/ruleflow-web/src/app/globals.css` defines RuleFlow design tokens and base styles (no `@tailwind` / `@apply`).
-    - `apps/ruleflow-web/postcss.config.cjs` no longer includes `tailwindcss`.
-    - `apps/ruleflow-web/tailwind.config.ts` deleted.
-    - `apps/ruleflow-web/package.json` no longer depends on `tailwindcss`, `tailwind-merge`, `@tailwindcss/typography`, or `class-variance-authority`.
+The in-product experience supports the required beginner loop:
 
-- RESOLVED (2026-02-09): AppShell is fluid/responsive-first.
-  - Evidence:
-    - `apps/ruleflow-web/src/components/layout/app-shell.module.css` uses `width: min(1440px, 100% - padding)` and responsive sidebar/drawer behavior.
-    - Playwright captures visual snapshots at 1280/1024/768/375 in `apps/ruleflow-web/e2e/smoke.spec.ts`.
+1. Clone a sample config (creates a DRAFT `versionId`)
+2. Open Builder and modify UI (drag/drop, schema-driven props editor, validation)
+3. Add a rule (starter rule button) and save
+4. Run in Playground and view trace
+5. Toggle Explain mode and see clause results + reads + action diffs
 
-- GAP: Host/theming adapter mechanism is not explicitly documented/implemented beyond CSS variables.
-  - Evidence:
-    - Tokens exist in `apps/ruleflow-web/src/app/globals.css`, but there is no dedicated "theme adapter" API nor a documented host CSS injection path.
+Evidence:
+- Getting Started wizard: `apps/ruleflow-web/src/components/onboarding/onboarding-wizard.tsx`
+- Samples gallery: `apps/ruleflow-web/src/components/onboarding/samples-gallery.tsx`, `/samples` route `apps/ruleflow-web/src/app/samples/page.tsx`
+- Builder: `apps/ruleflow-web/src/app/builder/page.tsx`
+- Rules Builder: `apps/ruleflow-web/src/app/builder/rules/page.tsx`
+- Playground + Explain UI: `apps/ruleflow-web/src/components/playground/playground.tsx`
+- E2E walkthrough: `apps/ruleflow-web/e2e/smoke.spec.ts` ("getting started wizard completes core walkthrough")
 
-## 2) Builder: Drag/Drop + Canvas + Property Panel (Critical)
+## 1) Guided Onboarding (In-Product)
 
-- RESOLVED (2026-02-09): Real drag/drop exists (palette -> canvas, plus reorder within canvas).
-  - Evidence:
-    - `apps/ruleflow-web/src/app/builder/page.tsx` uses `@dnd-kit` with a droppable canvas and sortable canvas items.
-    - E2E coverage: `apps/ruleflow-web/e2e/smoke.spec.ts` ("builder drag-drops palette component onto canvas").
+- RESOLVED: Wizard is accessible from sidebar and header, has step-by-step actions, PASS/FAIL, and sample templates.
+  - `apps/ruleflow-web/src/components/onboarding/onboarding-wizard.tsx`
+  - State persisted in localStorage, url `versionId` sync: `apps/ruleflow-web/src/components/onboarding/onboarding-provider.tsx`
 
-- RESOLVED (2026-02-09): Live Canvas rendering is wired.
-  - Evidence:
-    - `apps/ruleflow-web/src/app/builder/page.tsx` renders `UISchema` via `RenderPage`.
-    - Renderer respects grid `columns`: `packages/adapters/react-renderer/src/index.tsx`.
+## 2) Create UI Upfront (Builder)
 
-- RESOLVED (2026-02-09): Select-to-edit property panel exists.
-  - Evidence:
-    - Clicking a canvas component selects it and renders the editor in the right-side panel (`apps/ruleflow-web/src/app/builder/page.tsx`, `apps/ruleflow-web/src/components/builder/component-editor.tsx`).
+- RESOLVED: Drag/drop palette -> canvas, reorder, remove, schema-driven property panel, live preview.
+  - Builder + DnD: `apps/ruleflow-web/src/app/builder/page.tsx`
+  - Property editor generated from JSON Schema subset: `apps/ruleflow-web/src/components/builder/component-editor.tsx`
 
-## 3) Rules: Validation + Explainability + Date Support (Critical)
+- RESOLVED: Preview Mode toggle with breakpoints.
+  - `apps/ruleflow-web/src/app/builder/page.tsx`
 
-- GAP: No UI for building/validating rules or explaining pass/fail.
-  - Evidence:
-    - There is no rules editor/simulator route under `apps/ruleflow-web/src/app`.
-    - Current UI only validates `UISchema` via `@platform/validator` in Builder.
+- RESOLVED: “Rectify & Save” validation gate blocks save until issues fixed.
+  - UI schema validation: `apps/ruleflow-web/src/app/builder/page.tsx` + `@platform/validator`
+  - Issue focus jump: `apps/ruleflow-web/src/components/builder/schema-preview.tsx`
 
-- GAP: Rules engine has no date operators / date parsing support.
-  - Evidence:
-    - Operator list lacks date operators: `packages/schema/src/types.ts` `RuleOperator`.
-    - Runtime evaluation only handles a limited operator set: `packages/rules-engine/src/index.ts` `evalCondition`.
+## 3) Component Registry System + Component Onboarding
 
-## 4) Persistence: DB + Entities + Lifecycle (Critical)
+- RESOLVED: Registry drives palette + prop editor (schema-driven).
+  - Registry package: `packages/component-registry/src/index.ts`
+  - Builder loads effective registry: `/api/component-registry` -> `apps/ruleflow-web/src/app/api/component-registry/route.ts`
 
-- GAP: Persistence is JSON-file + in-memory, not a real DB (SQLite recommended).
-  - Evidence:
-    - `apps/ruleflow-web/src/server/demo/repository.ts` persists to `.ruleflow-demo-data/store.json`.
+- RESOLVED: Component Onboarding page validates and registers manifests.
+  - UI: `apps/ruleflow-web/src/app/component-registry/page.tsx`
 
-- RESOLVED (2026-02-09): Signed GitOps bundles (local HMAC) implemented.
-  - Evidence:
-    - `apps/ruleflow-web/src/server/demo/repository.ts` signs exports and verifies imports using `gitops-signing-key.txt` under `.ruleflow-demo-data/`.
-    - `apps/ruleflow-web/src/app/api/gitops/export/route.ts` returns a signed bundle payload.
-    - `apps/ruleflow-web/src/app/api/gitops/import/route.ts` rejects invalid/unsigned bundles.
+## 4) Custom Company Component Integration (Example Included)
 
-## 5) Integrations: Angular/Vue Real Examples (Critical)
+- RESOLVED: `CompanyCustomAdapter` example with two components:
+  - `company.currencyInput`
+  - `company.riskBadge`
+  - Adapter: `packages/adapters/react-company-adapter/src/index.tsx`
 
-- GAP: Integration Hub page is mostly snippets; it does not show working Angular/Vue renders.
-  - Evidence:
-    - `apps/ruleflow-web/src/app/integrations/page.tsx` only prints code blocks.
+- RESOLVED: Samples use company components.
+  - Templates: `apps/ruleflow-web/src/lib/samples.ts`
+  - Seeding: `apps/ruleflow-web/src/server/demo/repository.ts` (checkout-flow, loan-onboarding)
 
-- GAP: Angular/Vue renderers exist but are not showcased in the product UI with a working example.
-  - Evidence:
-    - Renderer packages:
-      - `packages/adapters/angular-renderer/src/index.ts`
-      - `packages/adapters/vue-renderer/src/index.ts`
-    - No product-level page renders their output.
+## 5) Persistence By configId/version + Lifecycle + Audit
 
-## 6) Docs: Newcomer Friendly End-to-End (Critical)
+- PARTIALLY RESOLVED: Entities + lifecycle exist (DRAFT/REVIEW/APPROVED/ACTIVE/DEPRECATED/RETIRED) with audit log and approvals.
+  - Repository: `apps/ruleflow-web/src/server/demo/repository.ts`
+  - Console UI: `apps/ruleflow-web/src/app/console/page.tsx`
 
-- GAP: Docs do not cover an end-to-end guided demo + extension points.
-  - Evidence:
-    - Root `README.md` does not provide a full guided walkthrough.
-    - Product docs routes exist (`apps/ruleflow-web/src/app/docs/**`), but content does not yet meet required sections:
-      - drag/drop internals
-      - storage model
-      - rules validation with examples
-      - adding adapters
-      - theming injection
-      - Angular/Vue embedding
+- GAP: Demo persistence is a local JSON store, not a real DB.
+  - Store location: `.ruleflow-demo-data/` (configured by `RULEFLOW_DEMO_STORE_DIR` in tests)
 
-## 7) Demo Requirements (Playground)
+## 6) Rules/Conditions Validation + Explain Mode
 
-- GAP: Demo bundle lacks a date picker component and date-based rules.
-  - Evidence:
-    - Example UI schema `packages/schema/examples/example.ui.json` contains input/table/chart/custom, but no date picker.
-    - Example rules `packages/schema/examples/example.rules.json` have no date conditions.
+- RESOLVED: Rules Builder exists and validates RuleSet JSON; includes “Add starter rule” flow.
+  - `apps/ruleflow-web/src/app/builder/rules/page.tsx`
 
-## 8) Testing Coverage (Mandatory)
+- RESOLVED: Explain mode shows clause results, reads, and action diffs.
+  - Trace types: `packages/observability/src/index.ts`
+  - Engine explain capture: `packages/rules-engine/src/index.ts`
+  - Playground UI: `apps/ruleflow-web/src/components/playground/playground.tsx`
 
-- GAP: No E2E test for drag/drop + property editing + rules simulation + persistence lifecycle.
-  - Evidence:
-    - Existing Playwright suite `apps/ruleflow-web/e2e/smoke.spec.ts` covers navigation, console lifecycle, builder add/save (click-based), playground flow, export/import; no drag/drop or rules simulator coverage.
+- GAP: Date operators and locale-aware date parsing are not implemented yet (`before/after/on/between/plusDays`).
+  - Engine ops: `packages/rules-engine/src/index.ts`
+  - Schema ops: `packages/schema/src/types.ts`
 
-- GAP: No unit tests for date operators.
-  - Evidence:
-    - `packages/rules-engine/tests` do not include date comparisons/parsing cases.
+## 7) Documentation (Beginner-Friendly)
+
+- RESOLVED: In-product docs hub + tutorials + glossary/common mistakes/debugging.
+  - Docs routes: `apps/ruleflow-web/src/app/docs/**`
+  - Docs content: `apps/ruleflow-web/src/content/docs/*.mdx`
+  - Search + registry: `apps/ruleflow-web/src/lib/docs.ts`, `apps/ruleflow-web/src/components/docs/*`
+
+## 8) Responsive Layout + Breakpoint Verification
+
+- RESOLVED: AppShell uses a fluid layout; a layout test page previews breakpoints.
+  - AppShell: `apps/ruleflow-web/src/components/layout/app-shell.tsx`
+  - Layout check: `apps/ruleflow-web/src/app/system/layout-check/page.tsx`
+
+## 9) Angular + Vue Integration Completeness
+
+- RESOLVED (minimal): Product Integration Hub shows React render and Angular/Vue HTML renderer outputs.
+  - `apps/ruleflow-web/src/app/integrations/page.tsx`
+  - Renderers: `packages/adapters/angular-renderer/src/index.ts`, `packages/adapters/vue-renderer/src/index.ts`
+
+- GAP: These Angular/Vue packages are HTML renderers (not full framework component integration).
+
+## 10) Testing
+
+- RESOLVED: Unit tests added for core “supportive UX” primitives.
+  - Component registry validation: `packages/component-registry/tests/component-registry.test.ts`
+  - Rules explain mode trace: `packages/rules-engine/tests/rules-engine.test.ts`
+  - Persistence lifecycle + GitOps: `apps/ruleflow-web/tests/demo-repository.test.ts`
+
+- RESOLVED: Playwright e2e coverage for onboarding and the core loop.
+  - `apps/ruleflow-web/e2e/smoke.spec.ts`

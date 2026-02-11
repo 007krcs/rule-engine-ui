@@ -1,4 +1,28 @@
-﻿import type { RuleAction, JSONValue } from '@platform/schema';
+import type { RuleAction, JSONValue } from '@platform/schema';
+
+export type ExplainOperand =
+  | { kind: 'path'; path: string; value: JSONValue | undefined }
+  | { kind: 'value'; value: JSONValue };
+
+export type ConditionExplain =
+  | { kind: 'all'; result: boolean; children: ConditionExplain[] }
+  | { kind: 'any'; result: boolean; children: ConditionExplain[] }
+  | { kind: 'not'; result: boolean; child: ConditionExplain }
+  | { kind: 'compare'; result: boolean; op: string; left: ExplainOperand; right?: ExplainOperand };
+
+export interface RuleRead {
+  path: string;
+  value: JSONValue | undefined;
+}
+
+export interface RuleActionDiff {
+  ruleId: string;
+  action: RuleAction;
+  target: 'data' | 'context';
+  path: string;
+  before: JSONValue | undefined;
+  after: JSONValue | undefined;
+}
 
 export interface RulesTrace {
   startedAt: string;
@@ -6,6 +30,10 @@ export interface RulesTrace {
   rulesConsidered: string[];
   rulesMatched: string[];
   conditionResults: Record<string, boolean>;
+  // Explain mode additions (optional for backwards compatibility).
+  conditionExplains?: Record<string, ConditionExplain>;
+  readsByRuleId?: Record<string, RuleRead[]>;
+  actionDiffs?: RuleActionDiff[];
   actionsApplied: Array<{ ruleId: string; action: RuleAction }>;
   events: Array<{ ruleId: string; event: string; payload?: JSONValue }>;
   errors: Array<{ ruleId?: string; message: string }>;
@@ -74,3 +102,4 @@ function defaultTraceLogger(message: string, trace: unknown): void {
   // eslint-disable-next-line no-console
   console.info(`[RuleFlow] ${message}`, trace);
 }
+

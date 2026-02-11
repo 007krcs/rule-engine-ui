@@ -158,12 +158,21 @@ importers:
       '@next/mdx':
         specifier: ^15.1.0
         version: 15.5.12(@mdx-js/react@3.1.1(@types/react@19.2.13)(react@19.2.4))
+      '@platform/angular-renderer':
+        specifier: workspace:*
+        version: link:../../packages/adapters/angular-renderer
+      '@platform/component-registry':
+        specifier: workspace:*
+        version: link:../../packages/component-registry
       '@platform/core-runtime':
         specifier: workspace:*
         version: link:../../packages/core-runtime
       '@platform/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@platform/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@platform/react-aggrid-adapter':
         specifier: workspace:*
         version: link:../../packages/adapters/react-aggrid-adapter
@@ -188,6 +197,9 @@ importers:
       '@platform/validator':
         specifier: workspace:*
         version: link:../../packages/validator
+      '@platform/vue-renderer':
+        specifier: workspace:*
+        version: link:../../packages/adapters/vue-renderer
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -359,6 +371,12 @@ importers:
       '@platform/observability':
         specifier: workspace:*
         version: link:../observability
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../schema
+
+  packages/component-registry:
+    dependencies:
       '@platform/schema':
         specifier: workspace:*
         version: link:../schema

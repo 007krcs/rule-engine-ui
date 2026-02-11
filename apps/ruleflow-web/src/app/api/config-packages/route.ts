@@ -9,6 +9,8 @@ export async function POST(request: Request) {
     name?: string;
     description?: string;
     templateId?: string;
+    tenantId?: string;
+    configId?: string;
   };
   if (!body || typeof body.name !== 'string') {
     return NextResponse.json({ ok: false, error: 'name is required' }, { status: 400 });
@@ -23,6 +25,8 @@ export async function POST(request: Request) {
     name: body.name,
     description: body.description,
     templateId: templateId ? (templateId as SampleTemplateId) : undefined,
+    tenantId: body.tenantId,
+    configId: body.configId,
   });
   return NextResponse.json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
 }

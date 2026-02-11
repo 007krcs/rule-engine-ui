@@ -3,7 +3,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
-export type OnboardingStepId = 'cloneSample' | 'editUi' | 'editRules' | 'runPlayground' | 'explainTrace';
+export type OnboardingStepId =
+  | 'createConfig'
+  | 'editUi'
+  | 'editRules'
+  | 'previewUi'
+  | 'saveDb'
+  | 'runPlayground'
+  | 'inspectTrace'
+  | 'exportGitOps';
 
 export type OnboardingState = {
   open: boolean;
@@ -37,11 +45,24 @@ function readState(): OnboardingState {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState;
     const parsed = JSON.parse(raw) as Partial<OnboardingState>;
+    const rawSteps = parsed.steps && typeof parsed.steps === 'object' ? (parsed.steps as Record<string, unknown>) : {};
+    const asBool = (key: string) => rawSteps[key] === true;
+    const normalizedSteps: Partial<Record<OnboardingStepId, boolean>> = {
+      // Migration: `cloneSample` -> `createConfig`, `explainTrace` -> `inspectTrace`
+      createConfig: asBool('createConfig') || asBool('cloneSample'),
+      editUi: asBool('editUi'),
+      editRules: asBool('editRules'),
+      previewUi: asBool('previewUi'),
+      saveDb: asBool('saveDb'),
+      runPlayground: asBool('runPlayground'),
+      inspectTrace: asBool('inspectTrace') || asBool('explainTrace'),
+      exportGitOps: asBool('exportGitOps'),
+    };
     return {
       open: Boolean(parsed.open),
       dismissed: Boolean(parsed.dismissed),
       activeVersionId: typeof parsed.activeVersionId === 'string' ? parsed.activeVersionId : null,
-      steps: parsed.steps && typeof parsed.steps === 'object' ? (parsed.steps as OnboardingState['steps']) : {},
+      steps: normalizedSteps,
     };
   } catch {
     return defaultState;
@@ -91,7 +112,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       return {
         ...current,
         activeVersionId: versionIdFromUrl,
-        steps: { ...current.steps, cloneSample: true },
+        steps: { ...current.steps, createConfig: true },
       };
     });
   }, [pathname, versionIdFromUrl]);
@@ -120,12 +141,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     if (!next) return;
     setState((current) => {
       const alreadySet = current.activeVersionId === next;
-      const alreadyMarked = current.steps.cloneSample === true;
+      const alreadyMarked = current.steps.createConfig === true;
       if (alreadySet && alreadyMarked) return current;
       return {
         ...current,
         activeVersionId: next,
-        steps: { ...current.steps, cloneSample: true },
+        steps: { ...current.steps, createConfig: true },
       };
     });
   }, []);

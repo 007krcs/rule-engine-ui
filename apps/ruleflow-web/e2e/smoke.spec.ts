@@ -1,14 +1,31 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ request, page }) => {
   await request.post('/api/system/reset');
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        'rf:onboarding:v1',
+        JSON.stringify({ open: false, dismissed: true, activeVersionId: null, steps: {} }),
+      );
+    } catch {
+      // ignore
+    }
+  });
 });
+
+async function waitForClientReady(page: Page) {
+  await expect(page.getByTestId('client-ready')).toBeVisible({ timeout: 120_000 });
+}
 
 test('navigation + header actions', async ({ page }) => {
   await page.goto('/');
+  await waitForClientReady(page);
 
   await page.getByRole('link', { name: 'Explore Console' }).click();
   await expect(page).toHaveURL(/\/console/);
+  await waitForClientReady(page);
+  await expect(page.getByText('Loading console data...')).toBeHidden({ timeout: 120_000 });
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export GitOps' }).click();
@@ -33,6 +50,8 @@ test('console lifecycle + diff + gitops import', async ({ page, request }, testI
   const versionId = created.versionId;
 
   await page.goto('/console?tab=versions');
+  await waitForClientReady(page);
+  await expect(page.getByText('Loading console data...')).toBeHidden({ timeout: 120_000 });
   const versionRow = page.getByTestId(`version-row-${versionId}`);
 
   await versionRow.getByRole('button', { name: 'Submit' }).click();
@@ -77,6 +96,7 @@ test('console lifecycle + diff + gitops import', async ({ page, request }, testI
 
 test('playground executes flow and shows trace', async ({ page }) => {
   await page.goto('/playground');
+  await waitForClientReady(page);
 
   await expect(page.getByText('State:')).toBeVisible();
 
@@ -93,6 +113,16 @@ test('playground executes flow and shows trace', async ({ page }) => {
   await expect(page.getByText('State: submitted')).toBeVisible();
 
   await expect(page.getByText('POST https://api.example.com/orders')).toBeVisible();
+
+  // Explain mode: per-rule clause results + reads + diffs.
+  await page.getByLabel('Explain').check();
+  const ruleDetails = page.getByTestId('rule-explain-US_ADMIN_DISCOUNT');
+  const ruleSummary = ruleDetails.locator('summary');
+  await expect(ruleSummary).toBeVisible();
+  await ruleSummary.click();
+  await expect(ruleDetails.getByText('COMPARE', { exact: true })).toBeVisible();
+  await expect(ruleDetails.getByText('data.orderTotal=1200', { exact: true })).toBeVisible();
+  await expect(ruleDetails.getByText('setField data.discount', { exact: true })).toBeVisible();
 });
 
 test('builder adds component and saves', async ({ page, request }) => {
@@ -100,8 +130,9 @@ test('builder adds component and saves', async ({ page, request }) => {
   const created = (await create.json()) as { ok: true; versionId: string };
 
   await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
+  await waitForClientReady(page);
   await expect(page.getByText('Schema Builder')).toBeVisible();
-  await expect(page.getByTestId('canvas-item-customerNameInput')).toBeVisible();
+  await expect(page.locator('[data-testid^=\"canvas-item-\"]').first()).toBeVisible();
 
   await page.getByPlaceholder('Component id').fill('newField');
   await page.getByRole('button', { name: 'Add' }).click();
@@ -118,9 +149,10 @@ test('builder drag-drops palette component onto canvas', async ({ page, request 
   const created = (await create.json()) as { ok: true; versionId: string };
 
   await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
+  await waitForClientReady(page);
   await expect(page.getByText('Schema Builder')).toBeVisible();
   // Wait for initial persisted schema to load (builder disables drag-drop while loading).
-  await expect(page.getByTestId('canvas-item-customerNameInput')).toBeVisible();
+  await expect(page.locator('[data-testid^=\"canvas-item-\"]').first()).toBeVisible();
 
   const paletteItem = page.getByTestId('palette-item-material-input');
   const canvas = page.getByTestId('builder-canvas');
@@ -169,4 +201,42 @@ test('visual snapshots (no assertion)', async ({ page }, testInfo) => {
       await page.screenshot({ path: out, fullPage: true });
     }
   }
+});
+
+test('getting started wizard completes core walkthrough', async ({ page }) => {
+  await page.goto('/');
+  await waitForClientReady(page);
+
+  await page.getByRole('button', { name: 'Get Started' }).click();
+  const wizard = page.getByRole('dialog');
+  await expect(wizard.getByText('Getting Started')).toBeVisible();
+
+  // Step 1: clone a sample config.
+  await wizard.getByRole('button', { name: 'Clone sample' }).first().click();
+  await expect(page).toHaveURL(/\/builder\?versionId=/);
+  await waitForClientReady(page);
+
+  const versionId = new URL(page.url()).searchParams.get('versionId');
+  if (!versionId) throw new Error('Missing versionId after cloning sample');
+
+  // Step 2 + 5: save (blocked if validation fails).
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Saved UI schema')).toBeVisible();
+
+  // Step 3: add a rule and save.
+  await page.goto(`/builder/rules?versionId=${encodeURIComponent(versionId)}`);
+  await waitForClientReady(page);
+  await page.getByRole('button', { name: 'Add starter rule' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Saved rule set')).toBeVisible();
+
+  // Step 6 + 7: run submit, then inspect explain trace.
+  await page.goto(`/playground?versionId=${encodeURIComponent(versionId)}&autorun=submit&focus=trace&explain=1`);
+  await waitForClientReady(page);
+  await expect(page.getByText('State: submitted')).toBeVisible();
+  await page.getByLabel('Explain').check();
+  const ruleDetails = page.getByTestId('rule-explain-US_ADMIN_DISCOUNT');
+  await ruleDetails.locator('summary').click();
+  await expect(ruleDetails.getByText('COMPARE', { exact: true })).toBeVisible();
+  await expect(ruleDetails.getByText('setField data.discount', { exact: true })).toBeVisible();
 });

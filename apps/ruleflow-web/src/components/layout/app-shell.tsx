@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Activity, BookOpen, Boxes, HeartPulse, LayoutDashboard, ListTodo, Menu, PackageOpen, Plug, ShieldCheck, Sparkles, X } from 'lucide-react';
 import styles from './app-shell.module.css';
 import { cn } from '@/lib/utils';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
-import { Button } from '@/components/ui/button';
+import { Button, buttonClassName } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,7 @@ const navItems = [
   { href: '/builder', label: 'Builder', icon: Boxes },
   { href: '/playground', label: 'Playground', icon: Sparkles },
   { href: '/samples', label: 'Samples', icon: PackageOpen },
+  { href: '/component-registry', label: 'Component Registry', icon: Plug },
   { href: '/docs', label: 'Documentation', icon: BookOpen },
   { href: '/integrations', label: 'Integration Hub', icon: Plug },
 ];
@@ -30,15 +31,29 @@ const systemItems = [
   { href: '/console?tab=governance', label: 'Governance', icon: ShieldCheck },
   { href: '/console?tab=observability', label: 'Observability', icon: Activity },
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
+  { href: '/system/layout-check', label: 'Layout Check', icon: Boxes },
   { href: '/system/health', label: 'Health', icon: HeartPulse },
   { href: '/system/roadmap', label: 'Roadmap', icon: ListTodo },
 ];
+
+function helpHrefForPathname(pathname: string): string {
+  if (pathname.startsWith('/builder/rules')) return '/docs/tutorial-rules';
+  if (pathname.startsWith('/builder')) return '/docs/tutorial-builder';
+  if (pathname.startsWith('/playground')) return '/docs/tutorial-playground';
+  if (pathname.startsWith('/console')) return '/docs/tutorial-console';
+  if (pathname.startsWith('/component-registry')) return '/docs/tutorial-component-registry';
+  if (pathname.startsWith('/integrations')) return '/docs/tutorial-integrations';
+  if (pathname.startsWith('/samples')) return '/docs/quickstart';
+  if (pathname.startsWith('/docs')) return '/docs';
+  return '/docs/quickstart';
+}
 
 function getPageTitle(pathname: string, tab?: string | null) {
   if (pathname === '/') return 'Overview';
 
   if (pathname.startsWith('/docs')) return 'Documentation';
   if (pathname.startsWith('/samples')) return 'Samples';
+  if (pathname.startsWith('/component-registry')) return 'Component Registry';
   if (pathname.startsWith('/integrations')) return 'Integration Hub';
   if (pathname.startsWith('/builder')) return 'Builder';
   if (pathname.startsWith('/playground')) return 'Playground';
@@ -51,6 +66,7 @@ function getPageTitle(pathname: string, tab?: string | null) {
   }
 
   if (pathname.startsWith('/system/health')) return 'Health';
+  if (pathname.startsWith('/system/layout-check')) return 'Layout Check';
   if (pathname.startsWith('/system/roadmap')) return 'Roadmap';
 
   return pathname.slice(1);
@@ -61,21 +77,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const onboarding = useOnboarding();
+  const [clientReady, setClientReady] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [newConfigOpen, setNewConfigOpen] = useState(false);
+  const [newConfigTenantId, setNewConfigTenantId] = useState('tenant-1');
+  const [newConfigId, setNewConfigId] = useState('');
   const [newConfigName, setNewConfigName] = useState('');
   const [newConfigDescription, setNewConfigDescription] = useState('');
   const [newConfigBusy, setNewConfigBusy] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
   const { toast } = useToast();
 
   const tab = searchParams.get('tab');
   const pageTitle = useMemo(() => getPageTitle(pathname, tab), [pathname, tab]);
+  const helpHref = useMemo(() => helpHrefForPathname(pathname), [pathname]);
+  const activeVersionId = onboarding.state.activeVersionId;
+
+  useEffect(() => {
+    setClientReady(true);
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === 'k') {
+        event.preventDefault();
+        setCommandQuery('');
+        setCommandOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const nav = (
     <div className={styles.navStack}>
       <nav className={styles.navCard}>
         <p className={styles.navTitle}>Platform</p>
         <div className={styles.navList}>
+          <button
+            type="button"
+            onClick={() => {
+              onboarding.open();
+              setMobileNavOpen(false);
+            }}
+            className={cn(styles.navItem, styles.navButton, onboarding.state.open ? styles.navItemActive : undefined)}
+          >
+            <Sparkles className={styles.navIcon} aria-hidden="true" focusable="false" />
+            Getting Started
+          </button>
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
             const Icon = item.icon;
@@ -138,9 +186,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const result = await apiPost<{ ok: true; packageId: string; versionId: string }>('/api/config-packages', {
         name,
         description: newConfigDescription.trim() || undefined,
+        tenantId: newConfigTenantId.trim() || undefined,
+        configId: newConfigId.trim() || undefined,
       });
       toast({ variant: 'success', title: 'Created draft config', description: result.versionId });
       setNewConfigOpen(false);
+      setNewConfigTenantId('tenant-1');
+      setNewConfigId('');
       setNewConfigName('');
       setNewConfigDescription('');
       router.push(`/builder?versionId=${encodeURIComponent(result.versionId)}`);
@@ -159,6 +211,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     try {
       await downloadFromApi('/api/gitops/export', 'ruleflow-gitops.json');
       toast({ variant: 'success', title: 'Exported GitOps bundle' });
+      onboarding.completeStep('exportGitOps');
     } catch (error) {
       toast({
         variant: 'error',
@@ -168,8 +221,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const commandActions = useMemo(() => {
+    const withActive = (href: string) => (activeVersionId ? `${href}${href.includes('?') ? '&' : '?'}versionId=${encodeURIComponent(activeVersionId)}` : href);
+
+    return [
+      { id: 'getting-started', label: 'Getting Started Wizard', onRun: () => onboarding.open() },
+      { id: 'new-config', label: 'New Config', onRun: () => setNewConfigOpen(true) },
+      { id: 'open-builder', label: 'Open Builder', onRun: () => router.push(withActive('/builder')) },
+      { id: 'open-rules', label: 'Open Rules Builder', onRun: () => router.push(withActive('/builder/rules')) },
+      { id: 'open-playground', label: 'Open Playground', onRun: () => router.push(withActive('/playground')) },
+      { id: 'open-console', label: 'Open Console', onRun: () => router.push('/console') },
+      { id: 'open-samples', label: 'Open Samples Gallery', onRun: () => router.push('/samples') },
+      { id: 'open-component-registry', label: 'Open Component Registry', onRun: () => router.push('/component-registry') },
+      { id: 'open-docs', label: 'Open Docs', onRun: () => router.push('/docs') },
+      { id: 'help', label: 'Help (this page)', onRun: () => router.push(helpHref) },
+      { id: 'export-gitops', label: 'Export GitOps Bundle', onRun: () => void exportGitOps() },
+    ];
+  }, [activeVersionId, exportGitOps, helpHref, onboarding, router]);
+
+  const filteredActions = useMemo(() => {
+    const q = commandQuery.trim().toLowerCase();
+    if (!q) return commandActions;
+    return commandActions.filter((action) => action.label.toLowerCase().includes(q));
+  }, [commandActions, commandQuery]);
+
   return (
     <div className={styles.shell}>
+      {clientReady ? <span data-testid="client-ready" className={styles.clientReady} aria-hidden="true" /> : null}
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <div className={styles.headerLeft}>
@@ -199,6 +277,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="outline" size="sm" onClick={exportGitOps}>
               Export GitOps
             </Button>
+            <Link className={buttonClassName({ variant: 'outline', size: 'sm' })} href={helpHref}>
+              Help
+            </Link>
             <Button variant="outline" size="sm" onClick={onboarding.open}>
               Get Started
             </Button>
@@ -242,9 +323,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
           <div className={styles.mobileActions}>
             <ThemeToggle />
-            <Button size="sm" variant="outline" onClick={onboarding.open}>
+            <Link className={buttonClassName({ variant: 'outline', size: 'sm' })} href={helpHref}>
               Help
-            </Button>
+            </Link>
             <Button size="sm" onClick={() => setNewConfigOpen(true)}>
               New
             </Button>
@@ -272,6 +353,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }
       >
         <div className={styles.modalBody}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+            <div>
+              <label className={styles.fieldLabel}>Tenant Id</label>
+              <Input value={newConfigTenantId} onChange={(e) => setNewConfigTenantId(e.target.value)} placeholder="tenant-1" />
+            </div>
+            <div>
+              <label className={styles.fieldLabel}>Config Id</label>
+              <Input value={newConfigId} onChange={(e) => setNewConfigId(e.target.value)} placeholder="checkout-flow" />
+            </div>
+          </div>
           <div>
             <label className={styles.fieldLabel}>Name</label>
             <Input value={newConfigName} onChange={(e) => setNewConfigName(e.target.value)} placeholder="Orders Bundle" />
@@ -287,6 +378,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Modal>
 
       <OnboardingWizard />
+
+      <Modal
+        open={commandOpen}
+        title="Command Palette"
+        description="Type to filter. Shortcut: Ctrl+K"
+        onClose={() => setCommandOpen(false)}
+      >
+        <div className={styles.commandBody}>
+          <Input
+            autoFocus
+            placeholder="Search actions..."
+            value={commandQuery}
+            onChange={(e) => setCommandQuery(e.target.value)}
+          />
+          <div className={styles.commandList} role="list">
+            {filteredActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className={styles.commandItem}
+                onClick={() => {
+                  setCommandOpen(false);
+                  action.onRun();
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+            {filteredActions.length === 0 ? <p className={styles.commandEmpty}>No matches.</p> : null}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

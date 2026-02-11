@@ -8,7 +8,15 @@
   RuleSet,
   RuleScope,
 } from '@platform/schema';
-import { logRulesTrace, type RulesTrace, type TraceLogger } from '@platform/observability';
+import {
+  logRulesTrace,
+  type ConditionExplain,
+  type ExplainOperand,
+  type RuleActionDiff,
+  type RuleRead,
+  type RulesTrace,
+  type TraceLogger,
+} from '@platform/observability';
 
 export interface EvaluateRulesInput {
   rules: Rule[] | RuleSet;
@@ -49,6 +57,9 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
     rulesConsidered: [],
     rulesMatched: [],
     conditionResults: {},
+    conditionExplains: {},
+    readsByRuleId: {},
+    actionDiffs: [],
     actionsApplied: [],
     events: [],
     errors: [],
@@ -79,9 +90,11 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
     const rule = sorted[i];
     if (!rule) continue;
     try {
-      const result = evaluateCondition(rule.when, context, data, { maxDepth });
-      trace.conditionResults[rule.ruleId] = result;
-      if (result) {
+      const explained = evaluateConditionExplain(rule.when, context, data, { maxDepth });
+      trace.conditionResults[rule.ruleId] = explained.result;
+      trace.conditionExplains![rule.ruleId] = explained.explain;
+      trace.readsByRuleId![rule.ruleId] = explained.reads;
+      if (explained.result) {
         trace.rulesMatched.push(rule.ruleId);
         if (mode === 'apply') {
           const actions = rule.actions ?? [];
@@ -103,7 +116,9 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
   if (input.options?.traceLogger) {
     input.options.traceLogger(trace);
   }
-  if (input.options?.logTrace || process.env.RULEFLOW_TRACE === '1') {
+  // Guard `process.env` for client bundles.
+  const traceEnv = typeof process !== 'undefined' ? process.env.RULEFLOW_TRACE : undefined;
+  if (input.options?.logTrace || traceEnv === '1') {
     logRulesTrace(trace, input.options?.logger);
   }
 
@@ -118,6 +133,129 @@ export function evaluateCondition(
 ): boolean {
   const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
   return evalCondition(condition, context, data, 0, maxDepth);
+}
+
+function evaluateConditionExplain(
+  condition: RuleCondition,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+  options?: { maxDepth?: number },
+): { result: boolean; explain: ConditionExplain; reads: RuleRead[] } {
+  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const reads: RuleRead[] = [];
+  const explain = evalConditionExplain(condition, context, data, reads, 0, maxDepth);
+  const deduped = new Map<string, RuleRead>();
+  for (const read of reads) {
+    deduped.set(read.path, read);
+  }
+  return { result: explain.result, explain, reads: Array.from(deduped.values()) };
+}
+
+function evalConditionExplain(
+  condition: RuleCondition,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+  reads: RuleRead[],
+  depth: number,
+  maxDepth: number,
+): ConditionExplain {
+  if (depth > maxDepth) {
+    throw new Error(`Max condition depth exceeded: ${maxDepth}`);
+  }
+
+  if ('all' in condition) {
+    const children = condition.all.map((child) => evalConditionExplain(child, context, data, reads, depth + 1, maxDepth));
+    const result = children.every((child) => child.result);
+    return { kind: 'all', result, children };
+  }
+
+  if ('any' in condition) {
+    const children = condition.any.map((child) => evalConditionExplain(child, context, data, reads, depth + 1, maxDepth));
+    const result = children.some((child) => child.result);
+    return { kind: 'any', result, children };
+  }
+
+  if ('not' in condition) {
+    const child = evalConditionExplain(condition.not, context, data, reads, depth + 1, maxDepth);
+    return { kind: 'not', result: !child.result, child };
+  }
+
+  const left = resolveOperandExplain(condition.left, context, data, reads);
+  const right = condition.right ? resolveOperandExplain(condition.right, context, data, reads) : undefined;
+
+  const leftValue = left.kind === 'path' ? left.value : left.value;
+  const rightValue = right ? (right.kind === 'path' ? right.value : right.value) : undefined;
+
+  let result = false;
+  switch (condition.op) {
+    case 'eq':
+      result = deepEqual(leftValue, rightValue);
+      break;
+    case 'neq':
+      result = !deepEqual(leftValue, rightValue);
+      break;
+    case 'gt':
+      result = typeof leftValue === 'number' && typeof rightValue === 'number' && leftValue > rightValue;
+      break;
+    case 'gte':
+      result = typeof leftValue === 'number' && typeof rightValue === 'number' && leftValue >= rightValue;
+      break;
+    case 'lt':
+      result = typeof leftValue === 'number' && typeof rightValue === 'number' && leftValue < rightValue;
+      break;
+    case 'lte':
+      result = typeof leftValue === 'number' && typeof rightValue === 'number' && leftValue <= rightValue;
+      break;
+    case 'in':
+      result = Array.isArray(rightValue) && rightValue.some((item) => deepEqual(item, leftValue));
+      break;
+    case 'contains':
+      if (typeof leftValue === 'string' && typeof rightValue === 'string') {
+        result = leftValue.includes(rightValue);
+      } else if (Array.isArray(leftValue)) {
+        result = leftValue.some((item) => deepEqual(item, rightValue));
+      } else {
+        result = false;
+      }
+      break;
+    case 'startsWith':
+      result = typeof leftValue === 'string' && typeof rightValue === 'string' && leftValue.startsWith(rightValue);
+      break;
+    case 'endsWith':
+      result = typeof leftValue === 'string' && typeof rightValue === 'string' && leftValue.endsWith(rightValue);
+      break;
+    case 'exists':
+      result = leftValue !== undefined;
+      break;
+    default:
+      result = false;
+  }
+
+  return { kind: 'compare', result, op: condition.op, left, right };
+}
+
+function resolveOperandExplain(
+  operand: RuleOperand,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+  reads: RuleRead[],
+): ExplainOperand {
+  if ('value' in operand) {
+    return { kind: 'value', value: operand.value };
+  }
+
+  const path = operand.path;
+  let value: JSONValue | undefined;
+  if (path.startsWith('context.')) {
+    value = getPath(context as unknown as Record<string, JSONValue>, path.slice('context.'.length));
+  } else if (path.startsWith('data.')) {
+    value = getPath(data, path.slice('data.'.length));
+  } else {
+    value = getPath(data, path);
+  }
+
+  reads.push({ path, value: cloneValue(value) });
+  return { kind: 'path', path, value };
 }
 
 function evalCondition(
@@ -240,18 +378,25 @@ function applyAction(
   },
 ): void {
   switch (action.type) {
-    case 'setField':
-      setPath(ctx.data, stripPrefix(action.path, 'data.'), action.value);
+    case 'setField': {
+      const path = stripPrefix(action.path, 'data.');
+      const before = cloneValue(getPath(ctx.data, path));
+      setPath(ctx.data, path, action.value);
+      const after = cloneValue(getPath(ctx.data, path));
+      recordActionDiff(ctx.trace, { ruleId: ctx.ruleId, action, target: 'data', path, before, after });
       ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
       break;
-    case 'setContext':
-      setPath(
-        ctx.context as unknown as Record<string, JSONValue>,
-        stripPrefix(action.path, 'context.'),
-        action.value,
-      );
+    }
+    case 'setContext': {
+      const path = stripPrefix(action.path, 'context.');
+      const contextObj = ctx.context as unknown as Record<string, JSONValue>;
+      const before = cloneValue(getPath(contextObj, path));
+      setPath(contextObj, path, action.value);
+      const after = cloneValue(getPath(contextObj, path));
+      recordActionDiff(ctx.trace, { ruleId: ctx.ruleId, action, target: 'context', path, before, after });
       ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
       break;
+    }
     case 'throwError':
       ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
       throw new RuleActionError(action.message);
@@ -262,7 +407,11 @@ function applyAction(
     case 'removeField': {
       const target = resolveTarget(ctx, action.path);
       if (target) {
+        const before = cloneValue(getPath(target.obj, target.path));
         removePath(target.obj, target.path);
+        const after = cloneValue(getPath(target.obj, target.path));
+        const targetKind: RuleActionDiff['target'] = action.path.startsWith('context.') ? 'context' : 'data';
+        recordActionDiff(ctx.trace, { ruleId: ctx.ruleId, action, target: targetKind, path: target.path, before, after });
         ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
       }
       break;
@@ -270,12 +419,16 @@ function applyAction(
     case 'addItem': {
       const target = resolveTarget(ctx, action.path);
       if (target) {
+        const before = cloneValue(getPath(target.obj, target.path));
         const current = getPath(target.obj, target.path);
         if (Array.isArray(current)) {
           current.push(action.value);
         } else {
           setPath(target.obj, target.path, [action.value]);
         }
+        const after = cloneValue(getPath(target.obj, target.path));
+        const targetKind: RuleActionDiff['target'] = action.path.startsWith('context.') ? 'context' : 'data';
+        recordActionDiff(ctx.trace, { ruleId: ctx.ruleId, action, target: targetKind, path: target.path, before, after });
         ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
       }
       break;
@@ -284,10 +437,14 @@ function applyAction(
       const source = resolveTarget(ctx, action.from);
       const dest = resolveTarget(ctx, action.to);
       if (source && dest) {
+        const before = cloneValue(getPath(dest.obj, dest.path));
         const value = getPath(source.obj, source.path);
         if (value !== undefined) {
           setPath(dest.obj, dest.path, value);
         }
+        const after = cloneValue(getPath(dest.obj, dest.path));
+        const targetKind: RuleActionDiff['target'] = action.to.startsWith('context.') ? 'context' : 'data';
+        recordActionDiff(ctx.trace, { ruleId: ctx.ruleId, action, target: targetKind, path: dest.path, before, after });
         ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
       }
       break;
@@ -320,6 +477,16 @@ function resolveTarget(
 
 function stripPrefix(path: string, prefix: string): string {
   return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
+
+function recordActionDiff(trace: RulesTrace, diff: RuleActionDiff): void {
+  if (!trace.actionDiffs) trace.actionDiffs = [];
+  trace.actionDiffs.push(diff);
+}
+
+function cloneValue(value: JSONValue | undefined): JSONValue | undefined {
+  if (value === undefined) return undefined;
+  return deepClone(value);
 }
 
 function deepClone<T>(value: T): T {

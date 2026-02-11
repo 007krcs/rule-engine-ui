@@ -1,0 +1,63 @@
+# Tutorial: Theming + CSS Variable Overrides
+
+RuleFlow is headless and pluggable:
+- the runtime is framework-agnostic
+- adapters are the seam for rendering and styling
+- the product UI uses first-party CSS variables so hosts can theme without rewriting pages
+
+## Goal
+
+Override colors/spacing/typography safely, without coupling to RuleFlow internals.
+
+## 1) RuleFlow design tokens
+
+The product app defines tokens in:
+- `apps/ruleflow-web/src/app/globals.css`
+
+They are plain CSS variables like:
+- `--rf-bg`, `--rf-fg`, `--rf-primary`, `--rf-border`
+- `--rf-radius-*`, `--rf-space-*`
+- `--rf-font-sans`, `--rf-font-mono`
+
+## 2) Override tokens in a host app
+
+In a host app, set variables before rendering RuleFlow UI:
+
+```css
+:root {
+  --rf-primary: #0ea5e9;
+  --rf-accent: #16a34a;
+  --rf-radius-md: 16px;
+}
+```
+
+If you embed RuleFlow into a larger app and want scoping:
+
+```css
+.ruleflowMount {
+  --rf-primary: #0ea5e9;
+  --rf-bg: #ffffff;
+}
+```
+
+Then mount RuleFlow inside that container.
+
+## 3) Using a CSS framework (optional)
+
+Companies can keep their framework-specific styling inside adapters:
+
+- React: your adapter returns framework components (MUI, Chakra, Tailwind, etc)
+- Angular/Vue: your renderer/adapter owns the HTML and classes
+
+RuleFlow schemas remain unchanged; only adapter implementation changes.
+
+## Common mistakes
+
+- Changing layout widths with fixed pixel containers (prefer fluid + max-width where needed)
+- Overriding component styles globally instead of scoping to a mount container
+- Adding framework CSS that breaks form defaults (inputs, buttons) without a reset strategy
+
+## Screenshot placeholders
+
+- [TODO screenshot: CSS variables override example]
+

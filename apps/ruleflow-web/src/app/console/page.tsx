@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { AuditItem } from '@/components/console/audit-item';
 import { MetricCard } from '@/components/console/metric-card';
+import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 import styles from './console.module.css';
 
 const statusVariant: Record<ConfigStatus, 'default' | 'success' | 'warning' | 'muted'> = {
@@ -37,6 +38,7 @@ export default function ConsolePage() {
   const showObservability = tab === 'observability' || !tab;
   const showVersions = tab === 'versions' || !tab;
   const { toast } = useToast();
+  const { completeStep } = useOnboarding();
 
   const [snapshot, setSnapshot] = useState<ConsoleSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -201,6 +203,7 @@ export default function ConsolePage() {
     try {
       await downloadFromApi('/api/gitops/export', 'ruleflow-gitops.json');
       toast({ variant: 'success', title: 'Exported GitOps bundle' });
+      completeStep('exportGitOps');
     } catch (error) {
       toast({
         variant: 'error',

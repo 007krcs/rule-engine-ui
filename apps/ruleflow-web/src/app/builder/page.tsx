@@ -9,6 +9,8 @@ import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
 import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
 import { registerD3Adapter } from '@platform/react-d3-adapter';
 import { registerCompanyAdapter } from '@platform/react-company-adapter';
+import type { ComponentDefinition } from '@platform/component-registry';
+import { builtinComponentDefinitions } from '@platform/component-registry';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 import { useSearchParams } from 'next/navigation';
 import type { ConfigVersion } from '@/lib/demo/types';
@@ -17,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { ComponentEditor } from '@/components/builder/component-editor';
 import { SchemaPreview } from '@/components/builder/schema-preview';
 import { CanvasItem } from '@/components/builder/canvas-item';
@@ -38,17 +41,6 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-type PaletteItemDef = { label: string; adapterHint: string; defaults?: Partial<UIComponent> };
-
-const palette: PaletteItemDef[] = [
-  { label: 'Text Field', adapterHint: 'material.input', defaults: { props: { label: 'Text field', placeholder: 'Type here...' } } },
-  { label: 'Button', adapterHint: 'material.button', defaults: { props: { label: 'Action button' } } },
-  { label: 'AG-Grid Table', adapterHint: 'aggrid.table', defaults: { props: { columns: [{ field: 'id' }, { field: 'status' }], rows: [] } } },
-  { label: 'Highcharts', adapterHint: 'highcharts.chart', defaults: { props: { title: 'Revenue', series: [2, 7, 4, 9] } } },
-  { label: 'D3 Custom', adapterHint: 'd3.custom', defaults: { props: { series: [1, 3, 2, 6, 4] } } },
-  { label: 'Company Lens', adapterHint: 'company.card', defaults: { props: { label: 'Company profile', metrics: [{ label: 'Risk', value: 'Low' }] } } },
-];
 
 const scratchComponents: UIComponent[] = [
   {
@@ -92,6 +84,10 @@ const scratchComponents: UIComponent[] = [
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
 
+type GetRegistryResponse =
+  | { ok: true; tenantId: string; effective: ComponentDefinition[] }
+  | { ok: false; error: string };
+
 const previewContext: ExecutionContext = {
   tenantId: 'tenant-1',
   userId: 'builder',
@@ -106,9 +102,15 @@ const previewContext: ExecutionContext = {
 };
 
 const previewData: Record<string, JSONValue> = {
+  orderTotal: 1200,
+  loanAmount: 250000,
+  riskLevel: 'Medium',
   orders: [],
   revenueSeries: [2, 7, 4, 9],
 };
+
+const BUILTIN_COMPONENT_DEFS = builtinComponentDefinitions();
+const DEFAULT_ADAPTER_HINT = BUILTIN_COMPONENT_DEFS[0]?.adapterHint ?? 'material.input';
 
 function normalizeFocusOrder(components: UIComponent[]) {
   return components.map((component, index) => ({
@@ -151,13 +153,13 @@ function toTestIdSuffix(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
-function buildComponentFromPalette(item: PaletteItemDef, id: string): UIComponent {
-  const type = deriveType(item.adapterHint);
+function buildComponentFromRegistry(def: ComponentDefinition, id: string): UIComponent {
+  const type = deriveType(def.adapterHint);
   return {
     id,
     type,
-    adapterHint: item.adapterHint,
-    ...(item.defaults ?? {}),
+    adapterHint: def.adapterHint,
+    props: def.defaultProps ? (JSON.parse(JSON.stringify(def.defaultProps)) as UIComponent['props']) : undefined,
     accessibility: {
       ariaLabelKey: `runtime.builder.${id}.aria`,
       keyboardNav: true,
@@ -181,20 +183,20 @@ function CanvasDropZone({ children, disabled }: { children: React.ReactNode; dis
 }
 
 function PaletteItem({
-  item,
+  def,
   selected,
   disabled,
   onSelect,
 }: {
-  item: PaletteItemDef;
+  def: ComponentDefinition;
   selected: boolean;
   disabled?: boolean;
   onSelect: () => void;
 }) {
-  const id = `palette:${item.adapterHint}`;
+  const id = `palette:${def.adapterHint}`;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,
-    data: { kind: 'palette', adapterHint: item.adapterHint, label: item.label },
+    data: { kind: 'palette', adapterHint: def.adapterHint, label: def.displayName },
     disabled,
   });
 
@@ -208,15 +210,15 @@ function PaletteItem({
       ref={setNodeRef}
       type="button"
       style={style}
-      data-testid={`palette-item-${toTestIdSuffix(item.adapterHint)}`}
+      data-testid={`palette-item-${toTestIdSuffix(def.adapterHint)}`}
       className={`${styles.paletteButton} ${selected ? styles.paletteButtonActive : ''}`}
       onClick={onSelect}
       disabled={disabled}
       {...attributes}
       {...listeners}
     >
-      <span>{item.label}</span>
-      <Badge variant="muted">{item.adapterHint}</Badge>
+      <span>{def.displayName}</span>
+      <Badge variant="muted">{def.adapterHint}</Badge>
     </button>
   );
 }
@@ -224,20 +226,25 @@ function PaletteItem({
 export default function BuilderPage() {
   const searchParams = useSearchParams();
   const versionId = searchParams.get('versionId');
+  const previewFromUrl = searchParams.get('preview');
   const { toast } = useToast();
-  const onboarding = useOnboarding();
+  const { completeStep, setActiveVersionId } = useOnboarding();
 
   const [loading, setLoading] = useState(false);
+  const [registryLoading, setRegistryLoading] = useState(false);
+  const [registry, setRegistry] = useState<ComponentDefinition[]>(() => BUILTIN_COMPONENT_DEFS);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
   const [components, setComponents] = useState<UIComponent[]>(() => normalizeFocusOrder(scratchComponents));
   const [schemaVersion, setSchemaVersion] = useState('1.0.0');
   const [pageId, setPageId] = useState('builder-preview');
   const [columns, setColumns] = useState(1);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => scratchComponents[0]?.id ?? null);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<ExecutionContext['device']>('desktop');
 
   const [draft, setDraft] = useState({
     id: '',
-    adapterHint: palette[0]?.adapterHint ?? 'material.input',
+    adapterHint: DEFAULT_ADAPTER_HINT,
   });
 
   const sensors = useSensors(
@@ -253,6 +260,44 @@ export default function BuilderPage() {
     registerD3Adapter();
     registerCompanyAdapter();
   }, []);
+
+  useEffect(() => {
+    if (previewFromUrl === '1') setPreviewMode(true);
+  }, [previewFromUrl]);
+
+  useEffect(() => {
+    if (!previewMode) return;
+    completeStep('previewUi');
+  }, [completeStep, previewMode]);
+
+  useEffect(() => {
+    const loadRegistry = async () => {
+      setRegistryLoading(true);
+      try {
+        const resp = await apiGet<GetRegistryResponse>('/api/component-registry');
+        if (!resp.ok) throw new Error(resp.error);
+        setRegistry(resp.effective);
+      } catch (error) {
+        toast({
+          variant: 'error',
+          title: 'Failed to load component registry',
+          description: error instanceof Error ? error.message : String(error),
+        });
+        setRegistry(BUILTIN_COMPONENT_DEFS);
+      } finally {
+        setRegistryLoading(false);
+      }
+    };
+    void loadRegistry();
+  }, [toast]);
+
+  useEffect(() => {
+    if (registry.length === 0) return;
+    setDraft((current) => {
+      if (registry.some((def) => def.adapterHint === current.adapterHint)) return current;
+      return { ...current, adapterHint: registry[0]!.adapterHint };
+    });
+  }, [registry]);
 
   const schema: UISchema = useMemo(
     () => ({
@@ -308,7 +353,7 @@ export default function BuilderPage() {
       setComponents(normalized);
       setSelectedComponentId(normalized[0]?.id ?? null);
 
-      onboarding.setActiveVersionId(versionId);
+      setActiveVersionId(versionId);
       toast({ variant: 'info', title: 'Loaded config', description: response.version.version });
     } catch (error) {
       toast({ variant: 'error', title: 'Failed to load config', description: error instanceof Error ? error.message : String(error) });
@@ -335,10 +380,10 @@ export default function BuilderPage() {
       return;
     }
 
-    const item = palette.find((p) => p.adapterHint === draft.adapterHint) ?? palette[0];
-    if (!item) return;
+    const def = registry.find((p) => p.adapterHint === draft.adapterHint) ?? registry[0];
+    if (!def) return;
 
-    const nextComponent = buildComponentFromPalette(item, trimmedId);
+    const nextComponent = buildComponentFromRegistry(def, trimmedId);
     const next = normalizeFocusOrder([...components, nextComponent]);
     setComponents(next);
     setSelectedComponentId(nextComponent.id);
@@ -364,8 +409,9 @@ export default function BuilderPage() {
       });
       if (!result.ok) throw new Error(result.error);
       toast({ variant: 'success', title: 'Saved UI schema' });
-      onboarding.setActiveVersionId(versionId);
-      onboarding.completeStep('editUi');
+      setActiveVersionId(versionId);
+      completeStep('editUi');
+      completeStep('saveDb');
       await loadFromStore();
     } catch (error) {
       toast({ variant: 'error', title: 'Save failed', description: error instanceof Error ? error.message : String(error) });
@@ -391,6 +437,25 @@ export default function BuilderPage() {
   };
 
   const selectedComponent = selectedComponentId ? components.find((c) => c.id === selectedComponentId) ?? null : null;
+  const selectedDefinition =
+    selectedComponent ? registry.find((def) => def.adapterHint === selectedComponent.adapterHint) ?? null : null;
+
+  const focusComponent = (componentId: string) => {
+    setSelectedComponentId(componentId);
+    window.setTimeout(() => {
+      const safe = componentId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const el = document.querySelector(`[data-component-id="${safe}"]`);
+      if (el && el instanceof HTMLElement) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+  };
+
+  const effectivePreviewContext = useMemo(
+    () => ({ ...previewContext, device: previewDevice }),
+    [previewDevice],
+  );
+  const previewMaxWidth = previewDevice === 'mobile' ? 390 : previewDevice === 'tablet' ? 820 : 1280;
   const baseLocale = previewContext.locale.split('-')[0] ?? previewContext.locale;
   const i18n = useMemo(
     () =>
@@ -426,13 +491,13 @@ export default function BuilderPage() {
 
     if (activeId.startsWith('palette:')) {
       const adapterHint = activeId.slice('palette:'.length);
-      const item = palette.find((p) => p.adapterHint === adapterHint);
-      if (!item) return;
+      const def = registry.find((p) => p.adapterHint === adapterHint);
+      if (!def) return;
 
       const existingIds = new Set(components.map((c) => c.id));
       const base = deriveType(adapterHint);
       const id = nextId(base, existingIds);
-      const nextComponent = buildComponentFromPalette(item, id);
+      const nextComponent = buildComponentFromRegistry(def, id);
 
       const insertIndex = overId === 'canvas' ? components.length : components.findIndex((c) => c.id === overId);
       const next = normalizeFocusOrder(
@@ -477,10 +542,24 @@ export default function BuilderPage() {
               <Button variant="outline" size="sm" onClick={loadFromStore} disabled={!versionId || loading}>
                 Reload
               </Button>
-              <Button variant="outline" size="sm" onClick={submitForReview} disabled={!versionId || loading}>
+              <Button variant="outline" size="sm" onClick={() => setPreviewMode((v) => !v)} disabled={loading}>
+                {previewMode ? 'Exit preview' : 'Preview'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={submitForReview}
+                disabled={!versionId || loading || !validation.valid}
+                title={!validation.valid ? 'Fix validation issues before submitting for review' : undefined}
+              >
                 Submit for review
               </Button>
-              <Button size="sm" onClick={saveToStore} disabled={!versionId || loading || !validation.valid}>
+              <Button
+                size="sm"
+                onClick={saveToStore}
+                disabled={!versionId || loading || !validation.valid}
+                title={!validation.valid ? 'Fix validation issues to enable Save' : undefined}
+              >
                 {loading ? 'Working...' : 'Save'}
               </Button>
             </div>
@@ -504,19 +583,52 @@ export default function BuilderPage() {
       </Card>
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        {previewMode ? (
+          <Card>
+            <CardHeader>
+              <div className={styles.canvasHeaderRow}>
+                <CardTitle>Preview Mode</CardTitle>
+                <div className={styles.actions}>
+                  <Select
+                    value={previewDevice}
+                    onChange={(e) => setPreviewDevice(e.target.value as ExecutionContext['device'])}
+                    disabled={loading}
+                    aria-label="Preview breakpoint"
+                  >
+                    <option value="desktop">Desktop</option>
+                    <option value="tablet">Tablet</option>
+                    <option value="mobile">Mobile</option>
+                  </Select>
+                  <Button variant="outline" size="sm" onClick={() => setPreviewMode(false)} disabled={loading}>
+                    Back to editing
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className={styles.previewContent}>
+              <div className={styles.previewFrameWrap}>
+                <div className={styles.previewFrame} style={{ width: previewMaxWidth, maxWidth: '100%' }}>
+                  <RenderPage uiSchema={schema} data={previewData} context={effectivePreviewContext} i18n={i18n} />
+                </div>
+              </div>
+              <p className={styles.canvasHint}>Switch breakpoints to validate responsive layout.</p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className={styles.builderGrid}>
           <Card>
             <CardHeader>
               <CardTitle>Component Palette</CardTitle>
             </CardHeader>
             <CardContent className={styles.paletteContent}>
-              {palette.map((item) => (
+              {registryLoading ? <p className={styles.canvasHint}>Loading registry...</p> : null}
+              {registry.map((def) => (
                 <PaletteItem
-                  key={item.adapterHint}
-                  item={item}
-                  selected={draft.adapterHint === item.adapterHint}
-                  disabled={loading}
-                  onSelect={() => setDraft((current) => ({ ...current, adapterHint: item.adapterHint }))}
+                  key={def.adapterHint}
+                  def={def}
+                  selected={draft.adapterHint === def.adapterHint}
+                  disabled={loading || registryLoading}
+                  onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
                 />
               ))}
 
@@ -575,6 +687,8 @@ export default function BuilderPage() {
             {selectedComponent ? (
               <ComponentEditor
                 component={selectedComponent}
+                definition={selectedDefinition}
+                registry={registry}
                 issues={issuesByComponentId.get(selectedComponent.id)}
                 onChange={(next) =>
                   setComponents((current) => normalizeFocusOrder(current.map((item) => (item.id === next.id ? next : item))))
@@ -595,9 +709,15 @@ export default function BuilderPage() {
               </Card>
             )}
 
-            <SchemaPreview schema={schema} issues={validation.issues} />
+            <SchemaPreview
+              schema={schema}
+              issues={validation.issues}
+              resolveComponentId={(path) => extractComponentIdFromIssue(path, components)}
+              onFocusComponentId={focusComponent}
+            />
           </div>
         </div>
+        )}
 
         <DragOverlay>
           {activeDrag ? (

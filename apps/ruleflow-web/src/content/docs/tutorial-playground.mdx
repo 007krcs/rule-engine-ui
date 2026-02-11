@@ -1,0 +1,47 @@
+# Tutorial: Playground + Trace
+
+Playground simulates runtime execution:
+- you choose a config version
+- you simulate context (role, country, device, locale)
+- you run flow events (Back/Next/Submit)
+- you inspect a trace for Flow, Rules, and API
+
+## Step-by-step (10 minutes)
+
+1. Open Playground
+- Navigate to `/playground`.
+- Pick a version in the **Config Version** dropdown.
+
+2. Simulate context
+- Change `role`, `country`, `device`, or `locale`.
+- This affects rule scope filters and any guard conditions.
+
+3. Run flow events
+- Click **Next** and **Back** to transition states.
+- Click **Submit** to run:
+  - flow transition
+  - rules evaluation
+  - API orchestration (if configured for the transition)
+
+4. Inspect the trace
+- Flow shows the transition and guard reason.
+- Rules shows:
+  - which rules were considered
+  - which rules matched
+  - which actions were applied
+- API shows the demo request/response.
+
+5. Explain mode
+- Toggle **Explain** in the Rules section to see per-rule match results.
+
+## Useful URLs
+
+- Focus trace after navigation: `/playground?versionId=...&focus=trace`
+- Auto-run submit: `/playground?versionId=...&autorun=submit&focus=trace`
+- Auto-run + explain: `/playground?versionId=...&autorun=submit&focus=trace&explain=1`
+
+## Screenshot placeholders
+
+- [TODO screenshot: Playground context simulator]
+- [TODO screenshot: Trace panel showing Flow + Rules + API]
+

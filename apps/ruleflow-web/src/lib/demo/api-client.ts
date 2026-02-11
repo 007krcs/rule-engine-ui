@@ -11,8 +11,19 @@ async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as unknown;
     if (data && typeof data === 'object') {
-      const error = (data as { error?: unknown }).error;
-      if (typeof error === 'string') return error;
+      const rec = data as { error?: unknown; issues?: unknown };
+      const error = rec.error;
+      if (typeof error === 'string') {
+        const issues = rec.issues;
+        if (Array.isArray(issues) && issues.length > 0) {
+          const first = issues[0] as { path?: unknown; message?: unknown };
+          const path = typeof first?.path === 'string' ? first.path : 'root';
+          const message = typeof first?.message === 'string' ? first.message : 'invalid';
+          const suffix = issues.length > 1 ? ` (+${issues.length - 1} more)` : '';
+          return `${error}: ${path}: ${message}${suffix}`;
+        }
+        return error;
+      }
     }
   } catch {
     // ignore
@@ -53,23 +64,11 @@ export async function apiPatch<T>(url: string, body: unknown): Promise<T> {
 }
 
 export async function downloadFromApi(url: string, fallbackFilename: string): Promise<void> {
-  const response = await fetch(url, { method: 'GET', headers: { 'cache-control': 'no-store' } });
-  if (!response.ok) {
-    throw new ApiError(await parseErrorMessage(response), response.status);
-  }
-
-  const blob = await response.blob();
-  const disposition = response.headers.get('content-disposition') ?? '';
-  const match = disposition.match(/filename="?([^";]+)"?/i);
-  const filename = (match?.[1] ?? fallbackFilename).replace(/[\\/:*?"<>|]+/g, '-');
-
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    anchor.click();
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  // Trigger the download via a direct navigation so browsers treat it as user-initiated.
+  // (Fetching + blob URLs can be blocked when awaited inside async click handlers.)
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fallbackFilename;
+  anchor.rel = 'noopener';
+  anchor.click();
 }

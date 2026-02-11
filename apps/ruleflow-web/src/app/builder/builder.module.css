@@ -107,6 +107,26 @@
   gap: var(--rf-space-4);
 }
 
+.previewContent {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.previewFrameWrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.previewFrame {
+  border-radius: var(--rf-radius-lg);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  padding: var(--rf-space-4);
+  box-shadow: var(--rf-shadow-soft);
+  overflow: hidden;
+}
+
 .canvasZone {
   border-radius: var(--rf-radius-lg);
   border: 1px dashed color-mix(in srgb, var(--rf-border) 70%, var(--rf-primary));

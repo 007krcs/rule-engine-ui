@@ -1,0 +1,56 @@
+# Tutorial: Rules + Explain Mode
+
+RuleFlow rules are:
+- deterministic
+- framework-agnostic
+- safe-by-default (no `eval`)
+
+Rules run against:
+- `context` (tenant, role, locale, device, etc)
+- `data` (mutable runtime data bag)
+
+## Step-by-step (10 minutes)
+
+1. Open Rules Builder
+- Navigate to `/builder/rules?versionId=...`.
+
+2. Add a starter rule
+- Click **Add starter rule**.
+- This inserts a beginner-friendly rule that sets a flag and emits an event.
+
+3. Save
+- Fix any validation issues.
+- Click **Save** to persist the RuleSet into the DRAFT version.
+
+4. Run + Explain
+- Open Playground and click **Submit**.
+- In the Trace panel, toggle **Explain** to see per-rule match results.
+
+## Rule DSL mental model
+
+Each rule has:
+- `scope` (optional filters, ex: roles/countries)
+- `when` condition (AST, not code)
+- `actions` (set fields, emit events, throw errors, etc)
+
+Example condition:
+
+```json
+{
+  "op": "gt",
+  "left": { "path": "data.orderTotal" },
+  "right": { "value": 1000 }
+}
+```
+
+Example action:
+
+```json
+{ "type": "setField", "path": "data.riskLevel", "value": "High" }
+```
+
+## Screenshot placeholders
+
+- [TODO screenshot: Rules Builder page]
+- [TODO screenshot: Trace -> Rules -> Explain enabled]
+

@@ -23,7 +23,8 @@ describe('demo repository', () => {
     await repo.resetDemoStore();
 
     const created = await repo.createConfigPackage({ name: 'My Package', description: 'Test' });
-    expect(created.packageId).toMatch(/^pkg-/);
+    // packageId is derived from configId/name (sanitized) to match how enterprise configIds work.
+    expect(created.packageId).toBe('my-package');
     expect(created.versionId).toMatch(/^ver-/);
 
     const draft = await repo.getConfigVersion(created.versionId);

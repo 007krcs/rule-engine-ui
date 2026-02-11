@@ -2,26 +2,65 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { apiPost } from '@/lib/demo/api-client';
+import { useToast } from '@/components/ui/toast';
 import { SamplesGallery } from '@/components/onboarding/samples-gallery';
 import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 import styles from './onboarding-wizard.module.css';
 
 function stepBadge(done: boolean) {
-  return <Badge variant={done ? 'success' : 'muted'}>{done ? 'Done' : 'Todo'}</Badge>;
+  return <Badge variant={done ? 'success' : 'warning'}>{done ? 'PASS' : 'FAIL'}</Badge>;
 }
 
 export function OnboardingWizard() {
   const router = useRouter();
+  const { toast } = useToast();
   const onboarding = useOnboarding();
   const versionId = onboarding.state.activeVersionId;
+
+  const [creating, setCreating] = useState(false);
+  const [tenantId, setTenantId] = useState('tenant-1');
+  const [configId, setConfigId] = useState('my-first-config');
+  const [name, setName] = useState('My First Config');
+
+  const createDraft = async () => {
+    setCreating(true);
+    try {
+      const result = await apiPost<{ ok: true; packageId: string; versionId: string }>('/api/config-packages', {
+        name: name.trim() || 'New Config',
+        configId: configId.trim() || undefined,
+        tenantId: tenantId.trim() || undefined,
+      });
+      onboarding.setActiveVersionId(result.versionId);
+      onboarding.completeStep('createConfig');
+      toast({ variant: 'success', title: 'Created draft config', description: result.versionId });
+      onboarding.close();
+      router.push(`/builder?versionId=${encodeURIComponent(result.versionId)}`);
+    } catch (error) {
+      toast({ variant: 'error', title: 'Create failed', description: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const openBuilder = () => {
     if (!versionId) return;
     onboarding.close();
     router.push(`/builder?versionId=${encodeURIComponent(versionId)}`);
+  };
+
+  const openPreview = () => {
+    if (!versionId) return;
+    onboarding.close();
+    const params = new URLSearchParams();
+    params.set('versionId', versionId);
+    params.set('preview', '1');
+    router.push(`/builder?${params.toString()}`);
   };
 
   const openRules = () => {
@@ -41,11 +80,16 @@ export function OnboardingWizard() {
     router.push(`/playground?${params.toString()}`);
   };
 
+  const openGitOps = () => {
+    onboarding.close();
+    router.push('/console?tab=versions');
+  };
+
   return (
     <Modal
       open={onboarding.state.open}
       title="Getting Started"
-      description="Clone a sample config and walk through Builder, Rules, Playground, and Trace with zero dead ends."
+      description="Create a config, build UI, add rules, preview, save, run in Playground, inspect trace, and export GitOps. No dead ends."
       size="lg"
       onClose={onboarding.close}
       footer={
@@ -68,7 +112,7 @@ export function OnboardingWizard() {
     >
       <div className={styles.metaRow}>
         <p className={styles.metaText}>
-          Active config:{' '}
+          Active versionId:{' '}
           {versionId ? <span className={styles.metaCode}>{versionId}</span> : <span className={styles.metaCode}>none</span>}
         </p>
         <div className={styles.footerRight}>
@@ -88,12 +132,42 @@ export function OnboardingWizard() {
         <section className={styles.stepCard}>
           <div className={styles.stepHeader}>
             <div>
-              <p className={styles.stepTitle}>1) Clone a sample config</p>
-              <p className={styles.stepText}>This creates a DRAFT config version you can safely edit.</p>
+              <p className={styles.stepTitle}>1) Create a new Config (tenantId + configId)</p>
+              <p className={styles.stepText}>
+                Create an empty DRAFT or clone a sample. This sets a versionId that Builder/Rules/Playground can load.
+              </p>
             </div>
-            {stepBadge(onboarding.isComplete('cloneSample'))}
+            {stepBadge(onboarding.isComplete('createConfig'))}
           </div>
-          <div style={{ height: 12 }} />
+
+          <div className={styles.stepActions}>
+            <div style={{ display: 'grid', gap: 10, width: 'min(520px, 100%)' }}>
+              <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                <div>
+                  <label className="rfFieldLabel">Tenant Id</label>
+                  <Input value={tenantId} onChange={(e) => setTenantId(e.target.value)} disabled={creating} />
+                </div>
+                <div>
+                  <label className="rfFieldLabel">Config Id</label>
+                  <Input value={configId} onChange={(e) => setConfigId(e.target.value)} disabled={creating} />
+                </div>
+              </div>
+              <div>
+                <label className="rfFieldLabel">Name</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} disabled={creating} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <Button size="sm" onClick={() => void createDraft()} disabled={creating || name.trim().length === 0}>
+                  {creating ? 'Creating...' : 'Create draft'}
+                </Button>
+                <Link href="/docs/tutorial-console" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+                  Learn configId/version
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: 16 }} />
           <SamplesGallery
             onCloned={() => {
               onboarding.close();
@@ -104,30 +178,30 @@ export function OnboardingWizard() {
         <section className={styles.stepCard}>
           <div className={styles.stepHeader}>
             <div>
-              <p className={styles.stepTitle}>2) Open Builder and modify the UI</p>
+              <p className={styles.stepTitle}>2) Build UI in Builder</p>
               <p className={styles.stepText}>
-                Drag any component onto the canvas, then hit <strong>Save</strong>.
+                Drag from the palette, reorder, edit props via schema-driven forms, and validate WCAG/i18n keys.
               </p>
             </div>
             {stepBadge(onboarding.isComplete('editUi'))}
           </div>
           <div className={styles.stepActions}>
             <Button size="sm" onClick={openBuilder} disabled={!versionId}>
-              Open UI Builder
+              Open Builder
             </Button>
-            <Link href="/docs/schemas" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
-              Learn UISchema
+            <Link href="/docs/tutorial-builder" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+              Builder tutorial
             </Link>
           </div>
-          {!versionId ? <p className={styles.stepText}>Clone a sample first to enable this step.</p> : null}
+          {!versionId ? <p className={styles.stepText}>Create or clone a config first to enable this step.</p> : null}
         </section>
 
         <section className={styles.stepCard}>
           <div className={styles.stepHeader}>
             <div>
-              <p className={styles.stepTitle}>3) Add a rule and save</p>
+              <p className={styles.stepTitle}>3) Add a Rule</p>
               <p className={styles.stepText}>
-                Click <strong>Add starter rule</strong>, then <strong>Save</strong>. We will use Explain mode in the next step.
+                Use the Rules Builder. Click <strong>Add starter rule</strong> then <strong>Save</strong>.
               </p>
             </div>
             {stepBadge(onboarding.isComplete('editRules'))}
@@ -136,8 +210,8 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={openRules} disabled={!versionId}>
               Open Rules Builder
             </Button>
-            <Link href="/docs/concepts" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
-              Learn rules + flow
+            <Link href="/docs/tutorial-rules" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+              Rules tutorial
             </Link>
           </div>
         </section>
@@ -145,8 +219,46 @@ export function OnboardingWizard() {
         <section className={styles.stepCard}>
           <div className={styles.stepHeader}>
             <div>
-              <p className={styles.stepTitle}>4) Run in Playground</p>
-              <p className={styles.stepText}>Hit Submit and you will get a full runtime trace (flow + rules + API).</p>
+              <p className={styles.stepTitle}>4) Preview Mode (responsive canvas)</p>
+              <p className={styles.stepText}>Switch breakpoints (Desktop/Tablet/Mobile) to verify layout.</p>
+            </div>
+            {stepBadge(onboarding.isComplete('previewUi'))}
+          </div>
+          <div className={styles.stepActions}>
+            <Button size="sm" onClick={openPreview} disabled={!versionId}>
+              Open Preview Mode
+            </Button>
+            <Link href="/docs/tutorial-builder" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+              Responsive checklist
+            </Link>
+          </div>
+        </section>
+
+        <section className={styles.stepCard}>
+          <div className={styles.stepHeader}>
+            <div>
+              <p className={styles.stepTitle}>5) Save to DB (DRAFT version)</p>
+              <p className={styles.stepText}>
+                Save is blocked until the schema validates. Fix issues, then click <strong>Save</strong> in Builder.
+              </p>
+            </div>
+            {stepBadge(onboarding.isComplete('saveDb'))}
+          </div>
+          <div className={styles.stepActions}>
+            <Button size="sm" onClick={openBuilder} disabled={!versionId}>
+              Back to Builder
+            </Button>
+            <Link href="/docs/wcag" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+              Validation gates
+            </Link>
+          </div>
+        </section>
+
+        <section className={styles.stepCard}>
+          <div className={styles.stepHeader}>
+            <div>
+              <p className={styles.stepTitle}>6) Run in Playground</p>
+              <p className={styles.stepText}>Simulate role/country/device/locale and generate a runtime trace.</p>
             </div>
             {stepBadge(onboarding.isComplete('runPlayground'))}
           </div>
@@ -163,23 +275,37 @@ export function OnboardingWizard() {
         <section className={styles.stepCard}>
           <div className={styles.stepHeader}>
             <div>
-              <p className={styles.stepTitle}>5) View trace and toggle Explain mode</p>
+              <p className={styles.stepTitle}>7) Inspect Trace</p>
               <p className={styles.stepText}>
-                Explain mode shows a per-rule match result so beginners can answer: “What happened, and why?”
+                Beginners should be able to answer: "What happened, and why?" Use Explain mode and inspect API calls.
               </p>
             </div>
-            {stepBadge(onboarding.isComplete('explainTrace'))}
+            {stepBadge(onboarding.isComplete('inspectTrace'))}
           </div>
           <div className={styles.stepActions}>
-            <Button
-              size="sm"
-              onClick={() => openPlayground({ autorun: 'submit', focusTrace: true, explain: true })}
-              disabled={!versionId}
-            >
-              Open Explain mode
+            <Button size="sm" onClick={() => openPlayground({ autorun: 'submit', focusTrace: true, explain: true })} disabled={!versionId}>
+              Open Trace + Explain
             </Button>
-            <Link href="/docs/quickstart" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
-              Read beginner docs
+            <Link href="/docs/tutorial-playground" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+              Trace tutorial
+            </Link>
+          </div>
+        </section>
+
+        <section className={styles.stepCard}>
+          <div className={styles.stepHeader}>
+            <div>
+              <p className={styles.stepTitle}>8) Export GitOps bundle</p>
+              <p className={styles.stepText}>Export/import the full config registry as a signed GitOps JSON bundle.</p>
+            </div>
+            {stepBadge(onboarding.isComplete('exportGitOps'))}
+          </div>
+          <div className={styles.stepActions}>
+            <Button size="sm" onClick={openGitOps}>
+              Open GitOps Export
+            </Button>
+            <Link href="/docs/deployment" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+              GitOps docs
             </Link>
           </div>
         </section>
@@ -187,4 +313,3 @@ export function OnboardingWizard() {
     </Modal>
   );
 }
-

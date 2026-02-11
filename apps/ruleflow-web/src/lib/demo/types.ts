@@ -1,4 +1,5 @@
 import type { ApiMapping, FlowSchema, RuleSet, UISchema } from '@platform/schema';
+import type { ComponentDefinition } from '@platform/component-registry';
 
 export type ConfigStatus =
   | 'DRAFT'
@@ -23,6 +24,8 @@ export type ConfigBundle = {
 
 export type ConfigPackage = {
   id: string;
+  tenantId: string;
+  configId: string;
   name: string;
   description?: string;
   createdAt: string;
@@ -74,6 +77,10 @@ export type GitOpsBundle = {
     packages: ConfigPackage[];
     approvals: ApprovalRequest[];
     audit: AuditEvent[];
+    componentRegistry?: {
+      global: ComponentDefinition[];
+      tenants: Record<string, ComponentDefinition[]>;
+    };
   };
   signature: {
     alg: 'HMAC-SHA256';

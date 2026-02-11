@@ -18,8 +18,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ ver
 
   const result = await submitForReview({ versionId, scope, risk });
   if (!result.ok) {
-    return NextResponse.json(result, { status: 404 });
+    const status = result.error === 'Version not found' ? 404 : 400;
+    return NextResponse.json(result, { status });
   }
   return NextResponse.json(result, { headers: { 'cache-control': 'no-store' } });
 }
-
