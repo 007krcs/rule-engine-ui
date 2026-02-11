@@ -13,6 +13,18 @@ export const docs: DocEntry[] = [
     body: 'In-product onboarding wizard, clone a sample config, edit in Builder, add rules, run in Playground, inspect trace. Also: install/run, render a UI schema, execute a flow event.',
   },
   {
+    slug: 'getting-started',
+    title: 'Getting Started',
+    description: 'Data flow, config lifecycle, and the fastest end-to-end setup path.',
+    body: 'Runtime inputs/outputs, lifecycle stages, first-run checklist, and Console import/export guidance.',
+  },
+  {
+    slug: 'start-here',
+    title: 'Start Here',
+    description: 'Understand configId/versionId and the end-to-end workflow.',
+    body: 'Identifiers, end-to-end workflow, demo mode loop, and common mistakes.',
+  },
+  {
     slug: 'tutorial-console',
     title: 'Tutorial: Console + Versioning',
     description: 'Create configs, submit for review, approve, promote, and diff bundles.',
@@ -23,6 +35,12 @@ export const docs: DocEntry[] = [
     title: 'Tutorial: Create UI Upfront (Builder)',
     description: 'Drag/drop from palette, edit props via JSON Schema, validate and save.',
     body: 'Component Registry-driven palette, schema-driven property panel, preview mode breakpoints, rectify-and-save.',
+  },
+  {
+    slug: 'tutorial-flow-editor',
+    title: 'Tutorial: Flow Editor (JSON Workflow)',
+    description: 'Edit flow schema safely via GitOps JSON export/import and validate in Playground.',
+    body: 'Flow schema editing workflow, Console import/export, and transition validation checklist.',
   },
   {
     slug: 'tutorial-rules',
@@ -101,6 +119,12 @@ export const docs: DocEntry[] = [
     title: 'Deployment',
     description: 'Build and deploy RuleFlow across environments.',
     body: 'Build pipelines, GitOps export, promotion workflow.',
+  },
+  {
+    slug: 'release-checklist',
+    title: 'Release Checklist',
+    description: 'Required checks, acceptance criteria, and manual a11y verification.',
+    body: 'CI gates, enterprise acceptance criteria, and manual accessibility checklist.',
   },
   {
     slug: 'common-mistakes',

@@ -25,8 +25,13 @@ function renderMaterial(component: UIComponent, ctx: AdapterContext): React.Reac
         ? ctx.i18n.t(component.i18n.helperTextKey)
         : String(component.props?.helperText ?? '');
       const inputType = String(component.props?.inputType ?? 'text');
-      const bindingPath = (component.bindings?.data?.value as string | undefined) ?? 'data.value';
-      const boundValue = ctx.bindings.data.value?.value ?? (ctx.data as Record<string, JSONValue>).value ?? null;
+      const field = typeof component.props?.field === 'string' && component.props.field.trim().length > 0 ? component.props.field : 'value';
+      const bindingPath =
+        (component.bindings?.data?.[field] as string | undefined) ??
+        (component.bindings?.data?.value as string | undefined) ??
+        `data.${field}`;
+      const boundValue =
+        ctx.bindings.data[field]?.value ?? ctx.bindings.data.value?.value ?? (ctx.data as Record<string, JSONValue>)[field] ?? null;
       const inputValue =
         typeof boundValue === 'string' || typeof boundValue === 'number' ? boundValue : boundValue === null || boundValue === undefined ? '' : '';
       const required = component.validations?.required ?? false;
@@ -50,11 +55,7 @@ function renderMaterial(component: UIComponent, ctx: AdapterContext): React.Reac
         if (isDateType) {
           nextValue = event.target.value === '' ? null : event.target.value;
         }
-        ctx.events.onChange({
-          componentId: component.id,
-          value: nextValue,
-          bindingPath,
-        });
+        ctx.events.onChange(nextValue, bindingPath);
       };
       return (
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

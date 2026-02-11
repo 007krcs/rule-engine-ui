@@ -1,25 +1,70 @@
-# Tutorial: Embed In React / Angular / Vue
+﻿# Tutorial: Embed In React / Angular / Vue
 
 RuleFlow is headless:
-- the runtime is framework-agnostic
-- UI rendering is done through thin adapters selected via `adapterHint`
+- runtime execution is framework-agnostic
+- UI rendering happens through adapters selected by `adapterHint`
 
-## React (recommended)
+## Step-by-step integration path
+
+1. Register demo adapters first (fastest zero-dependency start).
+2. Verify schema renders and interactions in Playground.
+3. Swap to production adapters (same `adapterHint` values).
+4. For Angular/Vue hosts, use the Web Component bridge.
+
+## React (demo adapters)
 
 ```tsx
 import { RenderPage } from '@platform/react-renderer';
 import { registerMaterialAdapters } from '@platform/react-material-adapter';
 import { registerCompanyAdapter } from '@platform/react-company-adapter';
+import { registerAgGridAdapter } from '@platform/react-aggrid-adapter'; // demo
+import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter'; // demo
 
 registerMaterialAdapters();
 registerCompanyAdapter();
+registerAgGridAdapter(); // demo adapter
+registerHighchartsAdapter(); // demo adapter
 
 <RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />
 ```
 
-## Angular (HTML renderer)
+Use demo adapters when you need no external UI dependencies.
 
-The Angular demo renderer returns a HTML string and can mount to a target:
+## React (production adapters)
+
+```bash
+pnpm add @platform/react-aggrid-real @platform/react-highcharts-real ag-grid-react ag-grid-community highcharts highcharts-react-official
+```
+
+```tsx
+import { registerAgGridRealAdapter } from '@platform/react-aggrid-real';
+import { registerHighchartsRealAdapter } from '@platform/react-highcharts-real';
+
+registerAgGridRealAdapter();
+registerHighchartsRealAdapter();
+```
+
+Official references:
+- https://www.ag-grid.com/react-data-grid/getting-started/
+- https://www.highcharts.com/docs/getting-started/react
+
+## Web Component bridge (Angular/Vue/React hosts)
+
+```ts
+import { defineRuleflowRendererElement } from '@platform/web-component-bridge';
+
+defineRuleflowRendererElement();
+```
+
+```html
+<ruleflow-renderer
+  ui-schema="{...}"
+  data="{...}"
+  context="{...}"
+></ruleflow-renderer>
+```
+
+## Angular (HTML renderer demo)
 
 ```ts
 import { renderAngular } from '@platform/angular-renderer';
@@ -27,7 +72,7 @@ import { renderAngular } from '@platform/angular-renderer';
 renderAngular({ uiSchema, data, context, i18n, target: '#root' });
 ```
 
-## Vue (HTML renderer)
+## Vue (HTML renderer demo)
 
 ```ts
 import { renderVue } from '@platform/vue-renderer';
@@ -37,12 +82,11 @@ renderVue({ uiSchema, data, context, i18n, target: '#app' });
 
 ## Integration checklist
 
-- Register adapters that match your `adapterHint` prefixes
-- Validate schemas before running (`@platform/validator`)
-- Capture runtime traces for auditability (`@platform/observability`)
-- Keep host-specific styling in your adapter layer (or inject CSS variables)
+- Register adapter packages that match your `adapterHint` prefixes.
+- Keep demo adapters explicitly labeled as demo in docs/code.
+- Validate schemas before runtime execution.
+- Capture trace output for debugging and audits.
 
-## Screenshot placeholders
+## Screenshot
 
-- [TODO screenshot: Integration Hub page]
-
+![Integration Hub page](/docs/integration-hub.png)

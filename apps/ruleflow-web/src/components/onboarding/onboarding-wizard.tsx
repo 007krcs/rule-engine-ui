@@ -89,7 +89,7 @@ export function OnboardingWizard() {
     <Modal
       open={onboarding.state.open}
       title="Getting Started"
-      description="Create a config, build UI, add rules, preview, save, run in Playground, inspect trace, and export GitOps. No dead ends."
+      description="Create a config, build UI, add rules, save, run Playground, inspect trace, then use Console export/import."
       size="lg"
       onClose={onboarding.close}
       footer={
@@ -122,8 +122,8 @@ export function OnboardingWizard() {
           <span className="rfHelperText" style={{ margin: 0 }}>
             |
           </span>
-          <Link href="/docs/quickstart" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
-            Beginner docs
+          <Link href="/docs/getting-started" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            Getting started
           </Link>
         </div>
       </div>
@@ -180,7 +180,7 @@ export function OnboardingWizard() {
             <div>
               <p className={styles.stepTitle}>2) Build UI in Builder</p>
               <p className={styles.stepText}>
-                Drag from the palette, reorder, edit props via schema-driven forms, and validate WCAG/i18n keys.
+                Drag from **Component Palette**, reorder with drag/drop or **Move up/down**, then click **Save**.
               </p>
             </div>
             {stepBadge(onboarding.isComplete('editUi'))}
@@ -220,7 +220,7 @@ export function OnboardingWizard() {
           <div className={styles.stepHeader}>
             <div>
               <p className={styles.stepTitle}>4) Preview Mode (responsive canvas)</p>
-              <p className={styles.stepText}>Switch breakpoints (Desktop/Tablet/Mobile) to verify layout.</p>
+              <p className={styles.stepText}>Click **Preview**, switch Desktop/Tablet/Mobile, then return to editing.</p>
             </div>
             {stepBadge(onboarding.isComplete('previewUi'))}
           </div>
@@ -258,7 +258,7 @@ export function OnboardingWizard() {
           <div className={styles.stepHeader}>
             <div>
               <p className={styles.stepTitle}>6) Run in Playground</p>
-              <p className={styles.stepText}>Simulate role/country/device/locale and generate a runtime trace.</p>
+              <p className={styles.stepText}>Change context or input values, click **Submit**, and generate a runtime trace.</p>
             </div>
             {stepBadge(onboarding.isComplete('runPlayground'))}
           </div>
@@ -295,14 +295,14 @@ export function OnboardingWizard() {
         <section className={styles.stepCard}>
           <div className={styles.stepHeader}>
             <div>
-              <p className={styles.stepTitle}>8) Export GitOps bundle</p>
-              <p className={styles.stepText}>Export/import the full config registry as a signed GitOps JSON bundle.</p>
+              <p className={styles.stepTitle}>8) Console export/import</p>
+              <p className={styles.stepText}>Open Console Versions tab, then use **Export** and **Import** in GitOps Package.</p>
             </div>
             {stepBadge(onboarding.isComplete('exportGitOps'))}
           </div>
           <div className={styles.stepActions}>
             <Button size="sm" onClick={openGitOps}>
-              Open GitOps Export
+              Open Console (Versions)
             </Button>
             <Link href="/docs/deployment" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
               GitOps docs

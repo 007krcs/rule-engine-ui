@@ -33,15 +33,12 @@ import exampleFlow from '@platform/schema/examples/example.flow.json';
 import exampleRules from '@platform/schema/examples/example.rules.json';
 import exampleApi from '@platform/schema/examples/example.api.json';
 import {
-  createConfigStore,
-  createConfigStoreManager,
-  isPersistenceUnavailableError,
-  PersistenceUnavailableError,
+  FileConfigStore,
+  STORE_WRITE_FAILED_MESSAGE,
+  TmpConfigStore,
   type ConfigStore,
-  type ConfigStoreDiagnostics,
-  type ConfigStoreFactoryOptions,
-  type StoreState,
-} from './store';
+} from '@platform/core-runtime/store';
+import type { StoreState } from './store';
 
 const STORE_SEVERITY_FOR_STATUS: Record<ConfigStatus, AuditEvent['severity']> = {
   DRAFT: 'info',
@@ -51,10 +48,122 @@ const STORE_SEVERITY_FOR_STATUS: Record<ConfigStatus, AuditEvent['severity']> = 
   DEPRECATED: 'warning',
   RETIRED: 'warning',
 };
-const storeManager = createConfigStoreManager({
-  seedState,
-  normalizeState,
-});
+
+type ConfigStoreFactoryOptions = {
+  defaultDir?: string;
+  tmpDir?: string;
+  vercel?: string;
+};
+
+export type ConfigStoreDiagnostics = {
+  provider: ConfigStore['provider'];
+  baseDir: string | null;
+  canWriteToStore: boolean;
+  warning?: string;
+};
+
+type PersistedStateSchema = {
+  state: StoreState;
+  signingKeyBase64?: string;
+};
+
+const DEMO_STATE_CONFIG_ID = 'ruleflow-demo-state';
+
+let store: ConfigStore | null = null;
+let signingKeyCache: Buffer | null = null;
+let canWriteToStore = true;
+let storeWarning: string | undefined;
+
+export class PersistenceUnavailableError extends Error {
+  readonly diagnostics: ConfigStoreDiagnostics;
+
+  constructor(message: string, diagnostics: ConfigStoreDiagnostics, cause?: unknown) {
+    super(message);
+    this.name = 'PersistenceUnavailableError';
+    this.diagnostics = diagnostics;
+    if (cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+function createRepositoryStore(options?: ConfigStoreFactoryOptions): ConfigStore {
+  const vercel = options?.vercel ?? process.env.VERCEL;
+  const defaultDir = options?.defaultDir ?? process.env.RULEFLOW_DEMO_STORE_DIR;
+  const tmpDir = options?.tmpDir ?? process.env.RULEFLOW_DEMO_TMP_STORE_DIR;
+  if (vercel === '1') {
+    return new TmpConfigStore({ baseDir: tmpDir });
+  }
+  return new FileConfigStore({ baseDir: defaultDir });
+}
+
+async function getRepositoryStore(): Promise<ConfigStore> {
+  if (!store) {
+    store = createRepositoryStore();
+  }
+  return store;
+}
+
+function makeDiagnostics(currentStore: ConfigStore): ConfigStoreDiagnostics {
+  return {
+    provider: currentStore.provider,
+    baseDir: currentStore.baseDir ?? null,
+    canWriteToStore,
+    warning: storeWarning,
+  };
+}
+
+function decodePersistedState(schema: unknown): PersistedStateSchema {
+  if (!isPlainRecord(schema)) {
+    return { state: normalizeState(schema) };
+  }
+
+  if ('state' in schema) {
+    const rawState = (schema as { state?: unknown }).state;
+    const key = (schema as { signingKeyBase64?: unknown }).signingKeyBase64;
+    return {
+      state: normalizeState(rawState),
+      signingKeyBase64: typeof key === 'string' ? key : undefined,
+    };
+  }
+
+  // Backward compatibility with raw StoreState persisted as schema.
+  return { state: normalizeState(schema) };
+}
+
+async function persistStateSchema(next: PersistedStateSchema): Promise<void> {
+  const currentStore = await getRepositoryStore();
+  const payload = {
+    state: next.state,
+    signingKeyBase64: next.signingKeyBase64,
+  };
+
+  try {
+    const existing = await currentStore.getConfig(DEMO_STATE_CONFIG_ID);
+    if (existing) {
+      await currentStore.updateSchema(DEMO_STATE_CONFIG_ID, payload);
+    } else {
+      await currentStore.createConfig({ id: DEMO_STATE_CONFIG_ID, schema: payload });
+    }
+    canWriteToStore = true;
+    storeWarning = undefined;
+  } catch (error) {
+    canWriteToStore = false;
+    storeWarning = STORE_WRITE_FAILED_MESSAGE;
+    throw new PersistenceUnavailableError(STORE_WRITE_FAILED_MESSAGE, makeDiagnostics(currentStore), error);
+  }
+}
+
+async function loadPersistedStateSchema(): Promise<PersistedStateSchema> {
+  const currentStore = await getRepositoryStore();
+  const existing = await currentStore.getConfig(DEMO_STATE_CONFIG_ID);
+  if (!existing) {
+    const seeded = { state: seedState() };
+    await persistStateSchema(seeded);
+    return seeded;
+  }
+  return decodePersistedState(existing.schema);
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -126,7 +235,29 @@ function stableStringifyJson(value: unknown): string {
 }
 
 async function loadSigningKey(): Promise<Buffer> {
-  return await storeManager.loadSigningKey();
+  if (signingKeyCache) {
+    return signingKeyCache;
+  }
+
+  const env = process.env.RULEFLOW_GITOPS_HMAC_KEY;
+  if (env && env.trim().length > 0) {
+    signingKeyCache = Buffer.from(env.trim(), 'utf8');
+    return signingKeyCache;
+  }
+
+  const persisted = await loadPersistedStateSchema();
+  if (persisted.signingKeyBase64 && persisted.signingKeyBase64.trim().length > 0) {
+    signingKeyCache = Buffer.from(persisted.signingKeyBase64, 'base64');
+    return signingKeyCache;
+  }
+
+  const generated = crypto.randomBytes(32);
+  await persistStateSchema({
+    ...persisted,
+    signingKeyBase64: generated.toString('base64'),
+  });
+  signingKeyCache = generated;
+  return signingKeyCache;
 }
 
 function signingKeyId(key: Buffer) {
@@ -149,11 +280,16 @@ function safeEqualBase64(a: string, b: string) {
 }
 
 async function loadState(): Promise<StoreState> {
-  return await storeManager.readState();
+  const persisted = await loadPersistedStateSchema();
+  return persisted.state;
 }
 
 async function persistState(next: StoreState): Promise<void> {
-  await storeManager.replaceState(next);
+  const persisted = await loadPersistedStateSchema();
+  await persistStateSchema({
+    state: next,
+    signingKeyBase64: persisted.signingKeyBase64,
+  });
 }
 
 function seedBundle(variant: 'active' | 'review' | 'deprecated'): ConfigBundle {
@@ -1145,29 +1281,27 @@ export async function resetDemoStore() {
 }
 
 export async function getStoreDiagnostics(): Promise<ConfigStoreDiagnostics> {
-  return await storeManager.getDiagnostics();
+  const currentStore = await getRepositoryStore();
+  return makeDiagnostics(currentStore);
 }
 
 export function isPersistenceError(error: unknown): boolean {
-  return isPersistenceUnavailableError(error);
+  return error instanceof PersistenceUnavailableError;
 }
 
 export async function getConfigStore(): Promise<ConfigStore> {
-  return await storeManager.getStore();
+  return await getRepositoryStore();
 }
 
 export async function createConfigStoreForTests(
-  options: Omit<ConfigStoreFactoryOptions, 'seedState' | 'normalizeState'>,
+  options: ConfigStoreFactoryOptions = {},
 ): Promise<ConfigStore> {
-  return await createConfigStore({
-    ...options,
-    seedState,
-    normalizeState,
-  });
+  return createRepositoryStore(options);
 }
 
 export function resetConfigStoreManagerForTests() {
-  storeManager.resetForTests();
+  store = null;
+  signingKeyCache = null;
+  canWriteToStore = true;
+  storeWarning = undefined;
 }
-
-export { PersistenceUnavailableError };

@@ -210,8 +210,11 @@ export default function RulesBuilderPage() {
         </CardHeader>
         <CardContent className={styles.grid2}>
           <div className={styles.field}>
-            <label className="rfFieldLabel">RuleSet JSON</label>
+            <label className="rfFieldLabel" htmlFor="ruleset-json">
+              RuleSet JSON
+            </label>
             <Textarea
+              id="ruleset-json"
               className={styles.textarea}
               value={rulesText}
               placeholder={versionId ? 'Loading...' : 'Clone a sample config to begin.'}
@@ -272,4 +275,3 @@ export default function RulesBuilderPage() {
     </div>
   );
 }
-

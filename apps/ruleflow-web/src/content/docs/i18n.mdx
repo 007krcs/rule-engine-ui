@@ -1,8 +1,37 @@
 ﻿# I18n
 
-RuleFlow uses i18n keys in schema (`labelKey`, `placeholderKey`, `ariaLabelKey`).
+RuleFlow schemas use i18n keys (`labelKey`, `placeholderKey`, `helperTextKey`, `ariaLabelKey`) so UI text resolves at runtime.
 
-## Integrate your own provider
+![Builder props panel](/docs/builder-props-panel.png)
+
+## Step-by-step integration
+
+1. Add i18n keys in UI schema components.
+2. Provide locale bundles (platform + tenant override bundles).
+3. Build an `I18nProvider`.
+4. Pass the provider into renderer hosts.
+
+### 1) Add keys in schema
+
+```json
+{
+  "id": "customerName",
+  "type": "input",
+  "adapterHint": "material.input",
+  "i18n": {
+    "labelKey": "customer.name.label",
+    "placeholderKey": "customer.name.placeholder",
+    "helperTextKey": "customer.name.helper",
+    "ariaLabelKey": "customer.name.aria"
+  }
+}
+```
+
+### 2) Provide bundles
+
+Store bundles in your system or ship them with the host app. RuleFlow demo merges platform bundles with tenant bundles.
+
+### 3) Implement provider
 
 ```ts
 const provider: I18nProvider = {
@@ -15,19 +44,18 @@ const provider: I18nProvider = {
 };
 ```
 
-Pass it to the renderer:
+### 4) Pass provider to renderer
 
 ```tsx
 <RenderPage uiSchema={uiSchema} data={data} context={context} i18n={provider} />
 ```
 
-## Tenant override bundles
+## Bundle precedence
 
-Bundles are resolved in this order:
-
-1. Tenant override bundle (tenant + locale + namespace)
+1. Tenant override bundle
 2. Platform bundle
-3. Key-as-text (dev) or fallback string (prod)
+3. Fallback text (dev key-as-text or prod fallback)
 
 ## RTL
-The renderer applies `dir="rtl"` when the locale is RTL (`ar`, `he`, `fa`, `ur`).
+
+Renderer applies `dir="rtl"` when locale is RTL (`ar`, `he`, `fa`, `ur`).

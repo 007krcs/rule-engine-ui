@@ -8,31 +8,36 @@ Playground simulates runtime execution:
 
 ## Step-by-step (10 minutes)
 
-1. Open Playground
-- Navigate to `/playground`.
-- Pick a version in the **Config Version** dropdown.
+1. **Open Playground**
+   - Navigate to `/playground`.
+   - Pick a version in the **Config Version** dropdown.
 
-2. Simulate context
-- Change `role`, `country`, `device`, or `locale`.
-- This affects rule scope filters and any guard conditions.
+2. **Simulate context**
+   - Change `role`, `country`, `device`, or `locale`.
+   - This affects rule scope filters and guard conditions.
 
-3. Run flow events
-- Click **Next** and **Back** to transition states.
-- Click **Submit** to run:
-  - flow transition
-  - rules evaluation
-  - API orchestration (if configured for the transition)
+3. **Update bound data**
+   - Change a bound input (ex: `orderTotal`).
+   - This should change which rules match.
+   - Use the same `versionId` you edited in Builder/Rules so trace reflects your latest draft.
 
-4. Inspect the trace
-- Flow shows the transition and guard reason.
-- Rules shows:
-  - which rules were considered
-  - which rules matched
-  - which actions were applied
-- API shows the demo request/response.
+4. **Run flow events**
+   - Click **Next** and **Back** to transition states.
+   - Click **Submit** to run:
+     - flow transition
+     - rules evaluation
+     - API orchestration (if configured)
 
-5. Explain mode
-- Toggle **Explain** in the Rules section to see per-rule match results.
+5. **Inspect the trace**
+   - Flow shows the transition and guard reason.
+   - Rules shows:
+     - rules considered
+     - rules matched
+     - actions applied
+   - API shows the demo request/response.
+
+6. **Explain mode**
+   - Toggle **Explain** to see per-rule match results.
 
 ## Useful URLs
 
@@ -40,8 +45,10 @@ Playground simulates runtime execution:
 - Auto-run submit: `/playground?versionId=...&autorun=submit&focus=trace`
 - Auto-run + explain: `/playground?versionId=...&autorun=submit&focus=trace&explain=1`
 
-## Screenshot placeholders
+## Screenshots
 
-- [TODO screenshot: Playground context simulator]
-- [TODO screenshot: Trace panel showing Flow + Rules + API]
+![Playground overview](/docs/playground-overview.png)
 
+![Playground context simulator](/docs/playground-context.png)
+
+![Trace panel showing Flow + Rules + API](/docs/playground-trace.png)

@@ -1,13 +1,23 @@
 ﻿# Concepts
 
-RuleFlow is composed of three deterministic engines.
+RuleFlow is composed of three deterministic engines:
 
-- **Flow Engine**: Finite state machine for navigation.
-- **Rules Engine**: AST-based conditions and actions.
-- **API Orchestrator**: Declarative REST/GraphQL execution.
+- **Flow Engine**: finite state transitions (`back`, `next`, `submit`).
+- **Rules Engine**: JSON AST conditions + actions (no `eval`).
+- **API Orchestrator**: declarative REST/GraphQL execution from mappings.
+
+![Playground trace](/docs/playground-trace.png)
 
 ## Determinism
-All execution inputs are explicit: schema versions, context, data, and events. Replay uses the same inputs to produce the same outputs.
+
+Execution inputs are explicit:
+- schema version bundle (`versionId`)
+- context
+- data
+- event
+
+Replay the same inputs and you get the same outputs.
 
 ## Governance
-Configs flow through a controlled lifecycle and are promoted by users with appropriate RBAC roles.
+
+Configs move through lifecycle gates (`DRAFT -> REVIEW -> APPROVED -> ACTIVE`) with approval and audit history in Console.

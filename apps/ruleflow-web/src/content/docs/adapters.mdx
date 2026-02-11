@@ -1,6 +1,6 @@
 ﻿# Adapters
 
-Adapters map `adapterHint` values to real UI components.
+Adapters map `adapterHint` values to concrete UI components.
 
 ```ts
 registerAdapter('acme.', (component, ctx) => {
@@ -9,4 +9,34 @@ registerAdapter('acme.', (component, ctx) => {
 });
 ```
 
-You can ship adapters for any library without changing the runtime.
+## Demo vs production adapters
+
+Demo adapters (no external deps):
+- `@platform/react-aggrid-adapter`
+- `@platform/react-highcharts-adapter`
+
+Production adapters (peer deps, real libraries):
+- `@platform/react-aggrid-real`
+- `@platform/react-highcharts-real`
+
+You can swap demo vs production adapters without changing schema `adapterHint` values.
+
+## Adapter registration pattern
+
+1. Register shared primitives (for example Material adapter package).
+2. Register domain adapters (`company.*`, charts, tables, etc.).
+3. Render with `RenderPage`.
+
+## Web Component bridge
+
+For Angular/Vue or mixed hosts:
+
+```ts
+import { defineRuleflowRendererElement } from '@platform/web-component-bridge';
+
+defineRuleflowRendererElement();
+```
+
+## Screenshot
+
+![Integration Hub page](/docs/integration-hub.png)

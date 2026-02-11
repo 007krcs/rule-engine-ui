@@ -1,10 +1,17 @@
 ﻿# Security
 
-RuleFlow enforces:
+RuleFlow security controls in this demo platform:
 
-- Tenant isolation (`tenantId` required)
-- No dynamic code execution
-- Timeouts + max rules + circuit breakers
-- Audit trails and replay
+- tenant isolation (`tenantId` required)
+- deterministic runtime (no dynamic code execution)
+- bounded execution and validation gates
+- audit trails and replayability
 
-All schemas and config transitions are validated and signed.
+![Console versions list](/docs/console-versions.png)
+
+## Practical guidance
+
+1. Keep `versionId` immutable for production runs.
+2. Enforce approval before promotion to ACTIVE.
+3. Keep GitOps bundles signed and traceable.
+4. Validate schemas in CI (`pnpm validate:configs`).

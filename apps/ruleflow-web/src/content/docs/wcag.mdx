@@ -1,9 +1,37 @@
 ﻿# WCAG
 
-Accessibility is mandatory.
+Accessibility is a first-class requirement in RuleFlow validation.
 
-- `ariaLabelKey` required for every component
-- `keyboardNav` must be true
-- `focusOrder` is mandatory and must be unique
+![Builder props panel](/docs/builder-props-panel.png)
 
-CI fails when accessibility metadata is missing.
+## Step-by-step checklist
+
+1. Set `accessibility.ariaLabelKey` for every component.
+2. Set `keyboardNav: true`.
+3. Keep `focusOrder` unique and predictable.
+4. In Builder, fix all validation errors before Save.
+5. Verify keyboard-only flow in Builder and Playground.
+
+### Example accessibility block
+
+```json
+{
+  "accessibility": {
+    "ariaLabelKey": "customer.name.aria",
+    "keyboardNav": true,
+    "focusOrder": 1
+  }
+}
+```
+
+## Where validation happens
+
+- Builder validates on edit.
+- Save is disabled while errors remain.
+- issue links focus the offending component.
+
+## Common failures
+
+- missing `ariaLabelKey`
+- duplicate `focusOrder`
+- disabled keyboard navigation

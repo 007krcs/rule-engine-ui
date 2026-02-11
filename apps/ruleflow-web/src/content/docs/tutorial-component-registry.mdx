@@ -1,13 +1,11 @@
 # Tutorial: Component Registry
 
-The Component Registry is how RuleFlow stays pluggable:
-- the platform runtime is headless
+The Component Registry keeps RuleFlow pluggable:
+- the runtime is headless
 - UI is rendered by adapters resolved via `adapterHint`
-- Builder learns how to edit props from each component's `propsSchema`
+- Builder learns how to edit props from `propsSchema`
 
 ## What a component definition looks like
-
-Component manifests are JSON:
 
 ```json
 {
@@ -33,22 +31,21 @@ Component manifests are JSON:
 
 ## Step-by-step (5 minutes)
 
-1. Open the registry page
-- Navigate to `/component-registry`.
+1. **Open the registry page**
+   - Navigate to `/component-registry`.
 
-2. Choose scope
-- **Global** applies to all tenants in the demo.
-- **Tenant** overrides global definitions for a specific tenantId.
+2. **Choose scope**
+   - **Global** applies to all tenants in the demo.
+   - **Tenant** overrides global definitions for a specific tenantId.
 
-3. Paste a manifest
-- Paste the JSON into **Manifest JSON**.
-- Fix validation issues if any are shown.
+3. **Paste a manifest**
+   - Paste JSON into **Manifest JSON**.
+   - Fix validation issues if any are shown.
 
-4. Register
-- Click **Register**.
-- Go to Builder: the palette should include the newly registered components immediately.
+4. **Register**
+   - Click **Register**.
+   - Open Builder: new components appear in the palette immediately.
 
-## Screenshot placeholders
+## Screenshots
 
-- [TODO screenshot: Component Registry page]
-
+![Component Registry page](/docs/component-registry.png)

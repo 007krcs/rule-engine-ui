@@ -1,12 +1,21 @@
 # Demo Host Angular
 
-Angular-oriented demo host using the HTML renderer.
+Angular-oriented demo host showing two integration modes.
 
 Purpose
-Demonstrate how a host app executes a flow step and renders the resulting UI schema.
+- Execute a flow step and render HTML with `@platform/angular-renderer`
+- Demonstrate a Web Component host path with `<ruleflow-page>`
 
 Exports
-- `runAngularDemo` to execute the demo flow and render HTML
+- `runAngularDemo(target?)` executes runtime + renders HTML output
+- `mountRuleflowPage(target?)` registers `<ruleflow-page>` and mounts it
+
+Web Component example
+```ts
+import { mountRuleflowPage } from './src';
+
+await mountRuleflowPage('#root');
+```
 
 When to modify
 Add Angular-specific bootstrapping or routing integration.

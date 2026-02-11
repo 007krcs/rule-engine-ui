@@ -29,6 +29,8 @@ export type ClickEventPayload = {
   componentId: string;
 };
 
+export type RendererOnChange = (bindingPath: string, value: JSONValue, componentId: string) => void;
+
 export interface RendererProps {
   uiSchema: UISchema;
   data: Record<string, JSONValue>;
@@ -36,6 +38,7 @@ export interface RendererProps {
   i18n?: I18nProvider;
   onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
   onAdapterEvent?: (event: UIEventName, payload: ChangeEventPayload | ClickEventPayload, component: UIComponent) => void;
+  onChange?: RendererOnChange;
   onDataChange?: (data: Record<string, JSONValue>) => void;
   onContextChange?: (context: ExecutionContext) => void;
   mode?: 'controlled' | 'internal';
@@ -48,7 +51,7 @@ export interface AdapterContext {
   i18n: I18nProvider;
   bindings: BindingGroupValues;
   events: {
-    onChange?: (payload: ChangeEventPayload) => void;
+    onChange?: (payloadOrValue: ChangeEventPayload | JSONValue, bindingPath?: string) => void;
     onClick?: (payload: ClickEventPayload) => void;
     onSubmit?: (payload: ClickEventPayload) => void;
   };
@@ -125,6 +128,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
     const events = buildEvents(component, {
       onEvent: props.onEvent,
       onAdapterEvent: props.onAdapterEvent,
+      onChange: props.onChange,
       onDataChange: applyDataChange,
       onContextChange: applyContextChange,
       data: currentData,
@@ -238,6 +242,7 @@ function buildEvents(
   options: {
     onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
     onAdapterEvent?: (event: UIEventName, payload: ChangeEventPayload | ClickEventPayload, component: UIComponent) => void;
+    onChange?: RendererOnChange;
     onDataChange: (next: Record<string, JSONValue>) => void;
     onContextChange: (next: ExecutionContext) => void;
     data: Record<string, JSONValue>;
@@ -252,9 +257,10 @@ function buildEvents(
   };
 
   return {
-    onChange: (payload) => {
-      const bindingPath = payload?.bindingPath || component.bindings?.data?.value || 'data.value';
-      const parsed = parseBindingPath(bindingPath, 'data');
+    onChange: (payloadOrValue, bindingPath) => {
+      const payload = normalizeChangePayload(component, payloadOrValue, bindingPath);
+      const resolvedBindingPath = payload.bindingPath || component.bindings?.data?.value || 'data.value';
+      const parsed = parseBindingPath(resolvedBindingPath, 'data');
       if (parsed) {
         if (parsed.target === 'data') {
           const next = setPath(options.data, parsed.path, payload.value);
@@ -264,6 +270,8 @@ function buildEvents(
           options.onContextChange(next as unknown as ExecutionContext);
         }
       }
+      const normalizedPath = parsed ? `${parsed.target}.${parsed.path}` : resolvedBindingPath;
+      options.onChange?.(normalizedPath, payload.value, payload.componentId);
       options.onAdapterEvent?.('onChange', payload, component);
       emitSchemaEvent('onChange');
     },
@@ -276,6 +284,28 @@ function buildEvents(
       emitSchemaEvent('onSubmit');
     },
   };
+}
+
+function normalizeChangePayload(
+  component: UIComponent,
+  payloadOrValue: ChangeEventPayload | JSONValue,
+  bindingPath?: string,
+): ChangeEventPayload {
+  if (isChangeEventPayload(payloadOrValue)) {
+    return payloadOrValue;
+  }
+
+  return {
+    componentId: component.id,
+    value: payloadOrValue,
+    bindingPath: bindingPath ?? component.bindings?.data?.value ?? 'data.value',
+  };
+}
+
+function isChangeEventPayload(value: ChangeEventPayload | JSONValue): value is ChangeEventPayload {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Partial<ChangeEventPayload>;
+  return typeof candidate.componentId === 'string' && typeof candidate.bindingPath === 'string' && 'value' in candidate;
 }
 
 function resolveBindings(

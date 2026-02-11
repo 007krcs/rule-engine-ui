@@ -294,15 +294,48 @@ export function Playground({
     if (!flow || !currentUiSchema) return;
     setBusy(true);
     try {
+      let runtimeStateId = stateId;
+      let runtimeContext = context;
+      let runtimeData = data;
+
+      if (event === 'submit') {
+        runtimeStateId = flow.initialState;
+        const maxHops = Math.max(1, Object.keys(flow.states).length);
+        for (let hop = 0; hop < maxHops; hop += 1) {
+          const current = flow.states[runtimeStateId];
+          if (!current) break;
+          if (current.on.submit) break;
+          if (!current.on.next) break;
+
+          const autoAdvance = await executeStep({
+            flow,
+            uiSchemasById,
+            rules,
+            apiMappingsById,
+            stateId: runtimeStateId,
+            event: 'next',
+            context: runtimeContext,
+            data: runtimeData,
+            fetchFn: demoFetch,
+          });
+
+          if (autoAdvance.trace.flow.reason !== 'ok') break;
+          if (autoAdvance.nextStateId === runtimeStateId) break;
+          runtimeStateId = autoAdvance.nextStateId;
+          runtimeContext = autoAdvance.updatedContext;
+          runtimeData = autoAdvance.updatedData as Record<string, JSONValue>;
+        }
+      }
+
       const result = await executeStep({
         flow,
         uiSchemasById,
         rules,
         apiMappingsById,
-        stateId,
+        stateId: runtimeStateId,
         event,
-        context,
-        data,
+        context: runtimeContext,
+        data: runtimeData,
         fetchFn: demoFetch,
       });
       setStateId(result.nextStateId);
@@ -554,7 +587,7 @@ function TracePanel({
                     const applied = rules.actionsApplied.filter((applied) => applied.ruleId === ruleId);
                     const testId = `rule-explain-${ruleId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
                     return (
-                      <li key={ruleId} className={styles.ruleItem}>
+                      <li key={`${trace.startedAt}-${ruleId}`} className={styles.ruleItem}>
                         <details data-testid={testId} className={styles.ruleDetails}>
                           <summary className={styles.ruleSummary}>
                             <div className={styles.ruleLeft}>

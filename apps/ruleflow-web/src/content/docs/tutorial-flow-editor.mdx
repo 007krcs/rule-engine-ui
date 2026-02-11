@@ -1,0 +1,48 @@
+# Tutorial: Flow Editor (JSON Workflow)
+
+RuleFlow currently edits flow definitions through JSON bundles, then runs them immediately in Playground for validation.
+
+![Playground overview](/docs/playground-overview.png)
+
+## Goal
+
+Update `flowSchema` safely and verify behavior end-to-end without breaking active configs.
+
+## Step-by-step (10 minutes)
+
+1. **Export current bundle**
+   - Open `/console?tab=versions`.
+   - In **GitOps Package**, click **Export**.
+   - Save the downloaded JSON file.
+
+2. **Edit flow schema**
+   - Open the file and locate:
+     - `payload.packages[*].versions[*].bundle.flowSchema`
+   - Start with the DRAFT version in your target package.
+   - Make a small change first (for example, adjust a transition label or guard).
+
+3. **Import back into Console**
+   - Return to Console.
+   - In **GitOps Package**, click **Import**.
+   - Select your edited JSON.
+
+4. **Run transitions in Playground**
+   - Open `/playground?versionId=...`.
+   - Run `Back`, `Next`, and `Submit`.
+   - Confirm the **Trace** panel flow section shows the updated transition behavior.
+
+5. **Promote when ready**
+   - Submit for review, approve, and promote through Console lifecycle actions.
+
+## Optional: sample JSON template
+
+Use this starter file as a reference template:
+
+- [`/docs/ruleflow-sample-project.json`](/docs/ruleflow-sample-project.json)
+
+## Validation checklist
+
+- `flow.initialState` exists in `flow.states`
+- every transition target state exists
+- guard paths use valid `context.*` or `data.*` paths
+- Playground trace reason is `ok` for the expected happy path

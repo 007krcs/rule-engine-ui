@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "exportedAt": "2026-02-11T00:00:00.000Z",
+  "tenantId": "tenant-1",
+  "payload": {
+    "packages": [
+      {
+        "id": "sample-checkout",
+        "tenantId": "tenant-1",
+        "configId": "sample-checkout",
+        "name": "Sample Checkout Project",
+        "description": "Starter package for docs walkthroughs.",
+        "createdAt": "2026-02-11T00:00:00.000Z",
+        "createdBy": "docs",
+        "versions": [
+          {
+            "id": "ver-sample-0.1.0",
+            "packageId": "sample-checkout",
+            "version": "0.1.0",
+            "status": "DRAFT",
+            "createdAt": "2026-02-11T00:00:00.000Z",
+            "createdBy": "docs",
+            "bundle": {
+              "uiSchema": {
+                "version": "1.0.0",
+                "pageId": "checkout-review",
+                "layout": {
+                  "id": "root",
+                  "type": "section",
+                  "componentIds": [
+                    "orderTotal",
+                    "submitButton"
+                  ]
+                },
+                "components": [
+                  {
+                    "id": "orderTotal",
+                    "type": "input",
+                    "adapterHint": "material.input",
+                    "props": {
+                      "label": "Order total",
+                      "inputType": "number"
+                    },
+                    "bindings": {
+                      "data": {
+                        "value": "data.orderTotal"
+                      }
+                    },
+                    "i18n": {
+                      "labelKey": "runtime.orderTotal.label"
+                    },
+                    "accessibility": {
+                      "ariaLabelKey": "runtime.orderTotal.aria",
+                      "keyboardNav": true,
+                      "focusOrder": 1
+                    }
+                  },
+                  {
+                    "id": "submitButton",
+                    "type": "button",
+                    "adapterHint": "material.button",
+                    "props": {
+                      "label": "Submit"
+                    },
+                    "i18n": {
+                      "labelKey": "runtime.submit.label"
+                    },
+                    "accessibility": {
+                      "ariaLabelKey": "runtime.submit.aria",
+                      "keyboardNav": true,
+                      "focusOrder": 2
+                    }
+                  }
+                ]
+              },
+              "flowSchema": {
+                "version": "1.0.0",
+                "initialState": "review",
+                "states": {
+                  "review": {
+                    "uiPageId": "checkout-review",
+                    "on": {
+                      "submit": {
+                        "to": "done",
+                        "actions": [
+                          "runRules"
+                        ]
+                      }
+                    }
+                  },
+                  "done": {
+                    "uiPageId": "checkout-review",
+                    "on": {}
+                  }
+                }
+              },
+              "rules": {
+                "version": "1.0.0",
+                "rules": [
+                  {
+                    "ruleId": "HIGH_ORDER_TOTAL",
+                    "priority": 100,
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "path": "data.orderTotal"
+                      },
+                      "right": {
+                        "value": 1000
+                      }
+                    },
+                    "actions": [
+                      {
+                        "type": "setField",
+                        "path": "data.riskLevel",
+                        "value": "High"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "apiMappingsById": {}
+            }
+          }
+        ]
+      }
+    ],
+    "approvals": [],
+    "audit": [],
+    "componentRegistry": {
+      "global": [],
+      "tenants": {}
+    }
+  },
+  "signature": {
+    "alg": "HMAC-SHA256",
+    "keyId": "replace-with-export-key-id",
+    "value": "replace-with-hmac-signature"
+  }
+}

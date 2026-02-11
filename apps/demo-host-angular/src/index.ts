@@ -30,6 +30,25 @@ const baseData: Record<string, JSONValue> = {
   revenueSeries: [10, 22, 35, 28, 42],
 };
 
+export async function mountRuleflowPage(target?: HTMLElement | string): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return false;
+  }
+
+  const { defineRuleflowRendererElement } = await import('@platform/web-component-bridge');
+  defineRuleflowRendererElement({ tagName: 'ruleflow-page' });
+
+  const host = resolveTarget(target);
+  if (!host) return false;
+
+  const element = document.createElement('ruleflow-page');
+  element.setAttribute('ui-schema', JSON.stringify(exampleUi));
+  element.setAttribute('data', JSON.stringify(baseData));
+  element.setAttribute('context', JSON.stringify(baseContext));
+  host.replaceChildren(element);
+  return true;
+}
+
 export async function runAngularDemo(target?: HTMLElement | string): Promise<string> {
   const flow = exampleFlow as unknown as FlowSchema;
   const uiSchema = exampleUi as unknown as UISchema;
@@ -80,4 +99,11 @@ if (typeof document !== 'undefined') {
     // eslint-disable-next-line no-console
     console.error(error);
   });
+}
+
+function resolveTarget(target?: HTMLElement | string): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  if (!target) return document.querySelector('#root');
+  if (typeof target === 'string') return document.querySelector(target);
+  return target;
 }

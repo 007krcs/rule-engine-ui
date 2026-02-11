@@ -1,41 +1,39 @@
-# Glossary
+﻿# Glossary
+
+![Docs overview](/docs/docs-overview.png)
 
 ## adapterHint
 
-A string like `material.input` or `company.currencyInput` that selects a UI adapter at render time.
+Prefix-based component selector such as `material.input` or `company.currencyInput`.
 
 ## Component Registry
 
-A registry of component metadata (display name, category, JSON Schema for props, default props, bindings supported).
+Manifest of component metadata (display name, category, props schema, default props, supported bindings).
 
 ## Config Package
 
-A named configuration bundle containing versions of UI/flow/rules/API configuration.
+Named container of versioned bundles (UI, flow, rules, API mappings).
 
 ## ExecutionContext
 
-Immutable runtime metadata: tenantId, role, locale, device, permissions, feature flags.
+Immutable runtime metadata: `tenantId`, role(s), locale, device, permissions, feature flags.
 
 ## FlowSchema
 
-A deterministic state machine defining states, transitions, guards, and actions.
+Deterministic state machine definition (states, transitions, guards, actions).
 
 ## GitOps Bundle
 
-A signed JSON export of the config store used to promote configs across environments.
+Signed JSON export/import payload used for moving config data between environments.
 
 ## RuleSet
 
-A list of rules expressed as a JSON AST (no code). Each rule has scope, condition, and actions.
+JSON AST rule list with scope, condition, and actions.
 
 ## Trace
 
-Structured output from runtime execution:
-- flow transition details
-- rules evaluation details
-- API call details
+Runtime execution output containing flow, rules, and API details.
 
 ## UISchema
 
-A declarative UI description containing a layout tree and component list.
-
+Declarative page description with layout tree and component list.

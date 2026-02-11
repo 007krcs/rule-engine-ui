@@ -7,7 +7,8 @@
     "@platform/angular-renderer": "workspace:*",
     "@platform/core-runtime": "workspace:*",
     "@platform/i18n": "workspace:*",
-    "@platform/schema": "workspace:*"
+    "@platform/schema": "workspace:*",
+    "@platform/web-component-bridge": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { ExecutionContext, JSONValue, UIComponent, UISchema } from '@platform/schema';
 import { validateUISchema, type ValidationIssue } from '@platform/validator';
 import { RenderPage } from '@platform/react-renderer';
@@ -154,6 +155,14 @@ function toTestIdSuffix(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
+function reorderComponentsById(components: UIComponent[], activeId: string, overId: string): UIComponent[] {
+  if (activeId === overId) return components;
+  const oldIndex = components.findIndex((component) => component.id === activeId);
+  const newIndex = components.findIndex((component) => component.id === overId);
+  if (oldIndex < 0 || newIndex < 0) return components;
+  return normalizeFocusOrder(arrayMove(components, oldIndex, newIndex));
+}
+
 function buildComponentFromRegistry(def: ComponentDefinition, id: string): UIComponent {
   const type = deriveType(def.adapterHint);
   return {
@@ -231,15 +240,15 @@ export default function BuilderPage() {
   const { toast } = useToast();
   const { completeStep, setActiveVersionId } = useOnboarding();
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(versionId));
   const [registryLoading, setRegistryLoading] = useState(false);
   const [registry, setRegistry] = useState<ComponentDefinition[]>(() => BUILTIN_COMPONENT_DEFS);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
-  const [components, setComponents] = useState<UIComponent[]>(() => normalizeFocusOrder(scratchComponents));
+  const [components, setComponents] = useState<UIComponent[]>(() => (versionId ? [] : normalizeFocusOrder(scratchComponents)));
   const [schemaVersion, setSchemaVersion] = useState('1.0.0');
   const [pageId, setPageId] = useState('builder-preview');
   const [columns, setColumns] = useState(1);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => scratchComponents[0]?.id ?? null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => (versionId ? null : scratchComponents[0]?.id ?? null));
   const [previewMode, setPreviewMode] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<ExecutionContext['device']>('desktop');
 
@@ -517,21 +526,21 @@ export default function BuilderPage() {
       return;
     }
 
-    if (activeId === overId) return;
-    const oldIndex = components.findIndex((c) => c.id === activeId);
-    const newIndex = components.findIndex((c) => c.id === overId);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const next = normalizeFocusOrder(arrayMove(components, oldIndex, newIndex));
-    setComponents(next);
+    setComponents((current) => reorderComponentsById(current, activeId, overId));
   };
 
   const moveComponent = (componentId: string, direction: 'up' | 'down') => {
-    const index = components.findIndex((c) => c.id === componentId);
-    if (index < 0) return;
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= components.length) return;
-    const next = normalizeFocusOrder(arrayMove(components, index, targetIndex));
-    setComponents(next);
+    flushSync(() => {
+      setComponents((current) => {
+        const index = current.findIndex((component) => component.id === componentId);
+        if (index < 0) return current;
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= current.length) return current;
+        const overId = current[targetIndex]?.id;
+        if (!overId) return current;
+        return reorderComponentsById(current, componentId, overId);
+      });
+    });
   };
 
   return (
@@ -673,7 +682,8 @@ export default function BuilderPage() {
             </CardHeader>
             <CardContent className={styles.canvasContent}>
               <CanvasDropZone disabled={loading}>
-                {components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
+                {loading && components.length === 0 ? <p className={styles.canvasHint}>Loading schema...</p> : null}
+                {!loading && components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
                 <SortableContext items={components.map((c) => c.id)} strategy={rectSortingStrategy}>
                   <RenderPage
                     uiSchema={schema}

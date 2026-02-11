@@ -2,15 +2,29 @@
 
 All schemas are versioned and validated before activation.
 
-## UI Schema
+![Builder overview](/docs/builder-overview.png)
+
+## UI schema (`UISchema`)
+
 - `version`, `pageId`, `layout`, `components`
-- Components use `i18n` keys instead of raw strings.
+- component-level i18n + accessibility metadata
+- optional bindings for `data.*` / `context.*`
 
-## Flow Schema
-- `initialState` and transitions with guards.
+## Flow schema (`FlowSchema`)
 
-## Rules
-- JSON AST only; no eval.
+- `initialState`
+- `states[stateId].on[event]`
+- transition targets + actions + guards
 
-## API Mapping
-- Declarative request/response mapping.
+For editing flow JSON in the current product surface, use `/docs/tutorial-flow-editor`.
+
+## Rule set (`RuleSet`)
+
+- JSON AST only (safe, deterministic)
+- operators include logical, numeric, string, and date operators
+- actions update data/context and emit traceable effects
+
+## API mapping (`ApiMapping`)
+
+- declarative request/response mapping
+- no ad-hoc imperative API code in schema

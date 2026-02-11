@@ -131,13 +131,21 @@ test('playground input updates rule outcomes', async ({ page }) => {
 
   const orderTotalInput = page.getByLabel('Order total filter');
   await expect(orderTotalInput).toBeVisible();
-  await orderTotalInput.fill('500');
+  await orderTotalInput.fill('1200');
 
   await page.getByRole('button', { name: 'Submit' }).click();
   await expect(page.getByText('State: submitted')).toBeVisible();
 
   await page.getByLabel('Explain').check();
   const ruleDetails = page.getByTestId('rule-explain-US_ADMIN_DISCOUNT');
+  await ruleDetails.locator('summary').click();
+  await expect(ruleDetails.getByText('data.orderTotal=1200', { exact: true })).toBeVisible();
+  await expect(ruleDetails.getByText('Matched', { exact: true })).toBeVisible();
+
+  await orderTotalInput.fill('500');
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('State: submitted')).toBeVisible();
+
   await ruleDetails.locator('summary').click();
   await expect(ruleDetails.getByText('data.orderTotal=500', { exact: true })).toBeVisible();
   await expect(ruleDetails.getByText('Not matched', { exact: true })).toBeVisible();
@@ -160,13 +168,19 @@ test('builder adds component and saves', async ({ page, request }) => {
   await expect(save).toBeEnabled();
   await save.click();
   await expect(page.getByText('Saved UI schema')).toBeVisible();
+
+  await page.reload();
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+  await expect(page.getByTestId('canvas-item-newField')).toBeVisible();
 });
 
 test('builder drag-drops palette component onto canvas', async ({ page, request }, testInfo) => {
   const create = await request.post('/api/config-packages', { data: { name: 'QA DragDrop Package' } });
   const created = (await create.json()) as { ok: true; versionId: string };
+  const versionId = created.versionId;
 
-  await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
+  await page.goto(`/builder?versionId=${encodeURIComponent(versionId)}`);
   await waitForClientReady(page);
   await expect(page.getByText('Schema Builder')).toBeVisible();
   // Wait for initial persisted schema to load (builder disables drag-drop while loading).
@@ -202,8 +216,9 @@ test('builder drag-drops palette component onto canvas', async ({ page, request 
 test('builder keyboard reorder uses move controls', async ({ page, request }) => {
   const create = await request.post('/api/config-packages', { data: { name: 'QA Keyboard Reorder' } });
   const created = (await create.json()) as { ok: true; versionId: string };
+  const versionId = created.versionId;
 
-  await page.goto(`/builder?versionId=${encodeURIComponent(created.versionId)}`);
+  await page.goto(`/builder?versionId=${encodeURIComponent(versionId)}`);
   await waitForClientReady(page);
   await expect(page.getByText('Schema Builder')).toBeVisible();
   await expect(page.locator('[data-testid^=\"canvas-item-\"]').first()).toBeVisible();
@@ -224,6 +239,20 @@ test('builder keyboard reorder uses move controls', async ({ page, request }) =>
   );
 
   expect(afterOrder[0]).toBe(`canvas-item-${secondId}`);
+
+  const save = page.getByRole('button', { name: 'Save' });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(page.getByText('Saved UI schema')).toBeVisible();
+
+  await page.reload();
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+
+  const persistedOrder = await page.$$eval('[data-testid^="canvas-item-"]', (items) =>
+    items.map((item) => item.getAttribute('data-testid')),
+  );
+  expect(persistedOrder[0]).toBe(`canvas-item-${secondId}`);
 });
 
 test('builder date field + date rule flow works end-to-end', async ({ page, request }) => {
@@ -310,7 +339,7 @@ test('getting started wizard completes core walkthrough', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Get Started' }).click();
   const wizard = page.getByRole('dialog');
-  await expect(wizard.getByText('Getting Started')).toBeVisible();
+  await expect(wizard.getByText('Getting Started', { exact: true })).toBeVisible();
 
   // Step 1: clone a sample config.
   await wizard.getByRole('button', { name: 'Clone sample' }).first().click();

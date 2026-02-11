@@ -38,18 +38,41 @@ const data: Record<string, JSONValue> = {
   customViz: [],
 };
 
-const snippets = [
+const snippets: Array<{
+  title: string;
+  code: string;
+  description: string;
+  preview: 'react' | 'angular' | 'vue' | 'none';
+}> = [
   {
-    title: 'React',
-    code: `import { RenderPage } from '@platform/react-renderer';\nimport { registerMaterialAdapters } from '@platform/react-material-adapter';\n\nregisterMaterialAdapters();\n\n<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />`,
+    title: 'Install (Production Adapters)',
+    code: `pnpm add @platform/react-aggrid-real highcharts-react-official\npnpm add @platform/react-highcharts-real highcharts`,
+    description: 'Install the real adapter packages plus official chart/grid peer dependencies.',
+    preview: 'none',
   },
   {
-    title: 'Angular',
-    code: `import { renderAngular } from '@platform/angular-renderer';\n\nrenderAngular({ uiSchema, data, context, i18n, target: '#root' });`,
+    title: 'React (Demo Adapters)',
+    code: `import { RenderPage } from '@platform/react-renderer';\nimport { registerMaterialAdapters } from '@platform/react-material-adapter';\nimport { registerAgGridAdapter } from '@platform/react-aggrid-adapter';\nimport { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';\n\nregisterMaterialAdapters();\nregisterAgGridAdapter();\nregisterHighchartsAdapter();\n\n<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />`,
+    description: 'Demo adapters render HTML/SVG so you can ship without external UI dependencies.',
+    preview: 'react',
   },
   {
-    title: 'Vue',
-    code: `import { renderVue } from '@platform/vue-renderer';\n\nrenderVue({ uiSchema, data, context, i18n, target: '#app' });`,
+    title: 'React (Production Adapters)',
+    code: `import { registerAgGridRealAdapter } from '@platform/react-aggrid-real';\nimport { registerHighchartsRealAdapter } from '@platform/react-highcharts-real';\n\nregisterAgGridRealAdapter();\nregisterHighchartsRealAdapter();\n\n// Same adapterHint values, no runtime changes required.`,
+    description: 'Production adapters integrate AG Grid + Highcharts with peer dependencies.',
+    preview: 'none',
+  },
+  {
+    title: 'Web Component Bridge',
+    code: `import { defineRuleflowRendererElement } from '@platform/web-component-bridge';\n\ndefineRuleflowRendererElement();\n\n<ruleflow-renderer\n  ui-schema='{...}'\n  data='{...}'\n  context='{...}'\n></ruleflow-renderer>`,
+    description: 'Recommended for Angular/Vue/React hosts that want a custom element bridge.',
+    preview: 'none',
+  },
+  {
+    title: 'Angular/Vue (HTML Demo)',
+    code: `import { renderAngular } from '@platform/angular-renderer';\nimport { renderVue } from '@platform/vue-renderer';\n\nrenderAngular({ uiSchema, data, context, i18n, target: '#root' });\nrenderVue({ uiSchema, data, context, i18n, target: '#app' });`,
+    description: 'Demo HTML renderers used for host integration validation.',
+    preview: 'angular',
   },
 ];
 
@@ -101,22 +124,20 @@ export default function IntegrationsPage() {
               <pre className={cn(styles.snippet, 'rfScrollbar')}>{snippet.code}</pre>
 
               <div style={{ height: 12 }} />
-              <div className={styles.preview}>
-                {snippet.title === 'React' ? (
-                  <RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />
-                ) : (
-                  <div
-                    className={styles.previewHtml}
-                    dangerouslySetInnerHTML={{ __html: snippet.title === 'Angular' ? angularHtml : vueHtml }}
-                  />
-                )}
-              </div>
+              {snippet.preview === 'none' ? null : (
+                <div className={styles.preview}>
+                  {snippet.preview === 'react' ? (
+                    <RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />
+                  ) : (
+                    <div
+                      className={styles.previewHtml}
+                      dangerouslySetInnerHTML={{ __html: snippet.preview === 'angular' ? angularHtml : vueHtml }}
+                    />
+                  )}
+                </div>
+              )}
 
-              <p className="rfHelperText" style={{ marginTop: 10 }}>
-                {snippet.title === 'React'
-                  ? 'React uses adapters to render real components.'
-                  : 'Angular/Vue packages in this repo are minimal HTML renderers for host integration demos.'}
-              </p>
+              <p className="rfHelperText" style={{ marginTop: 10 }}>{snippet.description}</p>
             </CardContent>
           </Card>
         ))}
@@ -124,4 +145,3 @@ export default function IntegrationsPage() {
     </div>
   );
 }
-

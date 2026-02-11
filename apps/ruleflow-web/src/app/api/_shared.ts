@@ -1,7 +1,7 @@
-﻿import { NextResponse } from 'next/server';
-import { getStoreDiagnostics, isPersistenceError } from '@/server/demo/repository';
+import { NextResponse } from 'next/server';
+import { getConfigStore, getStoreDiagnostics, isPersistenceError } from '@/server/demo/repository';
 
-export const PERSISTENCE_UNAVAILABLE_MESSAGE = 'Persistence unavailable, check store provider';
+export const STORE_WRITE_FAILED_MESSAGE = 'Store write failed';
 
 const NO_STORE_HEADERS = {
   'cache-control': 'no-store',
@@ -16,6 +16,7 @@ export function noStoreJson(body: unknown, status = 200) {
 
 export async function withApiErrorHandling(handler: () => Promise<NextResponse>) {
   try {
+    await getConfigStore();
     return await handler();
   } catch (error) {
     const diagnostics = await getStoreDiagnostics().catch(() => null);
@@ -24,10 +25,10 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
       return noStoreJson(
         {
           ok: false,
-          error: PERSISTENCE_UNAVAILABLE_MESSAGE,
+          error: STORE_WRITE_FAILED_MESSAGE,
           diagnostics,
         },
-        503,
+        500,
       );
     }
 

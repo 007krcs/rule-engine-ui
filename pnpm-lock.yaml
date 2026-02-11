@@ -89,6 +89,9 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@platform/web-component-bridge':
+        specifier: workspace:*
+        version: link:../../packages/adapters/web-component-bridge
 
   apps/demo-host-react:
     dependencies:
@@ -266,6 +269,53 @@ importers:
         specifier: workspace:*
         version: link:../../i18n
 
+  packages/adapters/react-aggrid-real:
+    dependencies:
+      '@platform/react-renderer':
+        specifier: workspace:*
+        version: link:../react-renderer
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.0.0
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      ag-grid-community:
+        specifier: ^32.2.0
+        version: 32.3.9
+      ag-grid-react:
+        specifier: ^32.2.0
+        version: 32.3.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+
+  packages/adapters/react-aggrid-real-adapter:
+    dependencies:
+      '@platform/react-renderer':
+        specifier: workspace:*
+        version: link:../react-renderer
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.0.0
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+      ag-grid-community:
+        specifier: ^32.2.0
+        version: 32.3.9
+      ag-grid-react:
+        specifier: ^32.2.0
+        version: 32.3.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+
   packages/adapters/react-company-adapter:
     dependencies:
       '@platform/react-renderer':
@@ -323,6 +373,53 @@ importers:
         specifier: workspace:*
         version: link:../../i18n
 
+  packages/adapters/react-highcharts-real:
+    dependencies:
+      '@platform/react-renderer':
+        specifier: workspace:*
+        version: link:../react-renderer
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.0.0
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      highcharts:
+        specifier: ^11.4.0
+        version: 11.4.8
+      highcharts-react-official:
+        specifier: ^3.2.0
+        version: 3.2.3(highcharts@11.4.8)(react@18.3.1)
+
+  packages/adapters/react-highcharts-real-adapter:
+    dependencies:
+      '@platform/react-renderer':
+        specifier: workspace:*
+        version: link:../react-renderer
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.0.0
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+      highcharts:
+        specifier: ^11.4.0
+        version: 11.4.8
+      highcharts-react-official:
+        specifier: ^3.2.0
+        version: 3.2.3(highcharts@11.4.8)(react@18.3.1)
+
   packages/adapters/react-material-adapter:
     dependencies:
       '@platform/react-renderer':
@@ -365,6 +462,24 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../../schema
+
+  packages/adapters/web-component-bridge:
+    dependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+      '@platform/react-renderer':
+        specifier: workspace:*
+        version: link:../react-renderer
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.0.0
+        version: 18.3.1(react@18.3.1)
 
   packages/api-orchestrator:
     dependencies:
@@ -1295,6 +1410,18 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  ag-charts-types@10.3.9:
+    resolution: {integrity: sha512-drcRiJVencliC8LnRwk4MmeQDNNBg5GzmOoLFihO3/k0CUK0VF/N+2nc7iFozwaNG0btSB9vAhYuJLjqHMtRrQ==}
+
+  ag-grid-community@32.3.9:
+    resolution: {integrity: sha512-l07SB0mCbGPkC1R8rQQFgBtI5+1FoXBi3RUk1+dHKV/UPeorMEFAzCokcsOhz0qwcWCPrHauUsbRa1SIxfVEJQ==}
+
+  ag-grid-react@32.3.9:
+    resolution: {integrity: sha512-moC64CHbTOf+OSG2xCHYJdWh3MtYaVNvi5n7ro+ImS5gSFn7c5a42pjcfTmDh2sPsKD7qmBXXQ5Vr+Zwg9DhNA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
 
@@ -1540,6 +1667,15 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
+  highcharts-react-official@3.2.3:
+    resolution: {integrity: sha512-2gL8bVGe6Pf75tSe6IB5Ucd0nIOJX7ZrpttQBZVrjN2J9StdVZ12aOinXHIOFvlc6EzP8CbN13WS8NUq+9mptA==}
+    peerDependencies:
+      highcharts: '>=6.0.0'
+      react: '>=16.8.0'
+
+  highcharts@11.4.8:
+    resolution: {integrity: sha512-5Tke9LuzZszC4osaFisxLIcw7xgNGz4Sy3Jc9pRMV+ydm6sYqsPYdU8ELOgpzGNrbrRNDRBtveoR5xS3SzneEA==}
+
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
@@ -1677,6 +1813,10 @@ packages:
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
 
+  object-assign@4.1.1:
+    resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
+    engines: {node: '>=0.10.0'}
+
   obug@2.1.1:
     resolution: {integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==}
 
@@ -1744,6 +1884,9 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
+  prop-types@15.8.1:
+    resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
+
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
@@ -1757,6 +1900,9 @@ packages:
     resolution: {integrity: sha512-AXJdLo8kgMbimY95O2aKQqsz2iWi9jMgKJhRBAxECE4IFxfcazB2LmzloIoibJI3C12IlY20+KFaLv+71bUJeQ==}
     peerDependencies:
       react: ^19.2.4
+
+  react-is@16.13.1:
+    resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
   react-refresh@0.18.0:
     resolution: {integrity: sha512-QgT5//D3jfjJb6Gsjxv0Slpj23ip+HtOpnNgnb2S5zU3CB26G/IDPGoy4RJB42wzFE46DRsstbW6tKHoKbhAxw==}
@@ -2772,6 +2918,19 @@ snapshots:
 
   acorn@8.15.0: {}
 
+  ag-charts-types@10.3.9: {}
+
+  ag-grid-community@32.3.9:
+    dependencies:
+      ag-charts-types: 10.3.9
+
+  ag-grid-react@32.3.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      ag-grid-community: 32.3.9
+      prop-types: 15.8.1
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
   ajv@6.12.6:
     dependencies:
       fast-deep-equal: 3.1.3
@@ -3033,6 +3192,13 @@ snapshots:
 
   has-flag@4.0.0: {}
 
+  highcharts-react-official@3.2.3(highcharts@11.4.8)(react@18.3.1):
+    dependencies:
+      highcharts: 11.4.8
+      react: 18.3.1
+
+  highcharts@11.4.8: {}
+
   ignore@5.3.2: {}
 
   ignore@7.0.5: {}
@@ -3153,6 +3319,8 @@ snapshots:
 
   node-releases@2.0.27: {}
 
+  object-assign@4.1.1: {}
+
   obug@2.1.1: {}
 
   optionator@0.9.4:
@@ -3212,6 +3380,12 @@ snapshots:
 
   prettier@3.8.1: {}
 
+  prop-types@15.8.1:
+    dependencies:
+      loose-envify: 1.4.0
+      object-assign: 4.1.1
+      react-is: 16.13.1
+
   punycode@2.3.1: {}
 
   react-dom@18.3.1(react@18.3.1):
@@ -3224,6 +3398,8 @@ snapshots:
     dependencies:
       react: 19.2.4
       scheduler: 0.27.0
+
+  react-is@16.13.1: {}
 
   react-refresh@0.18.0: {}
 

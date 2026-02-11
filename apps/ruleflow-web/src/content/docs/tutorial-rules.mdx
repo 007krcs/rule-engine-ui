@@ -11,20 +11,21 @@ Rules run against:
 
 ## Step-by-step (10 minutes)
 
-1. Open Rules Builder
-- Navigate to `/builder/rules?versionId=...`.
+1. **Open Rules Builder**
+   - Navigate to `/builder/rules?versionId=...`.
 
-2. Add a starter rule
-- Click **Add starter rule**.
-- This inserts a beginner-friendly rule that sets a flag and emits an event.
+2. **Add a starter rule**
+   - Click **Add starter rule**.
+   - This inserts a beginner-friendly rule that sets a flag and emits an event.
 
-3. Save
-- Fix any validation issues.
-- Click **Save** to persist the RuleSet into the DRAFT version.
+3. **Save**
+   - Fix any validation issues.
+   - Click **Save** to persist the RuleSet into the DRAFT version.
 
-4. Run + Explain
-- Open Playground and click **Submit**.
-- In the Trace panel, toggle **Explain** to see per-rule match results.
+4. **Run + Explain**
+   - Open Playground and click **Submit**.
+   - Toggle **Explain** to see per-rule match results.
+   - Change a bound input value and run **Submit** again to verify rule outcomes change.
 
 ## Rule DSL mental model
 
@@ -49,8 +50,11 @@ Example action:
 { "type": "setField", "path": "data.riskLevel", "value": "High" }
 ```
 
-## Screenshot placeholders
+Date operators are also supported:
+- `dateEq`, `dateBefore`, `dateAfter`, `dateBetween`
 
-- [TODO screenshot: Rules Builder page]
-- [TODO screenshot: Trace -> Rules -> Explain enabled]
+## Screenshots
 
+![Rules Builder page](/docs/rules-builder.png)
+
+![Trace explain mode](/docs/playground-trace.png)

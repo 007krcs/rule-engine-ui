@@ -13,6 +13,8 @@
     "test": "turbo run test",
     "test:e2e": "playwright test",
     "lint": "turbo run lint",
+    "lint:docs": "node scripts/lint-docs.js",
+    "lint:docs:todo": "node scripts/lint-docs-todo.js",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "demo:react": "tsx apps/demo-host-react/scripts/run-demo.ts",

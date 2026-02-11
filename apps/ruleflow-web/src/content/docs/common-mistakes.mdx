@@ -1,26 +1,28 @@
-# Common Mistakes
+﻿# Common Mistakes
+
+![Docs overview](/docs/docs-overview.png)
 
 ## Builder / UISchema
 
 - Missing `accessibility.ariaLabelKey`
 - Missing or duplicate `accessibility.focusOrder`
-- Layout references a component id that doesn't exist
-- Adapter hint not registered in the host (renders as "No adapter for ...")
+- Layout references a missing component id
+- `adapterHint` not registered in host app
+
+## Flow / Rules
+
+- Editing wrong `versionId` then expecting changes in Playground
+- Operand paths missing `data.` or `context.` prefixes
+- Expecting rules to change outcomes without pressing **Submit** in Playground
 
 ## Component Registry
 
-- `adapterHint` not namespaced (`company.currencyInput` is good, `currencyInput` is not)
-- `propsSchema` missing or not an object
-- Duplicated `adapterHint` entries across manifests
-
-## Rules
-
-- Using paths that do not exist (`data.foo.bar` when `data.foo` is missing)
-- Expecting UI inputs to update data automatically (host/event wiring is required)
-- Throwing errors without handling them in the host
+- `adapterHint` not namespaced (`company.currencyInput` is good)
+- malformed `propsSchema`
+- duplicate `adapterHint` entries across manifests
 
 ## i18n / WCAG
 
-- Adding new i18n keys without providing bundles in the host
-- Hard-coding strings instead of using `i18n.labelKey` and friends
-
+- hard-coded labels instead of i18n keys
+- missing keys in locale bundles
+- skipping keyboard/focus verification after layout changes

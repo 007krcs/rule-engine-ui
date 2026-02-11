@@ -25,12 +25,15 @@ registerAdapter('acme.', (component, ctx) => {
 
 - `react-renderer`: Headless React renderer and adapter registry.
 - `react-material-adapter`: Demo adapters for common inputs/layout.
-- `react-aggrid-adapter`: Table adapter.
-- `react-highcharts-adapter`: Chart adapter.
+- `react-aggrid-adapter`: Demo table adapter (HTML table fallback).
+- `react-highcharts-adapter`: Demo chart adapter (inline SVG).
 - `react-d3-adapter`: Custom visualization adapter.
 - `react-company-adapter`: Example company integration (`company.currencyInput`, `company.riskBadge`).
+- `react-aggrid-real-adapter`: Production AG Grid adapter (peer deps).
+- `react-highcharts-real-adapter`: Production Highcharts adapter (peer deps).
 - `angular-renderer`: Minimal HTML renderer used for Angular integration demos.
 - `vue-renderer`: Minimal HTML renderer used for Vue integration demos.
+- `web-component-bridge`: Custom element wrapper for Angular/Vue/React hosts.
 
 ## Styling And Theming
 
@@ -39,4 +42,3 @@ Adapters are the seam for "bring your own UI library":
 - You can render any component library in your adapter handlers.
 - You can inject your CSS framework in the host and keep RuleFlow’s schema contracts unchanged.
 - The product app uses first-party CSS variables (see `apps/ruleflow-web/src/app/globals.css`) so themes can be applied by overriding variables.
-

@@ -2,7 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: 'apps/ruleflow-web/e2e',
+  testMatch: ['**/*.spec.ts', '**/*.e2e.ts'],
   timeout: 120_000,
+  workers: process.env.CI ? 1 : undefined,
   expect: {
     timeout: 30_000,
   },

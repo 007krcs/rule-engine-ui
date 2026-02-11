@@ -4,7 +4,7 @@ import type * as React from 'react';
 import type { UIComponent } from '@platform/schema';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import styles from './canvas-item.module.css';
 
@@ -77,12 +77,28 @@ export function CanvasItem({
               event.stopPropagation();
               onMoveUp?.();
             }}
-            onKeyDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                onMoveUp?.();
+                return;
+              }
+              event.stopPropagation();
+            }}
+            onKeyUp={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+              event.stopPropagation();
+            }}
             disabled={!canMoveUp || disabled}
             aria-label={`Move ${component.id} up`}
             data-testid={`canvas-move-up-${component.id}`}
           >
-            <ArrowUp size={14} aria-hidden="true" focusable="false" />
+            <span aria-hidden="true">↑</span>
             <span>Move up</span>
           </button>
           <button
@@ -92,12 +108,28 @@ export function CanvasItem({
               event.stopPropagation();
               onMoveDown?.();
             }}
-            onKeyDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                onMoveDown?.();
+                return;
+              }
+              event.stopPropagation();
+            }}
+            onKeyUp={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+              event.stopPropagation();
+            }}
             disabled={!canMoveDown || disabled}
             aria-label={`Move ${component.id} down`}
             data-testid={`canvas-move-down-${component.id}`}
           >
-            <ArrowDown size={14} aria-hidden="true" focusable="false" />
+            <span aria-hidden="true">↓</span>
             <span>Move down</span>
           </button>
           <span className={styles.chip}>{component.type}</span>

@@ -1,0 +1,88 @@
+# Getting Started
+
+Use this page as your first stop. It explains how data moves through RuleFlow, how config lifecycle works, and the shortest path from draft to runtime trace.
+
+![Docs overview](/docs/docs-overview.png)
+
+## Runtime data flow
+
+RuleFlow executes with four explicit inputs:
+
+1. **Config version** (`versionId`) selects one immutable bundle:
+   - `uiSchema`
+   - `flowSchema`
+   - `rules`
+   - `apiMappingsById`
+2. **Execution context** (`context.*`) carries role, locale, device, tenant, and permissions.
+3. **Data bag** (`data.*`) carries mutable form/runtime values (for example `data.orderTotal`).
+4. **Event** (`back`, `next`, `submit`) drives flow transitions and rule execution.
+
+Execution output is deterministic:
+- next state
+- updated data/context
+- trace (flow + rules + API details)
+
+## Config lifecycle
+
+Every config package moves through:
+
+`DRAFT -> REVIEW -> APPROVED -> ACTIVE`
+
+Console actions:
+1. `Submit` moves DRAFT to REVIEW and creates an approval request.
+2. `Approve` moves REVIEW to APPROVED.
+3. `Promote` moves APPROVED to ACTIVE and deprecates previous ACTIVE.
+
+## First successful run (10-15 minutes)
+
+1. **Create a draft config**
+   - Open **Get Started** in the header.
+   - Enter `tenantId`, `configId`, and `name`.
+   - Click **Create draft**.
+2. **Build UI**
+   - In Builder (`/builder?versionId=...`), drag a palette item to canvas.
+   - Reorder with drag/drop or **Move up** / **Move down**.
+   - Click **Save**.
+3. **Create rules**
+   - Open Rules Builder (`/builder/rules?versionId=...`).
+   - Click **Add starter rule**.
+   - Click **Save**.
+4. **Run simulation**
+   - Open Playground (`/playground?versionId=...`).
+   - Change a bound input such as `orderTotal`.
+   - Click **Submit**.
+   - In Trace, enable **Explain** and confirm rule match changes.
+5. **Promote through governance**
+   - Open Console (`/console?tab=versions`).
+   - Click **Submit**, then approve in governance, then **Promote**.
+
+## Flow editor workflow (JSON-first today)
+
+RuleFlow currently exposes flow editing as a JSON workflow:
+
+1. Open Console and click **Export** in **GitOps Package**.
+2. Edit `bundle.flowSchema` in your JSON.
+3. Return to Console and click **Import**.
+4. Open Playground and test transitions (`Back`/`Next`/`Submit`).
+
+For a full walk-through see `/docs/tutorial-flow-editor`.
+
+## Import a sample in Console
+
+Download the sample JSON template:
+
+- [`/docs/ruleflow-sample-project.json`](/docs/ruleflow-sample-project.json)
+
+Then:
+
+1. Open `/console?tab=versions`.
+2. In **GitOps Package**, click **Import**.
+3. Pick your JSON file.
+
+Note: GitOps import validates HMAC signatures. If you get a signature error, export a bundle from your environment first, then re-import that exported file as your baseline.
+
+## Key IDs
+
+- **configId**: stable product/tenant config identifier
+- **versionId**: immutable config snapshot used by Builder/Rules/Playground
+- **packageId**: internal package container ID shown in Console metadata

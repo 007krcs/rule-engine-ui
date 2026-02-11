@@ -1,0 +1,28 @@
+﻿# Release Checklist
+
+Use this checklist before releasing RuleFlow changes.
+
+![Docs overview](/docs/docs-overview.png)
+
+## Required checks
+
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm validate:configs`
+- `pnpm test:e2e` (when UI flow changes are included)
+
+## Acceptance criteria
+
+- Builder: drag/drop + keyboard reorder + save works.
+- Rules: create/update/save and Explain behavior verified.
+- Playground: input updates change rule outcomes in trace.
+- Console: `Submit -> Approve -> Promote -> Export/Import` path works without errors.
+- Docs: no placeholder text remains, screenshots render, code blocks remain readable on mobile.
+
+## Manual accessibility checks
+
+- keyboard-only navigation across Builder, Rules, Playground, Console
+- visible focus style on interactive controls
+- meaningful `ariaLabelKey` coverage
+- unique and deterministic focus order for schema components

@@ -1,54 +1,58 @@
-# Tutorial: Console + Versioning
+﻿# Tutorial: Console + Versioning
 
-The Console is where admins manage the lifecycle of a config package: DRAFT -> REVIEW -> APPROVED -> ACTIVE.
+Console manages config lifecycle:
+
+`DRAFT -> REVIEW -> APPROVED -> ACTIVE`
 
 It also includes:
-- an audit log (who did what, when)
-- a schema diff viewer (what changed between versions)
-- GitOps export/import (signed bundle for promotion across environments)
+- audit log
+- bundle diff viewer
+- GitOps export/import
 
 ## Step-by-step (10 minutes)
 
-1. Create a new config
-- Click **New Config** in the header.
-- Give it a name (and optionally tenantId/configId in the Getting Started wizard).
+1. **Create a config**
+   - Click **New Config** or use **Get Started**.
+   - This creates a DRAFT version and a `versionId`.
 
-2. Edit the config
-- Open **Builder** and make a change.
-- Open **Rules Builder** and add a starter rule.
+2. **Make a change**
+   - Open Builder and add a component.
+   - Click **Save**.
 
-3. Submit for review
-- Go to **Console** -> **Versions**.
-- Find your version in **DRAFT**, click **Submit**.
+3. **Submit for review**
+   - Open `/console?tab=versions`.
+   - On your DRAFT version, click **Submit**.
 
-4. Approve
-- Go to **Console** -> **Governance**.
-- Click **Approve** on the pending request.
+4. **Approve**
+   - Stay in Console and open governance cards (or `/console?tab=governance`).
+   - Click **Approve** on the pending request.
 
-5. Promote to ACTIVE
-- Back in **Console** -> **Versions**, click **Promote**.
-- The previous ACTIVE version is automatically deprecated.
+5. **Promote**
+   - Return to versions list.
+   - Click **Promote** on the APPROVED version.
 
-6. Diff the bundle
-- Click **Diff** to see a JSON-level diff of (UI schema + flow + rules + API mappings).
+6. **Compare bundle diffs**
+   - Click **Diff** on a version row to compare against ACTIVE.
 
-7. Export GitOps
-- In **Console** -> **Versions**, use **Export** under GitOps Package.
+7. **Export GitOps**
+   - In **GitOps Package**, click **Export**.
 
-8. Import GitOps
-- Use **Import** to load a GitOps bundle back into the demo store.
+8. **Import sample JSON in Console**
+   - Download sample template: [`/docs/ruleflow-sample-project.json`](/docs/ruleflow-sample-project.json)
+   - In **GitOps Package**, click **Import** and choose your JSON file.
+   - If signature validation fails, export a bundle from your environment first and use that exported file as your trusted baseline.
 
-## Validator Gate (no dead buttons)
+## Validation gates
 
-Submitting and promoting are blocked if validation fails:
+Submit and Promote are blocked when validation fails:
 - schema validity
-- WCAG basics (ariaLabelKey + focus order)
-- i18n coverage for required keys
+- accessibility checks (`ariaLabelKey`, unique `focusOrder`)
+- required i18n key coverage
 
-If validation fails, fix issues in Builder/Rules and try again.
+Fix issues in Builder/Rules Builder, then retry lifecycle actions.
 
-## Screenshot placeholders
+## Screenshots
 
-- [TODO screenshot: Console -> Versions list]
-- [TODO screenshot: Console -> Bundle Diff modal]
+![Console versions list](/docs/console-versions.png)
 
+![Bundle diff modal](/docs/console-bundle-diff.png)

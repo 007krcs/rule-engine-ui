@@ -180,6 +180,11 @@ describe('rules-engine', () => {
   it('evaluates date operators', () => {
     const rules: Rule[] = [
       {
+        ruleId: 'DATE_BEFORE',
+        when: { op: 'dateBefore', left: { path: 'data.orderDate' }, right: { value: '2024-12-01' } },
+        actions: [{ type: 'setField', path: 'data.before', value: true }],
+      },
+      {
         ruleId: 'DATE_AFTER',
         when: { op: 'dateAfter', left: { path: 'data.orderDate' }, right: { value: '2024-01-01' } },
         actions: [{ type: 'setField', path: 'data.after', value: true }],
@@ -197,7 +202,26 @@ describe('rules-engine', () => {
       data: { orderDate: '2024-06-15' },
     });
 
+    expect(result.data.before).toBe(true);
     expect(result.data.after).toBe(true);
     expect(result.data.between).toBe(true);
+  });
+
+  it('returns false for invalid date values', () => {
+    expect(
+      evaluateCondition(
+        { op: 'dateBefore', left: { value: 'not-a-date' }, right: { value: '2024-01-01' } },
+        baseContext,
+        {},
+      ),
+    ).toBe(false);
+
+    expect(
+      evaluateCondition(
+        { op: 'dateAfter', left: { value: '2024-01-01' }, right: { value: 'bad-date' } },
+        baseContext,
+        {},
+      ),
+    ).toBe(false);
   });
 });

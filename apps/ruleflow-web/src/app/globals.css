@@ -178,6 +178,23 @@ pre {
   border-radius: var(--rf-radius-md);
   padding: var(--rf-space-4);
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rfProse pre code {
+  display: block;
+  min-width: max-content;
+}
+
+.rfProse img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 .rfProse ul,

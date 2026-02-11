@@ -7,11 +7,12 @@ export class ApiError extends Error {
   }
 }
 
-const PERSISTENCE_UNAVAILABLE_MESSAGE = 'Persistence unavailable, check store provider';
+const STORE_WRITE_FAILED_MESSAGE = 'Store write failed';
+const PERSISTENCE_HINT = 'Persistence unavailable, check store provider';
 
 function withPersistenceHint(message: string, status: number): string {
-  if (status >= 500 && !message.toLowerCase().includes(PERSISTENCE_UNAVAILABLE_MESSAGE.toLowerCase())) {
-    return `${message}. ${PERSISTENCE_UNAVAILABLE_MESSAGE}`;
+  if (status >= 500 && !message.toLowerCase().includes(PERSISTENCE_HINT.toLowerCase())) {
+    return `${message}. ${PERSISTENCE_HINT}`;
   }
   return message;
 }
@@ -32,7 +33,7 @@ async function parseErrorMessage(response: Response): Promise<string> {
           return withPersistenceHint(`${error}: ${path}: ${message}${suffix}`, response.status);
         }
 
-        if (error === PERSISTENCE_UNAVAILABLE_MESSAGE && rec.diagnostics && typeof rec.diagnostics === 'object') {
+        if (error === STORE_WRITE_FAILED_MESSAGE && rec.diagnostics && typeof rec.diagnostics === 'object') {
           const provider = (rec.diagnostics as { provider?: unknown }).provider;
           if (typeof provider === 'string') {
             return `${error} (provider: ${provider})`;
