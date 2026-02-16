@@ -176,6 +176,9 @@ importers:
       '@platform/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@platform/persistence-postgres':
+        specifier: workspace:*
+        version: link:../../packages/persistence-postgres
       '@platform/react-aggrid-adapter':
         specifier: workspace:*
         version: link:../../packages/adapters/react-aggrid-adapter
@@ -240,6 +243,37 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  apps/ui-docs:
+    dependencies:
+      '@platform/ui-kit':
+        specifier: workspace:*
+        version: link:../../packages/ui-kit
+      next:
+        specifier: ^15.1.0
+        version: 15.5.12(@babel/core@7.29.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^25.2.1
+        version: 25.2.1
+      '@types/react':
+        specifier: ^19.2.13
+        version: 19.2.13
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.13)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@25.2.1)(jiti@1.21.7)(tsx@4.21.0)
 
   packages/adapters/angular-renderer:
     dependencies:
@@ -547,6 +581,12 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
+  packages/persistence-postgres:
+    dependencies:
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/rules-engine:
     dependencies:
       '@platform/observability':
@@ -557,6 +597,15 @@ importers:
         version: link:../schema
 
   packages/schema: {}
+
+  packages/ui-kit:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
 
   packages/validator:
     dependencies:
