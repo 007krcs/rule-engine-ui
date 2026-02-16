@@ -342,6 +342,19 @@ export function Playground({
       setContext(result.updatedContext);
       setData(result.updatedData as Record<string, JSONValue>);
       setTrace(result.trace);
+
+      const executionId = globalThis.crypto?.randomUUID?.() ?? `exec-${Date.now()}`;
+      const correlationId = globalThis.crypto?.randomUUID?.() ?? executionId;
+      await fetch('/api/execution-traces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          executionId,
+          correlationId,
+          versionId: version?.id,
+          trace: result.trace,
+        }),
+      }).catch(() => undefined);
     } catch (error) {
       toast({
         variant: 'error',

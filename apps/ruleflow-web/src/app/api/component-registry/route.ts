@@ -1,5 +1,5 @@
 import type { ComponentRegistryManifest, RegistryScope } from '@platform/component-registry';
-import { getComponentRegistrySnapshot, registerComponentRegistryManifest } from '@/server/demo/repository';
+import { getComponentRegistrySnapshot, registerComponentRegistryManifest } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -38,3 +38,4 @@ export async function POST(request: Request) {
     return noStoreJson(result);
   });
 }
+

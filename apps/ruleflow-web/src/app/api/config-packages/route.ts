@@ -1,4 +1,4 @@
-import { createConfigPackage } from '@/server/demo/repository';
+import { createConfigPackage } from '@/server/repository';
 import { sampleTemplateById, type SampleTemplateId } from '@/lib/samples';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
@@ -29,6 +29,11 @@ export async function POST(request: Request) {
       tenantId: body.tenantId,
       configId: body.configId,
     });
+    if ('ok' in result && result.ok === false) {
+      const status = result.error === 'policy_failed' ? 403 : 400;
+      return noStoreJson(result, status);
+    }
     return noStoreJson({ ok: true, ...result });
   });
 }
+

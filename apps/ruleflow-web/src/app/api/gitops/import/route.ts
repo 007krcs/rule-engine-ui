@@ -1,5 +1,5 @@
 import type { GitOpsBundle } from '@/lib/demo/types';
-import { importGitOpsBundle } from '@/server/demo/repository';
+import { importGitOpsBundle } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -41,8 +41,10 @@ export async function POST(request: Request) {
 
     const result = await importGitOpsBundle({ bundle: bundle as GitOpsBundle });
     if (!result.ok) {
-      return noStoreJson(result, 400);
+      const status = result.error === 'policy_failed' ? 403 : 400;
+      return noStoreJson(result, status);
     }
     return noStoreJson(result);
   });
 }
+

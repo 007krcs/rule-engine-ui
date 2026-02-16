@@ -24,6 +24,7 @@
     "@platform/component-registry": "workspace:*",
     "@platform/i18n": "workspace:*",
     "@platform/observability": "workspace:*",
+    "@platform/persistence-postgres": "workspace:*",
     "@platform/react-aggrid-adapter": "workspace:*",
     "@platform/react-company-adapter": "workspace:*",
     "@platform/react-d3-adapter": "workspace:*",

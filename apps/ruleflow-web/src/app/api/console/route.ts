@@ -1,4 +1,4 @@
-import { getConsoleSnapshot } from '@/server/demo/repository';
+import { getConsoleSnapshot } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -9,3 +9,4 @@ export async function GET() {
     return noStoreJson(snapshot);
   });
 }
+

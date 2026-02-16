@@ -21,9 +21,19 @@ async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as unknown;
     if (data && typeof data === 'object') {
-      const rec = data as { error?: unknown; issues?: unknown; diagnostics?: unknown };
+      const rec = data as { error?: unknown; issues?: unknown; policyErrors?: unknown; diagnostics?: unknown };
       const error = rec.error;
       if (typeof error === 'string') {
+        const policyErrors = rec.policyErrors;
+        if (Array.isArray(policyErrors) && policyErrors.length > 0) {
+          const first = policyErrors[0] as { code?: unknown; message?: unknown; hint?: unknown };
+          const code = typeof first.code === 'string' ? first.code : 'policy';
+          const message = typeof first.message === 'string' ? first.message : 'Policy check failed';
+          const hint = typeof first.hint === 'string' ? ` (${first.hint})` : '';
+          const suffix = policyErrors.length > 1 ? ` (+${policyErrors.length - 1} more)` : '';
+          return withPersistenceHint(`${error}: ${code}: ${message}${hint}${suffix}`, response.status);
+        }
+
         const issues = rec.issues;
         if (Array.isArray(issues) && issues.length > 0) {
           const first = issues[0] as { path?: unknown; message?: unknown };

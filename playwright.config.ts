@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: 'apps/ruleflow-web/e2e',
   testMatch: ['**/*.spec.ts', '**/*.e2e.ts'],
   timeout: 120_000,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.PLAYWRIGHT_WORKERS ? Number(process.env.PLAYWRIGHT_WORKERS) : 1,
   expect: {
     timeout: 30_000,
   },

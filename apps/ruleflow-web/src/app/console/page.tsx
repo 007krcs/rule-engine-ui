@@ -29,7 +29,29 @@ const statusVariant: Record<ConfigStatus, 'default' | 'success' | 'warning' | 'm
 
 type DiffResponse =
   | { ok: false; error: string }
-  | { ok: true; before: { id: string; version: string }; after: { id: string; version: string }; diffs: JsonDiffItem[] };
+  | {
+      ok: true;
+      before: { id: string; version: string };
+      after: { id: string; version: string };
+      diffs: JsonDiffItem[];
+      semantic?: { uiChanged: boolean; flowChanged: boolean; rulesChanged: boolean; apiChanged: boolean };
+    };
+
+type FeatureFlag = {
+  id: string;
+  env: string;
+  key: string;
+  enabled: boolean;
+};
+
+type KillSwitch = {
+  id: string;
+  scope: 'TENANT' | 'RULESET' | 'VERSION';
+  packageId?: string;
+  versionId?: string;
+  active: boolean;
+  reason?: string;
+};
 
 export default function ConsolePage() {
   const searchParams = useSearchParams();
@@ -55,6 +77,17 @@ export default function ConsolePage() {
   const [requestChangesOpen, setRequestChangesOpen] = useState(false);
   const [requestChangesApprovalId, setRequestChangesApprovalId] = useState<string | null>(null);
   const [requestChangesNotes, setRequestChangesNotes] = useState('');
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
+  const [killSwitches, setKillSwitches] = useState<KillSwitch[]>([]);
+  const [executionTraces, setExecutionTraces] = useState<Array<{ id: string; executionId: string; correlationId: string; createdAt: string }>>([]);
+  const [metricsText, setMetricsText] = useState('');
+  const [sessionRoles, setSessionRoles] = useState<string[]>([]);
+  const [newFlagEnv, setNewFlagEnv] = useState('prod');
+  const [newFlagKey, setNewFlagKey] = useState('rules.explainMode');
+  const [newFlagEnabled, setNewFlagEnabled] = useState(true);
+  const [killScope, setKillScope] = useState<'TENANT' | 'RULESET' | 'VERSION'>('TENANT');
+  const [killVersionId, setKillVersionId] = useState('');
+  const [killReason, setKillReason] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -63,6 +96,22 @@ export default function ConsolePage() {
     try {
       const data = await apiGet<ConsoleSnapshot>('/api/console');
       setSnapshot(data);
+      const [flagsResp, killsResp] = await Promise.all([
+        apiGet<{ ok: true; flags: FeatureFlag[] }>('/api/feature-flags').catch(() => ({ ok: true as const, flags: [] })),
+        apiGet<{ ok: true; killSwitches: KillSwitch[] }>('/api/kill-switches').catch(() => ({ ok: true as const, killSwitches: [] })),
+      ]);
+      setFeatureFlags(flagsResp.flags ?? []);
+      setKillSwitches(killsResp.killSwitches ?? []);
+      const traceResp = await apiGet<{ ok: true; traces: Array<{ id: string; executionId: string; correlationId: string; createdAt: string }> }>(
+        '/api/execution-traces?limit=50',
+      ).catch(() => ({ ok: true as const, traces: [] }));
+      setExecutionTraces(traceResp.traces ?? []);
+      const metricsResp = await fetch('/api/metrics').then((response) => response.text()).catch(() => '');
+      setMetricsText(metricsResp);
+      const sessionResp = await apiGet<{ ok: true; session: { roles: string[] } }>('/api/session').catch(
+        () => ({ ok: true as const, session: { roles: [] } }),
+      );
+      setSessionRoles(sessionResp.session.roles ?? []);
     } catch (error) {
       toast({
         variant: 'error',
@@ -128,6 +177,43 @@ export default function ConsolePage() {
       toast({
         variant: 'error',
         title: 'Promote failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const rollback = async (versionId: string) => {
+    setBusyKey(`rollback:${versionId}`);
+    try {
+      await apiPost(`/api/config-versions/${encodeURIComponent(versionId)}/rollback`);
+      toast({ variant: 'success', title: 'Rolled back ACTIVE version' });
+      await refresh();
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Rollback failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const createVersion = async (packageId: string, fromVersionId?: string) => {
+    setBusyKey(`new-version:${packageId}`);
+    try {
+      const result = await apiPost<{ ok: true; versionId: string }>(
+        `/api/config-packages/${encodeURIComponent(packageId)}/versions`,
+        { fromVersionId },
+      );
+      toast({ variant: 'success', title: `Created new DRAFT version (${result.versionId})` });
+      await refresh();
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Create version failed',
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -215,6 +301,50 @@ export default function ConsolePage() {
     }
   };
 
+  const saveFeatureFlag = async () => {
+    setBusyKey('flags:save');
+    try {
+      await apiPost('/api/feature-flags', {
+        env: newFlagEnv.trim(),
+        key: newFlagKey.trim(),
+        enabled: newFlagEnabled,
+        value: {},
+      });
+      toast({ variant: 'success', title: 'Feature flag updated' });
+      await refresh();
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Feature flag update failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const saveKillSwitch = async () => {
+    setBusyKey('kill:save');
+    try {
+      await apiPost('/api/kill-switches', {
+        scope: killScope,
+        active: true,
+        versionId: killScope === 'VERSION' ? killVersionId.trim() : undefined,
+        reason: killReason.trim() || undefined,
+      });
+      toast({ variant: 'success', title: 'Kill switch updated' });
+      await refresh();
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Kill switch update failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
   const importGitOps = async (file: File) => {
     setBusyKey('gitops:import');
     try {
@@ -253,6 +383,9 @@ export default function ConsolePage() {
   const versions = snapshot?.versions ?? [];
   const approvals = (snapshot?.approvals ?? []).filter((a) => a.status === 'PENDING');
   const audit = snapshot?.audit ?? [];
+  const canAuthor = sessionRoles.includes('Author');
+  const canApprove = sessionRoles.includes('Approver');
+  const canPublish = sessionRoles.includes('Publisher');
 
   return (
     <div className={styles.page}>
@@ -307,8 +440,8 @@ export default function ConsolePage() {
                 <div className={styles.stack}>
                   {versions.map((version) => {
                     const pkgName = packageNameById.get(version.packageId) ?? version.packageId;
-                    const canPromote = version.status === 'APPROVED';
-                    const canSubmitReview = version.status === 'DRAFT';
+                    const canPromote = version.status === 'APPROVED' && canPublish;
+                    const canSubmitReview = version.status === 'DRAFT' && canAuthor;
                     return (
                       <div key={version.id} data-testid={`version-row-${version.id}`} className={styles.versionRow}>
                         <div className={styles.versionTop}>
@@ -341,6 +474,22 @@ export default function ConsolePage() {
                               title={canPromote ? undefined : `Cannot promote a ${version.status} version`}
                             >
                               {busyKey === `promote:${version.id}` ? 'Promoting...' : 'Promote'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => rollback(version.id)}
+                              disabled={!canPublish || busyKey === `rollback:${version.id}`}
+                            >
+                              {busyKey === `rollback:${version.id}` ? 'Rolling back...' : 'Rollback'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => createVersion(version.packageId, version.id)}
+                              disabled={!canAuthor || busyKey === `new-version:${version.packageId}`}
+                            >
+                              {busyKey === `new-version:${version.packageId}` ? 'Creating...' : 'New Version'}
                             </Button>
                             <Button
                               size="sm"
@@ -379,6 +528,7 @@ export default function ConsolePage() {
                     packageName={packageNameById.get(item.packageId)}
                     busyKey={busyKey}
                     onApprove={() => approve(item.id)}
+                    canApprove={canApprove}
                     onRequestChanges={() => {
                       setRequestChangesApprovalId(item.id);
                       setRequestChangesOpen(true);
@@ -390,6 +540,92 @@ export default function ConsolePage() {
               </CardContent>
             </Card>
           ) : null}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Feature Flags</CardTitle>
+            </CardHeader>
+            <CardContent className={styles.stack}>
+              <div className={styles.formGrid}>
+                <div>
+                  <label className="rfFieldLabel">Env</label>
+                  <Input value={newFlagEnv} onChange={(event) => setNewFlagEnv(event.target.value)} />
+                </div>
+                <div>
+                  <label className="rfFieldLabel">Key</label>
+                  <Input value={newFlagKey} onChange={(event) => setNewFlagKey(event.target.value)} />
+                </div>
+                <div>
+                  <label className="rfFieldLabel">Enabled</label>
+                  <Select
+                    value={newFlagEnabled ? 'true' : 'false'}
+                    onChange={(event) => setNewFlagEnabled(event.target.value === 'true')}
+                  >
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Button size="sm" onClick={saveFeatureFlag} disabled={!canPublish || busyKey === 'flags:save'}>
+                  {busyKey === 'flags:save' ? 'Saving...' : 'Save Flag'}
+                </Button>
+              </div>
+              <div className={styles.stack}>
+                {featureFlags.map((flag) => (
+                  <div key={flag.id} className={styles.approvalRow}>
+                    <p className={styles.approvalMeta}>
+                      {flag.env}:{flag.key}
+                    </p>
+                    <Badge variant={flag.enabled ? 'success' : 'muted'}>{String(flag.enabled)}</Badge>
+                  </div>
+                ))}
+                {featureFlags.length === 0 ? <p className={styles.muted}>No feature flags.</p> : null}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Kill Switch</CardTitle>
+            </CardHeader>
+            <CardContent className={styles.stack}>
+              <div className={styles.formGrid}>
+                <div>
+                  <label className="rfFieldLabel">Scope</label>
+                  <Select value={killScope} onChange={(event) => setKillScope(event.target.value as 'TENANT' | 'RULESET' | 'VERSION')}>
+                    <option value="TENANT">TENANT</option>
+                    <option value="RULESET">RULESET</option>
+                    <option value="VERSION">VERSION</option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="rfFieldLabel">Version Id (optional)</label>
+                  <Input value={killVersionId} onChange={(event) => setKillVersionId(event.target.value)} />
+                </div>
+                <div>
+                  <label className="rfFieldLabel">Reason</label>
+                  <Input value={killReason} onChange={(event) => setKillReason(event.target.value)} />
+                </div>
+              </div>
+              <div>
+                <Button size="sm" onClick={saveKillSwitch} disabled={!canPublish || busyKey === 'kill:save'}>
+                  {busyKey === 'kill:save' ? 'Saving...' : 'Activate Kill Switch'}
+                </Button>
+              </div>
+              <div className={styles.stack}>
+                {killSwitches.map((kill) => (
+                  <div key={kill.id} className={styles.approvalRow}>
+                    <p className={styles.approvalMeta}>
+                      {kill.scope} {kill.versionId ? `(${kill.versionId})` : ''}
+                    </p>
+                    <Badge variant={kill.active ? 'warning' : 'muted'}>{kill.active ? 'active' : 'inactive'}</Badge>
+                  </div>
+                ))}
+                {killSwitches.length === 0 ? <p className={styles.muted}>No kill switches.</p> : null}
+              </div>
+            </CardContent>
+          </Card>
         </section>
       ) : null}
 
@@ -412,6 +648,35 @@ export default function ConsolePage() {
                   />
                 ))}
                 {audit.length === 0 ? <p className={styles.muted}>No audit events yet.</p> : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showObservability ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Prometheus Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className={styles.diffPre}>{metricsText || '# metrics unavailable'}</pre>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showObservability ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Execution Traces</CardTitle>
+              </CardHeader>
+              <CardContent className={styles.stack}>
+                {executionTraces.map((trace) => (
+                  <div key={trace.id} className={styles.approvalRow}>
+                    <p className={styles.approvalMeta}>executionId: {trace.executionId}</p>
+                    <p className={styles.approvalMeta}>correlationId: {trace.correlationId}</p>
+                    <p className={styles.approvalMeta}>{new Date(trace.createdAt).toLocaleString()}</p>
+                  </div>
+                ))}
+                {executionTraces.length === 0 ? <p className={styles.muted}>No execution traces captured yet.</p> : null}
               </CardContent>
             </Card>
           ) : null}
@@ -469,7 +734,7 @@ export default function ConsolePage() {
             <Button
               type="button"
               onClick={submitReview}
-              disabled={!reviewVersionId || busyKey !== null || reviewScope.trim().length === 0}
+              disabled={!canAuthor || !reviewVersionId || busyKey !== null || reviewScope.trim().length === 0}
             >
               Submit
             </Button>
@@ -502,7 +767,7 @@ export default function ConsolePage() {
             <Button type="button" variant="outline" onClick={() => setRequestChangesOpen(false)} disabled={busyKey !== null}>
               Cancel
             </Button>
-            <Button type="button" onClick={doRequestChanges} disabled={!requestChangesApprovalId || busyKey !== null}>
+            <Button type="button" onClick={doRequestChanges} disabled={!canApprove || !requestChangesApprovalId || busyKey !== null}>
               Request changes
             </Button>
           </div>
@@ -542,6 +807,14 @@ export default function ConsolePage() {
               Comparing <strong>{diffData.before.version}</strong> -&gt; <strong>{diffData.after.version}</strong> (
               {diffData.diffs.length} changes)
             </p>
+            {diffData.semantic ? (
+              <p className={styles.muted}>
+                Semantic: UI {diffData.semantic.uiChanged ? 'changed' : 'unchanged'} | Flow{' '}
+                {diffData.semantic.flowChanged ? 'changed' : 'unchanged'} | Rules{' '}
+                {diffData.semantic.rulesChanged ? 'changed' : 'unchanged'} | API{' '}
+                {diffData.semantic.apiChanged ? 'changed' : 'unchanged'}
+              </p>
+            ) : null}
             <div className={styles.diffScroll}>
               <ul className={styles.diffList}>
                 {diffData.diffs.slice(0, 200).map((d) => (
@@ -572,12 +845,14 @@ function ApprovalRow({
   packageName,
   busyKey,
   onApprove,
+  canApprove,
   onRequestChanges,
 }: {
   item: ApprovalRequest;
   packageName?: string;
   busyKey: string | null;
   onApprove: () => void;
+  canApprove: boolean;
   onRequestChanges: () => void;
 }) {
   const approving = busyKey === `approve:${item.id}`;
@@ -590,10 +865,10 @@ function ApprovalRow({
       <p className={styles.approvalMeta}>Requested by {item.requestedBy}</p>
       <p className={styles.approvalMeta}>{item.scope}</p>
       <div className={styles.approvalActions}>
-        <Button size="sm" onClick={onApprove} disabled={approving}>
+        <Button size="sm" onClick={onApprove} disabled={!canApprove || approving}>
           {approving ? 'Approving...' : 'Approve'}
         </Button>
-        <Button variant="outline" size="sm" onClick={onRequestChanges} disabled={busyKey !== null}>
+        <Button variant="outline" size="sm" onClick={onRequestChanges} disabled={!canApprove || busyKey !== null}>
           Request changes
         </Button>
       </div>

@@ -1,5 +1,5 @@
 import type { RuleSet } from '@platform/schema';
-import { updateRules } from '@/server/demo/repository';
+import { updateRules } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -15,8 +15,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ve
     const rules = body.rules as RuleSet;
     const result = await updateRules({ versionId, rules });
     if (!result.ok) {
-      return noStoreJson(result, 404);
+      const status = result.error === 'policy_failed' ? 403 : 404;
+      return noStoreJson(result, status);
     }
     return noStoreJson(result);
   });
 }
+
+
+

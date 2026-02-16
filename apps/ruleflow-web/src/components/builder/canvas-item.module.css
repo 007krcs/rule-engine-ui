@@ -124,6 +124,29 @@
   outline-offset: 2px;
 }
 
+.removeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--rf-warning) 25%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-warning) 8%, var(--rf-surface-2));
+  color: var(--rf-warning);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.removeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.removeButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--rf-warning) 45%, transparent);
+  outline-offset: 2px;
+}
+
 .body {
   display: grid;
   gap: var(--rf-space-2);

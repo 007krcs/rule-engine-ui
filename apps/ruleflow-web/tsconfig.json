@@ -20,6 +20,9 @@
     "paths": {
       "@/*": [
         "src/*"
+      ],
+      "@platform/persistence-postgres": [
+        "../../packages/persistence-postgres/src/index.ts"
       ]
     },
     "isolatedModules": true,

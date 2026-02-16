@@ -18,17 +18,7 @@ async function waitForClientReady(page: Page) {
   await expect(page.getByTestId('client-ready')).toBeVisible({ timeout: 120_000 });
 }
 
-test('drag component, reorder via keyboard, and save config', async ({ page, request }) => {
-  const create = await request.post('/api/config-packages', { data: { name: 'QA Builder E2E Package' } });
-  expect(create.ok()).toBeTruthy();
-  const created = (await create.json()) as { ok: true; versionId: string };
-  const versionId = created.versionId;
-
-  await page.goto(`/builder?versionId=${encodeURIComponent(versionId)}`);
-  await waitForClientReady(page);
-  await expect(page.getByText('Schema Builder')).toBeVisible();
-  await expect(page.locator('[data-testid^="canvas-item-"]').first()).toBeVisible();
-
+async function dragPaletteInputToCanvas(page: Page) {
   const paletteItem = page.getByTestId('palette-item-material-input');
   const canvas = page.getByTestId('builder-canvas');
   await expect(paletteItem).toBeVisible();
@@ -43,6 +33,20 @@ test('drag component, reorder via keyboard, and save config', async ({ page, req
   await page.mouse.down();
   await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + Math.min(100, canvasBox.height / 2), { steps: 15 });
   await page.mouse.up();
+}
+
+test('drag component, reorder via keyboard, and save config', async ({ page, request }) => {
+  const create = await request.post('/api/config-packages', { data: { name: 'QA Builder E2E Package' } });
+  expect(create.ok()).toBeTruthy();
+  const created = (await create.json()) as { ok: true; versionId: string };
+  const versionId = created.versionId;
+
+  await page.goto(`/builder?versionId=${encodeURIComponent(versionId)}`);
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+  await expect(page.locator('[data-testid^="canvas-item-"]').first()).toBeVisible();
+
+  await dragPaletteInputToCanvas(page);
 
   await expect(page.getByTestId('canvas-item-input')).toBeVisible({ timeout: 30_000 });
 
@@ -67,7 +71,7 @@ test('drag component, reorder via keyboard, and save config', async ({ page, req
   const save = page.getByRole('button', { name: 'Save' });
   await expect(save).toBeEnabled();
   await save.click();
-  await expect(page.getByText('Saved UI schema')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled({ timeout: 30_000 });
 
   await page.reload();
   await waitForClientReady(page);
@@ -77,4 +81,15 @@ test('drag component, reorder via keyboard, and save config', async ({ page, req
     items.map((item) => item.getAttribute('data-testid') ?? ''),
   );
   expect(persistedOrder[0]).toBe(`canvas-item-${secondId}`);
+});
+
+test('dragging Input updates schema JSON panel', async ({ page }) => {
+  await page.goto('/builder');
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+
+  await dragPaletteInputToCanvas(page);
+  await expect(page.getByTestId('canvas-item-input')).toBeVisible({ timeout: 30_000 });
+
+  await expect(page.getByLabel('Schema JSON editor')).toHaveValue(/"type":\s*"input"/);
 });

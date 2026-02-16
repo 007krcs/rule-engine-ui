@@ -1,5 +1,5 @@
-﻿import type { UISchema } from '@platform/schema';
-import { getConfigVersion, updateUiSchema } from '@/server/demo/repository';
+import type { UISchema } from '@platform/schema';
+import { getConfigVersion, updateUiSchema } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -26,8 +26,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ve
     const uiSchema = body.uiSchema as UISchema;
     const result = await updateUiSchema({ versionId, uiSchema });
     if (!result.ok) {
-      return noStoreJson(result, 404);
+      const status = result.error === 'policy_failed' ? 403 : 404;
+      return noStoreJson(result, status);
     }
     return noStoreJson(result);
   });
 }
+
+
+

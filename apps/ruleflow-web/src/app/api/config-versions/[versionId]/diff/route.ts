@@ -1,4 +1,4 @@
-import { diffVersion } from '@/server/demo/repository';
+import { diffVersion } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -16,3 +16,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ vers
     return noStoreJson(result);
   });
 }
+

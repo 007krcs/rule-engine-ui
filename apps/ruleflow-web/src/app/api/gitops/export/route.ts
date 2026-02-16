@@ -1,4 +1,4 @@
-import { exportGitOpsBundle } from '@/server/demo/repository';
+import { exportGitOpsBundle } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -12,3 +12,4 @@ export async function GET() {
     return response;
   });
 }
+

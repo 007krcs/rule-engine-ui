@@ -43,6 +43,8 @@ export type ConfigVersion = {
   updatedAt?: string;
   updatedBy?: string;
   bundle: ConfigBundle;
+  isKilled?: boolean;
+  killReason?: string;
 };
 
 export type ApprovalRequest = {
@@ -69,14 +71,56 @@ export type AuditEvent = {
   metadata?: Record<string, unknown>;
 };
 
+export type FeatureFlag = {
+  id: string;
+  tenantId: string;
+  env: string;
+  key: string;
+  enabled: boolean;
+  value: Record<string, unknown>;
+  updatedBy?: string;
+  updatedAt: string;
+};
+
+export type KillSwitch = {
+  id: string;
+  tenantId: string;
+  scope: 'TENANT' | 'RULESET' | 'VERSION';
+  packageId?: string;
+  versionId?: string;
+  rulesetKey?: string;
+  active: boolean;
+  reason?: string;
+  updatedBy?: string;
+  updatedAt: string;
+};
+
+export type BrandingConfig = {
+  tenantId: string;
+  logoUrl?: string;
+  mode: 'light' | 'dark' | 'system';
+  primaryColor: string;
+  secondaryColor: string;
+  typographyScale: number;
+  radius: number;
+  spacing: number;
+  cssVariables: Record<string, unknown>;
+  updatedBy?: string;
+  updatedAt: string;
+};
+
 export type GitOpsBundle = {
   schemaVersion: 1;
   exportedAt: string;
   tenantId: string;
   payload: {
     packages: ConfigPackage[];
+    versions?: ConfigVersion[];
     approvals: ApprovalRequest[];
     audit: AuditEvent[];
+    featureFlags?: FeatureFlag[];
+    killSwitches?: KillSwitch[];
+    branding?: BrandingConfig;
     componentRegistry?: {
       global: ComponentDefinition[];
       tenants: Record<string, ComponentDefinition[]>;

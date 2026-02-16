@@ -11,10 +11,15 @@ export interface Session {
 }
 
 export function getMockSession(): Session {
+  const configured = (process.env.RULEFLOW_MOCK_ROLES ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value): value is Role => value === 'Author' || value === 'Approver' || value === 'Publisher' || value === 'Viewer');
+
   return {
     user: { id: 'u-1', name: 'Rita Morgan', email: 'rita@ruleflow.dev' },
     tenantId: 'tenant-1',
-    roles: ['Author', 'Approver'],
+    roles: configured.length > 0 ? configured : ['Author', 'Approver', 'Publisher'],
   };
 }
 

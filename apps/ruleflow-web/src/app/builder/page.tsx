@@ -24,6 +24,16 @@ import { Select } from '@/components/ui/select';
 import { ComponentEditor } from '@/components/builder/component-editor';
 import { SchemaPreview } from '@/components/builder/schema-preview';
 import { CanvasItem } from '@/components/builder/canvas-item';
+import {
+  createSchemaFromComponents,
+  getSchemaColumns,
+  isSchemaLike,
+  moveComponentInSchema,
+  normalizeFocusOrder,
+  normalizeSchema,
+  removeComponentFromSchema,
+  withUpdatedComponents,
+} from '@/components/builder/schema-state';
 import { useToast } from '@/components/ui/toast';
 import styles from './builder.module.css';
 import { cn } from '@/lib/utils';
@@ -41,8 +51,10 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+const BUILDER_LOCAL_STORAGE_KEY = 'ruleflow:builder:schema';
 
 const scratchComponents: UIComponent[] = [
   {
@@ -114,18 +126,6 @@ const previewData: Record<string, JSONValue> = {
 const BUILTIN_COMPONENT_DEFS = builtinComponentDefinitions();
 const DEFAULT_ADAPTER_HINT = BUILTIN_COMPONENT_DEFS[0]?.adapterHint ?? 'material.input';
 
-function normalizeFocusOrder(components: UIComponent[]) {
-  return components.map((component, index) => ({
-    ...component,
-    accessibility: {
-      ...(component.accessibility ?? {}),
-      keyboardNav: true,
-      focusOrder: index + 1,
-      ariaLabelKey: component.accessibility?.ariaLabelKey ?? `runtime.builder.${component.id}.aria`,
-    },
-  }));
-}
-
 function extractComponentIdFromIssue(path: string, components: UIComponent[]): string | null {
   if (!path.startsWith('components.')) return null;
   const rest = path.slice('components.'.length);
@@ -138,8 +138,7 @@ function extractComponentIdFromIssue(path: string, components: UIComponent[]): s
     return component?.id ?? null;
   }
 
-  // validateAccessibility uses `components.<componentId>...`
-  const exists = components.some((c) => c.id === first);
+  const exists = components.some((component) => component.id === first);
   return exists ? first : null;
 }
 
@@ -153,14 +152,6 @@ function nextId(base: string, existing: Set<string>) {
 
 function toTestIdSuffix(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
-}
-
-function reorderComponentsById(components: UIComponent[], activeId: string, overId: string): UIComponent[] {
-  if (activeId === overId) return components;
-  const oldIndex = components.findIndex((component) => component.id === activeId);
-  const newIndex = components.findIndex((component) => component.id === overId);
-  if (oldIndex < 0 || newIndex < 0) return components;
-  return normalizeFocusOrder(arrayMove(components, oldIndex, newIndex));
 }
 
 function buildComponentFromRegistry(def: ComponentDefinition, id: string): UIComponent {
@@ -185,7 +176,7 @@ function CanvasDropZone({ children, disabled }: { children: React.ReactNode; dis
     <div
       ref={setNodeRef}
       data-testid="builder-canvas"
-      className={cn(styles.canvasZone, highlight ? styles.canvasZoneOver : undefined)}
+      className={cn(styles.canvasZone, styles.builderCanvas, highlight ? styles.canvasZoneOver : undefined)}
     >
       {children}
     </div>
@@ -244,14 +235,12 @@ export default function BuilderPage() {
   const [registryLoading, setRegistryLoading] = useState(false);
   const [registry, setRegistry] = useState<ComponentDefinition[]>(() => BUILTIN_COMPONENT_DEFS);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
-  const [components, setComponents] = useState<UIComponent[]>(() => (versionId ? [] : normalizeFocusOrder(scratchComponents)));
-  const [schemaVersion, setSchemaVersion] = useState('1.0.0');
-  const [pageId, setPageId] = useState('builder-preview');
-  const [columns, setColumns] = useState(1);
+  const [schema, setSchema] = useState<UISchema>(() =>
+    versionId ? createSchemaFromComponents([]) : createSchemaFromComponents(scratchComponents),
+  );
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => (versionId ? null : scratchComponents[0]?.id ?? null));
   const [previewMode, setPreviewMode] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<ExecutionContext['device']>('desktop');
-
   const [draft, setDraft] = useState({
     id: '',
     adapterHint: DEFAULT_ADAPTER_HINT,
@@ -263,6 +252,21 @@ export default function BuilderPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [activeDrag, setActiveDrag] = useState<{ kind: 'palette' | 'component'; label: string } | null>(null);
+
+  const components = useMemo(() => normalizeFocusOrder(schema.components as UIComponent[]), [schema.components]);
+  const columns = useMemo(() => getSchemaColumns(schema), [schema]);
+  const effectiveSchema = useMemo(
+    () =>
+      normalizeSchema({
+        ...schema,
+        components,
+      }),
+    [components, schema],
+  );
+  const localStorageKey = useMemo(
+    () => `${BUILDER_LOCAL_STORAGE_KEY}:${versionId ?? 'scratch'}`,
+    [versionId],
+  );
 
   useEffect(() => {
     registerMaterialAdapters();
@@ -310,22 +314,36 @@ export default function BuilderPage() {
     });
   }, [registry]);
 
-  const schema: UISchema = useMemo(
-    () => ({
-      version: schemaVersion,
-      pageId,
-      layout: {
-        id: 'root',
-        type: 'grid',
-        columns,
-        componentIds: components.map((component) => component.id),
-      },
-      components,
-    }),
-    [columns, components, pageId, schemaVersion],
-  );
+  useEffect(() => {
+    if (!selectedComponentId) return;
+    if (components.some((component) => component.id === selectedComponentId)) return;
+    setSelectedComponentId(components[0]?.id ?? null);
+  }, [components, selectedComponentId]);
 
-  const validation = useMemo(() => validateUISchema(schema), [schema]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (versionId) return;
+
+    const raw = window.localStorage.getItem(localStorageKey);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!isSchemaLike(parsed)) return;
+      const normalized = normalizeSchema(parsed);
+      setSchema(normalized);
+      setSelectedComponentId((normalized.components as UIComponent[])[0]?.id ?? null);
+    } catch {
+      // ignore bad local state
+    }
+  }, [localStorageKey, versionId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(localStorageKey, JSON.stringify(effectiveSchema));
+  }, [effectiveSchema, localStorageKey]);
+
+  const validation = useMemo(() => validateUISchema(effectiveSchema), [effectiveSchema]);
 
   const issuesByComponentId = useMemo(() => {
     const map = new Map<string, ValidationIssue[]>();
@@ -339,12 +357,6 @@ export default function BuilderPage() {
     return map;
   }, [components, validation.issues]);
 
-  useEffect(() => {
-    if (!selectedComponentId) return;
-    if (components.some((c) => c.id === selectedComponentId)) return;
-    setSelectedComponentId(components[0]?.id ?? null);
-  }, [components, selectedComponentId]);
-
   const loadFromStore = async () => {
     if (!versionId) return;
     setLoading(true);
@@ -352,25 +364,20 @@ export default function BuilderPage() {
       const response = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(versionId)}`);
       if (!response.ok) throw new Error(response.error);
 
-      const uiSchema = response.version.bundle.uiSchema;
-      const normalized = normalizeFocusOrder(uiSchema.components as UIComponent[]);
+      const normalized = normalizeSchema(response.version.bundle.uiSchema as UISchema);
+      const normalizedComponents = normalized.components as UIComponent[];
 
       setLoadedVersion(response.version);
-      setSchemaVersion(uiSchema.version ?? '1.0.0');
-      setPageId(uiSchema.pageId ?? 'builder-preview');
-
-      const layout = uiSchema.layout;
-      setColumns(layout.type === 'grid' && typeof layout.columns === 'number' ? layout.columns : 1);
-      setComponents(normalized);
-      setSelectedComponentId(normalized[0]?.id ?? null);
-
+      setSchema(normalized);
+      setSelectedComponentId(normalizedComponents[0]?.id ?? null);
       setActiveVersionId(versionId);
       toast({ variant: 'info', title: 'Loaded config', description: response.version.version });
     } catch (error) {
       toast({ variant: 'error', title: 'Failed to load config', description: error instanceof Error ? error.message : String(error) });
+      const fallback = createSchemaFromComponents(scratchComponents);
       setLoadedVersion(null);
-      setComponents(normalizeFocusOrder(scratchComponents));
-      setSelectedComponentId(scratchComponents[0]?.id ?? null);
+      setSchema(fallback);
+      setSelectedComponentId((fallback.components as UIComponent[])[0]?.id ?? null);
     } finally {
       setLoading(false);
     }
@@ -391,25 +398,28 @@ export default function BuilderPage() {
       return;
     }
 
-    const def = registry.find((p) => p.adapterHint === draft.adapterHint) ?? registry[0];
+    const def = registry.find((item) => item.adapterHint === draft.adapterHint) ?? registry[0];
     if (!def) return;
 
     const nextComponent = buildComponentFromRegistry(def, trimmedId);
-    const next = normalizeFocusOrder([...components, nextComponent]);
-    setComponents(next);
+    setSchema((current) => withUpdatedComponents(current, (currentComponents) => [...currentComponents, nextComponent]));
     setSelectedComponentId(nextComponent.id);
     setDraft((current) => ({ ...current, id: '' }));
     toast({ variant: 'success', title: 'Component added', description: trimmedId });
   };
 
   const saveToStore = async () => {
-    if (!versionId) {
-      toast({ variant: 'error', title: 'No versionId', description: 'Create a config first via New Config.' });
+    if (!validation.valid) {
+      toast({ variant: 'error', title: 'Fix validation issues before saving', description: `${validation.issues.length} issue(s)` });
       return;
     }
 
-    if (!validation.valid) {
-      toast({ variant: 'error', title: 'Fix validation issues before saving', description: `${validation.issues.length} issue(s)` });
+    if (!versionId) {
+      toast({
+        variant: 'success',
+        title: 'Saved locally',
+        description: 'Schema is stored in browser localStorage for this builder session.',
+      });
       return;
     }
 
@@ -418,7 +428,7 @@ export default function BuilderPage() {
       const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(
         `/api/config-versions/${encodeURIComponent(versionId)}/ui-schema`,
         {
-          uiSchema: schema,
+          uiSchema: effectiveSchema,
         },
       );
       if (!result.ok) throw new Error(result.error);
@@ -450,7 +460,7 @@ export default function BuilderPage() {
     }
   };
 
-  const selectedComponent = selectedComponentId ? components.find((c) => c.id === selectedComponentId) ?? null : null;
+  const selectedComponent = selectedComponentId ? components.find((component) => component.id === selectedComponentId) ?? null : null;
   const selectedDefinition =
     selectedComponent ? registry.find((def) => def.adapterHint === selectedComponent.adapterHint) ?? null : null;
 
@@ -482,6 +492,17 @@ export default function BuilderPage() {
     [baseLocale],
   );
 
+  const moveComponent = (componentId: string, newIndex: number) => {
+    flushSync(() => {
+      setSchema((current) => moveComponentInSchema(current, componentId, newIndex));
+    });
+  };
+
+  const removeComponent = (componentId: string) => {
+    setSchema((current) => removeComponentFromSchema(current, componentId));
+    toast({ variant: 'info', title: 'Component removed', description: componentId });
+  };
+
   const onDragStart = (event: DragStartEvent) => {
     const activeId = String(event.active.id);
     if (activeId.startsWith('palette:')) {
@@ -505,46 +526,47 @@ export default function BuilderPage() {
 
     if (activeId.startsWith('palette:')) {
       const adapterHint = activeId.slice('palette:'.length);
-      const def = registry.find((p) => p.adapterHint === adapterHint);
+      const def = registry.find((item) => item.adapterHint === adapterHint);
       if (!def) return;
 
-      const existingIds = new Set(components.map((c) => c.id));
+      const existingIds = new Set(components.map((component) => component.id));
       const base = deriveType(adapterHint);
       const id = nextId(base, existingIds);
       const nextComponent = buildComponentFromRegistry(def, id);
 
-      const insertIndex = overId === 'canvas' ? components.length : components.findIndex((c) => c.id === overId);
-      const next = normalizeFocusOrder(
-        insertIndex >= 0
-          ? [...components.slice(0, insertIndex), nextComponent, ...components.slice(insertIndex)]
-          : [...components, nextComponent],
+      setSchema((current) =>
+        withUpdatedComponents(current, (currentComponents) => {
+          const insertIndex = overId === 'canvas' ? currentComponents.length : currentComponents.findIndex((component) => component.id === overId);
+          if (insertIndex < 0) return [...currentComponents, nextComponent];
+          return [
+            ...currentComponents.slice(0, insertIndex),
+            nextComponent,
+            ...currentComponents.slice(insertIndex),
+          ];
+        }),
       );
-
-      setComponents(next);
       setSelectedComponentId(id);
       toast({ variant: 'success', title: 'Dropped component', description: id });
       return;
     }
 
-    setComponents((current) => reorderComponentsById(current, activeId, overId));
-  };
+    if (overId === 'canvas') return;
 
-  const moveComponent = (componentId: string, direction: 'up' | 'down') => {
-    flushSync(() => {
-      setComponents((current) => {
-        const index = current.findIndex((component) => component.id === componentId);
-        if (index < 0) return current;
-        const targetIndex = direction === 'up' ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= current.length) return current;
-        const overId = current[targetIndex]?.id;
-        if (!overId) return current;
-        return reorderComponentsById(current, componentId, overId);
-      });
+    setSchema((current) => {
+      const currentComponents = current.components as UIComponent[];
+      const overIndex = currentComponents.findIndex((component) => component.id === overId);
+      return moveComponentInSchema(current, activeId, overIndex);
     });
   };
 
+  const componentIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    components.forEach((component, index) => map.set(component.id, index));
+    return map;
+  }, [components]);
+
   return (
-    <div className={styles.page}>
+    <div className={cn(styles.page, styles.builderRoot)}>
       <Card>
         <CardHeader>
           <div className={styles.headerRow}>
@@ -557,7 +579,7 @@ export default function BuilderPage() {
                     {loadedVersion ? ` - ${loadedVersion.status}` : null}
                   </>
                 ) : (
-                  'Scratch schema (not persisted). Use New Config to create a stored package.'
+                  'Scratch schema (stored in localStorage). Use New Config to persist a package.'
                 )}
               </p>
             </div>
@@ -580,7 +602,7 @@ export default function BuilderPage() {
               <Button
                 size="sm"
                 onClick={saveToStore}
-                disabled={!versionId || loading || !validation.valid}
+                disabled={loading || !validation.valid}
                 title={!validation.valid ? 'Fix validation issues to enable Save' : undefined}
               >
                 {loading ? 'Working...' : 'Save'}
@@ -592,15 +614,38 @@ export default function BuilderPage() {
         <CardContent className={styles.metaGrid}>
           <div>
             <label className="rfFieldLabel">Schema Version</label>
-            <Input value={schemaVersion} onChange={(e) => setSchemaVersion(e.target.value)} />
+            <Input
+              value={effectiveSchema.version}
+              onChange={(event) => setSchema((current) => ({ ...current, version: event.target.value }))}
+            />
           </div>
           <div>
             <label className="rfFieldLabel">Page Id</label>
-            <Input value={pageId} onChange={(e) => setPageId(e.target.value)} />
+            <Input
+              value={effectiveSchema.pageId}
+              onChange={(event) => setSchema((current) => ({ ...current, pageId: event.target.value }))}
+            />
           </div>
           <div>
             <label className="rfFieldLabel">Columns</label>
-            <Input type="number" value={columns} onChange={(e) => setColumns(Number(e.target.value) || 1)} />
+            <Input
+              type="number"
+              value={columns}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const nextColumns = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 1;
+                setSchema((current) => {
+                  const normalized = normalizeSchema(current);
+                  return {
+                    ...normalized,
+                    layout: {
+                      ...normalized.layout,
+                      columns: nextColumns,
+                    },
+                  };
+                });
+              }}
+            />
           </div>
         </CardContent>
       </Card>
@@ -614,7 +659,7 @@ export default function BuilderPage() {
                 <div className={styles.actions}>
                   <Select
                     value={previewDevice}
-                    onChange={(e) => setPreviewDevice(e.target.value as ExecutionContext['device'])}
+                    onChange={(event) => setPreviewDevice(event.target.value as ExecutionContext['device'])}
                     disabled={loading}
                     aria-label="Preview breakpoint"
                   >
@@ -631,120 +676,122 @@ export default function BuilderPage() {
             <CardContent className={styles.previewContent}>
               <div className={styles.previewFrameWrap}>
                 <div className={styles.previewFrame} style={{ width: previewMaxWidth, maxWidth: '100%' }}>
-                  <RenderPage uiSchema={schema} data={previewData} context={effectivePreviewContext} i18n={i18n} />
+                  <RenderPage uiSchema={effectiveSchema} data={previewData} context={effectivePreviewContext} i18n={i18n} />
                 </div>
               </div>
               <p className={styles.canvasHint}>Switch breakpoints to validate responsive layout.</p>
             </CardContent>
           </Card>
         ) : (
-        <div className={styles.builderGrid}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Component Palette</CardTitle>
-            </CardHeader>
-            <CardContent className={styles.paletteContent}>
-              {registryLoading ? <p className={styles.canvasHint}>Loading registry...</p> : null}
-              {registry.map((def) => (
-                <PaletteItem
-                  key={def.adapterHint}
-                  def={def}
-                  selected={draft.adapterHint === def.adapterHint}
-                  disabled={loading || registryLoading}
-                  onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
-                />
-              ))}
-
-              <div className={styles.addSection}>
-                <p className={styles.addTitle}>Quick Add (optional)</p>
-                <div className={styles.addStack}>
-                  <Input
-                    placeholder="Component id"
-                    value={draft.id}
-                    onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
+          <div className={styles.builderGrid}>
+            <Card className={styles.paletteColumn}>
+              <CardHeader>
+                <CardTitle>Component Palette</CardTitle>
+              </CardHeader>
+              <CardContent className={styles.paletteContent}>
+                {registryLoading ? <p className={styles.canvasHint}>Loading registry...</p> : null}
+                {registry.map((def) => (
+                  <PaletteItem
+                    key={def.adapterHint}
+                    def={def}
+                    selected={draft.adapterHint === def.adapterHint}
+                    disabled={loading || registryLoading}
+                    onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
                   />
-                  <Button size="sm" onClick={addComponent} disabled={loading}>
-                    Add
-                  </Button>
+                ))}
+
+                <div className={styles.addSection}>
+                  <p className={styles.addTitle}>Quick Add (optional)</p>
+                  <div className={styles.addStack}>
+                    <Input
+                      placeholder="Component id"
+                      value={draft.id}
+                      onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
+                    />
+                    <Button size="sm" onClick={addComponent} disabled={loading}>
+                      Add
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <div className={styles.canvasHeaderRow}>
-                <CardTitle>Canvas</CardTitle>
-                <Badge variant={validation.valid ? 'success' : 'warning'}>
-                  {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className={styles.canvasContent}>
-              <CanvasDropZone disabled={loading}>
-                {loading && components.length === 0 ? <p className={styles.canvasHint}>Loading schema...</p> : null}
-                {!loading && components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
-                <SortableContext items={components.map((c) => c.id)} strategy={rectSortingStrategy}>
-                  <RenderPage
-                    uiSchema={schema}
-                    data={previewData}
-                    context={previewContext}
-                    i18n={i18n}
-                    componentWrapper={(component, rendered) => (
-                      <CanvasItem
-                        component={component}
-                        selected={component.id === selectedComponentId}
-                        disabled={loading}
-                        onSelect={() => setSelectedComponentId(component.id)}
-                        canMoveUp={components[0]?.id !== component.id}
-                        canMoveDown={components[components.length - 1]?.id !== component.id}
-                        onMoveUp={() => moveComponent(component.id, 'up')}
-                        onMoveDown={() => moveComponent(component.id, 'down')}
-                      >
-                        {rendered}
-                      </CanvasItem>
-                    )}
-                  />
-                </SortableContext>
-              </CanvasDropZone>
-              <p className={styles.canvasHint}>Drag to reorder. Click a component to edit its properties.</p>
-            </CardContent>
-          </Card>
+            <Card className={styles.canvasColumn}>
+              <CardHeader>
+                <div className={styles.canvasHeaderRow}>
+                  <CardTitle>Canvas</CardTitle>
+                  <Badge variant={validation.valid ? 'success' : 'warning'}>
+                    {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className={styles.canvasContent}>
+                <CanvasDropZone disabled={loading}>
+                  {loading && components.length === 0 ? <p className={styles.canvasHint}>Loading schema...</p> : null}
+                  {!loading && components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
+                  <SortableContext items={components.map((component) => component.id)} strategy={rectSortingStrategy}>
+                    <RenderPage
+                      uiSchema={effectiveSchema}
+                      data={previewData}
+                      context={previewContext}
+                      i18n={i18n}
+                      componentWrapper={(component, rendered) => (
+                        <CanvasItem
+                          component={component}
+                          index={componentIndexById.get(component.id) ?? -1}
+                          totalItems={components.length}
+                          selected={component.id === selectedComponentId}
+                          disabled={loading}
+                          onSelect={() => setSelectedComponentId(component.id)}
+                          onMove={moveComponent}
+                          onRemove={removeComponent}
+                        >
+                          {rendered}
+                        </CanvasItem>
+                      )}
+                    />
+                  </SortableContext>
+                </CanvasDropZone>
+                <p className={styles.canvasHint}>Drag to reorder. Click a component to edit its properties.</p>
+              </CardContent>
+            </Card>
 
-          <div className={styles.canvasContent}>
-            {selectedComponent ? (
-              <ComponentEditor
-                component={selectedComponent}
-                definition={selectedDefinition}
-                registry={registry}
-                issues={issuesByComponentId.get(selectedComponent.id)}
-                onChange={(next) =>
-                  setComponents((current) => normalizeFocusOrder(current.map((item) => (item.id === next.id ? next : item))))
-                }
-                onRemove={() => {
-                  setComponents((current) => normalizeFocusOrder(current.filter((item) => item.id !== selectedComponent.id)));
-                  toast({ variant: 'info', title: 'Component removed', description: selectedComponent.id });
-                }}
+            <div className={cn(styles.canvasContent, styles.sideColumn)}>
+              {selectedComponent ? (
+                <ComponentEditor
+                  component={selectedComponent}
+                  definition={selectedDefinition}
+                  registry={registry}
+                  issues={issuesByComponentId.get(selectedComponent.id)}
+                  onChange={(next) =>
+                    setSchema((current) =>
+                      withUpdatedComponents(current, (currentComponents) =>
+                        currentComponents.map((item) => (item.id === next.id ? next : item)),
+                      ),
+                    )
+                  }
+                  onRemove={() => removeComponent(selectedComponent.id)}
+                />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Properties</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className={styles.emptyText}>Select a component on the canvas to edit its properties.</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <SchemaPreview
+                schema={effectiveSchema}
+                issues={validation.issues}
+                resolveComponentId={(path) => extractComponentIdFromIssue(path, components)}
+                onFocusComponentId={focusComponent}
+                onSchemaChange={(nextSchema) => setSchema(normalizeSchema(nextSchema))}
               />
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Properties</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className={styles.emptyText}>Select a component on the canvas to edit its properties.</p>
-                </CardContent>
-              </Card>
-            )}
-
-            <SchemaPreview
-              schema={schema}
-              issues={validation.issues}
-              resolveComponentId={(path) => extractComponentIdFromIssue(path, components)}
-              onFocusComponentId={focusComponent}
-            />
+            </div>
           </div>
-        </div>
         )}
 
         <DragOverlay>

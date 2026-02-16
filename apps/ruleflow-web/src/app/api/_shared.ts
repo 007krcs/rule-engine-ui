@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getConfigStore, getStoreDiagnostics, isPersistenceError } from '@/server/demo/repository';
+import { getConfigStore, getStoreDiagnostics, isPersistenceError } from '@/server/repository';
+import { recordApiCall } from '@/server/metrics';
 
 export const STORE_WRITE_FAILED_MESSAGE = 'Store write failed';
 
@@ -15,14 +16,17 @@ export function noStoreJson(body: unknown, status = 200) {
 }
 
 export async function withApiErrorHandling(handler: () => Promise<NextResponse>) {
+  const startedAt = Date.now();
   try {
     await getConfigStore();
-    return await handler();
+    const response = await handler();
+    recordApiCall(Date.now() - startedAt, response.status);
+    return response;
   } catch (error) {
     const diagnostics = await getStoreDiagnostics().catch(() => null);
 
     if (isPersistenceError(error)) {
-      return noStoreJson(
+      const response = noStoreJson(
         {
           ok: false,
           error: STORE_WRITE_FAILED_MESSAGE,
@@ -30,11 +34,13 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
         },
         500,
       );
+      recordApiCall(Date.now() - startedAt, response.status);
+      return response;
     }
 
     const message = error instanceof Error ? error.message : String(error);
 
-    return noStoreJson(
+    const response = noStoreJson(
       {
         ok: false,
         error: message,
@@ -42,5 +48,8 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
       },
       500,
     );
+    recordApiCall(Date.now() - startedAt, response.status);
+    return response;
   }
 }
+

@@ -1,4 +1,4 @@
-import { promoteVersion } from '@/server/demo/repository';
+import { promoteVersion } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -8,8 +8,17 @@ export async function POST(_request: Request, { params }: { params: Promise<{ ve
     const { versionId } = await params;
     const result = await promoteVersion({ versionId });
     if (!result.ok) {
-      return noStoreJson(result, 400);
+      const status =
+        result.error === 'policy_failed'
+          ? 403
+          : result.error === 'Version not found'
+            ? 404
+            : 400;
+      return noStoreJson(result, status);
     }
     return noStoreJson(result);
   });
 }
+
+
+

@@ -19,6 +19,7 @@ import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 
 const navItems = [
   { href: '/console', label: 'Admin Console', icon: LayoutDashboard },
+  { href: '/branding', label: 'Branding', icon: Sparkles },
   { href: '/builder', label: 'Builder', icon: Boxes },
   { href: '/playground', label: 'Playground', icon: Sparkles },
   { href: '/samples', label: 'Samples', icon: PackageOpen },

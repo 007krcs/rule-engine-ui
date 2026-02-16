@@ -4,29 +4,29 @@ import type * as React from 'react';
 import type { UIComponent } from '@platform/schema';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import styles from './canvas-item.module.css';
 
 export function CanvasItem({
   component,
+  index,
+  totalItems,
   selected,
   disabled,
   onSelect,
-  canMoveUp,
-  canMoveDown,
-  onMoveUp,
-  onMoveDown,
+  onMove,
+  onRemove,
   children,
 }: {
   component: UIComponent;
+  index: number;
+  totalItems: number;
   selected: boolean;
   disabled?: boolean;
   onSelect: () => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
+  onMove?: (id: string, newIndex: number) => void;
+  onRemove?: (id: string) => void;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -39,6 +39,8 @@ export function CanvasItem({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+  const canMoveUp = index > 0;
+  const canMoveDown = index < totalItems - 1;
 
   return (
     <div
@@ -52,9 +54,9 @@ export function CanvasItem({
       aria-label={`Select ${component.id}`}
       aria-pressed={selected}
       tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
           onSelect();
         }
       }}
@@ -75,13 +77,13 @@ export function CanvasItem({
             className={styles.moveButton}
             onClick={(event) => {
               event.stopPropagation();
-              onMoveUp?.();
+              onMove?.(component.id, index - 1);
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 event.stopPropagation();
-                onMoveUp?.();
+                onMove?.(component.id, index - 1);
                 return;
               }
               event.stopPropagation();
@@ -98,7 +100,7 @@ export function CanvasItem({
             aria-label={`Move ${component.id} up`}
             data-testid={`canvas-move-up-${component.id}`}
           >
-            <span aria-hidden="true">↑</span>
+            <span aria-hidden="true">^</span>
             <span>Move up</span>
           </button>
           <button
@@ -106,13 +108,13 @@ export function CanvasItem({
             className={styles.moveButton}
             onClick={(event) => {
               event.stopPropagation();
-              onMoveDown?.();
+              onMove?.(component.id, index + 1);
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 event.stopPropagation();
-                onMoveDown?.();
+                onMove?.(component.id, index + 1);
                 return;
               }
               event.stopPropagation();
@@ -129,8 +131,31 @@ export function CanvasItem({
             aria-label={`Move ${component.id} down`}
             data-testid={`canvas-move-down-${component.id}`}
           >
-            <span aria-hidden="true">↓</span>
+            <span aria-hidden="true">v</span>
             <span>Move down</span>
+          </button>
+          <button
+            type="button"
+            className={styles.removeButton}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove?.(component.id);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                onRemove?.(component.id);
+                return;
+              }
+              event.stopPropagation();
+            }}
+            aria-label={`Remove ${component.id}`}
+            data-testid={`canvas-remove-${component.id}`}
+            disabled={disabled}
+          >
+            <Trash2 size={14} aria-hidden="true" focusable="false" />
+            <span>Remove</span>
           </button>
           <span className={styles.chip}>{component.type}</span>
         </div>

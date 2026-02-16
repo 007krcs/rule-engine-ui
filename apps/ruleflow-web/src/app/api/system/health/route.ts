@@ -1,4 +1,4 @@
-﻿import { getStoreDiagnostics } from '@/server/demo/repository';
+import { getStoreDiagnostics } from '@/server/repository';
 import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
@@ -15,3 +15,4 @@ export async function GET() {
     });
   });
 }
+
