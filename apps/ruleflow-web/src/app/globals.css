@@ -22,29 +22,30 @@
   --rf-radius-pill: 999px;
 
   /* Colors */
-  --rf-bg: #f7fafc;
-  --rf-fg: #0f172a;
-  --rf-muted: #475569;
-  --rf-surface: #ffffff;
-  --rf-surface-2: #f1f5f9;
-  --rf-border: #e2e8f0;
+  --rf-bg: var(--pf-surface-canvas, #f7fafc);
+  --rf-fg: var(--pf-surface-text, #0f172a);
+  --rf-muted: var(--pf-surface-text-muted, #475569);
+  --rf-surface: var(--pf-surface-layer, #ffffff);
+  --rf-surface-2: var(--pf-surface-layer-alt, #f1f5f9);
+  --rf-border: var(--pf-surface-border, #e2e8f0);
   --rf-shadow: rgba(15, 23, 42, 0.08);
 
-  --rf-primary: #2563eb;
-  --rf-primary-fg: #ffffff;
-  --rf-accent: #7c3aed;
-  --rf-accent-fg: #ffffff;
-  --rf-success: #059669;
-  --rf-warning: #d97706;
-  --rf-danger: #e11d48;
+  --rf-primary: var(--pf-color-primary-500, #2563eb);
+  --rf-primary-fg: var(--pf-surface-inverse-text, #ffffff);
+  --rf-accent: var(--pf-color-secondary-500, #7c3aed);
+  --rf-accent-fg: var(--pf-surface-inverse-text, #ffffff);
+  --rf-success: var(--pf-color-success-500, #059669);
+  --rf-warning: var(--pf-color-warning-500, #d97706);
+  --rf-danger: var(--pf-color-error-500, #e11d48);
 
-  --rf-focus: rgba(37, 99, 235, 0.35);
+  --rf-focus: var(--pf-surface-focus, rgba(37, 99, 235, 0.35));
 
   /* Shadows */
   --rf-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 18px 40px rgba(15, 23, 42, 0.08);
   --rf-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.08), 0 10px 22px rgba(15, 23, 42, 0.10);
 }
 
+:root[data-theme='dark'],
 .dark {
   color-scheme: dark;
 
@@ -115,9 +116,21 @@ pre {
   background-size: 48px 48px;
 }
 
+:root[data-theme='dark'] .rfGridBg,
 .dark .rfGridBg {
   background-image: linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px);
+}
+
+:root[data-density='compact'] {
+  --rf-space-1: 2px;
+  --rf-space-2: 6px;
+  --rf-space-3: 10px;
+  --rf-space-4: 14px;
+  --rf-space-5: 18px;
+  --rf-space-6: 22px;
+  --rf-space-8: 28px;
+  --rf-space-10: 36px;
 }
 
 .rfScrollbar::-webkit-scrollbar {

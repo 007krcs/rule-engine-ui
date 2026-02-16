@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm -r --filter @platform/observability --filter @platform/validator --filter @platform/react-renderer --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter build",
-    "prebuild": "pnpm -r --filter @platform/schema --filter @platform/component-registry --filter @platform/i18n --filter @platform/observability --filter @platform/validator --filter @platform/core-runtime --filter @platform/react-renderer --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter --filter @platform/angular-renderer --filter @platform/vue-renderer build",
+    "predev": "pnpm -r --filter @platform/ui-kit --filter @platform/observability --filter @platform/validator --filter @platform/react-renderer --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter build",
+    "prebuild": "pnpm -r --filter @platform/ui-kit --filter @platform/schema --filter @platform/component-registry --filter @platform/i18n --filter @platform/observability --filter @platform/validator --filter @platform/core-runtime --filter @platform/react-renderer --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter --filter @platform/angular-renderer --filter @platform/vue-renderer build",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -32,6 +32,7 @@
     "@platform/react-material-adapter": "workspace:*",
     "@platform/react-renderer": "workspace:*",
     "@platform/schema": "workspace:*",
+    "@platform/ui-kit": "workspace:*",
     "@platform/validator": "workspace:*",
     "@platform/vue-renderer": "workspace:*",
     "clsx": "^2.1.1",

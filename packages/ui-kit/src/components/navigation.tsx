@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from 'react';
 import { cn, keyboardSelectionHandler, sizeClass, type PFBaseProps } from './utils';
 
 export interface PFTabItem {
@@ -8,8 +17,20 @@ export interface PFTabItem {
   disabled?: boolean;
 }
 
+export interface PFTabProps {
+  value: string;
+  label: ReactNode;
+  children?: ReactNode;
+  disabled?: boolean;
+}
+
+export function PFTab(_props: PFTabProps): null {
+  return null;
+}
+
 export interface PFTabsProps extends PFBaseProps {
-  tabs: PFTabItem[];
+  tabs?: PFTabItem[];
+  children?: ReactNode;
   value: string;
   onChange?: (value: string) => void;
   className?: string;
@@ -17,21 +38,40 @@ export interface PFTabsProps extends PFBaseProps {
 }
 
 export function PFTabs({
-  tabs,
+  tabs = [],
+  children,
   value,
   onChange,
   className,
   size = 'md',
   ariaLabel = 'Tabs',
 }: PFTabsProps) {
-  const selectedIndex = tabs.findIndex((tab) => tab.id === value);
-  const currentTab = selectedIndex >= 0 ? tabs[selectedIndex] : tabs[0];
+  const childTabs: PFTabItem[] = useMemo(() => {
+    if (!children) return [];
+    const items: PFTabItem[] = [];
+    for (const child of Children.toArray(children)) {
+      if (!isValidElement<PFTabProps>(child)) continue;
+      if (child.type !== PFTab) continue;
+      items.push({
+        id: child.props.value,
+        label: child.props.label,
+        content: child.props.children,
+        disabled: child.props.disabled,
+      });
+    }
+    return items;
+  }, [children]);
+
+  const normalizedTabs = childTabs.length > 0 ? childTabs : tabs;
+
+  const selectedIndex = normalizedTabs.findIndex((tab) => tab.id === value);
+  const currentTab = selectedIndex >= 0 ? normalizedTabs[selectedIndex] : normalizedTabs[0];
 
   const selectByOffset = (index: number, offset: number): string | null => {
     let nextIndex = index;
-    for (let step = 0; step < tabs.length; step += 1) {
-      nextIndex = (nextIndex + offset + tabs.length) % tabs.length;
-      if (!tabs[nextIndex]?.disabled) return tabs[nextIndex]?.id ?? null;
+    for (let step = 0; step < normalizedTabs.length; step += 1) {
+      nextIndex = (nextIndex + offset + normalizedTabs.length) % normalizedTabs.length;
+      if (!normalizedTabs[nextIndex]?.disabled) return normalizedTabs[nextIndex]?.id ?? null;
     }
     return null;
   };
@@ -39,7 +79,7 @@ export function PFTabs({
   return (
     <div className={cn('pf-tabs', sizeClass(size), className)}>
       <div className="pf-tabs__list" role="tablist" aria-label={ariaLabel}>
-        {tabs.map((tab, index) => {
+        {normalizedTabs.map((tab, index) => {
           const selected = tab.id === value;
           return (
             <button
@@ -62,8 +102,8 @@ export function PFTabs({
                   const nextId = selectByOffset(index, -1);
                   if (nextId) onChange?.(nextId);
                 }
-                if (event.key === 'Home') onChange?.(tabs[0]?.id ?? value);
-                if (event.key === 'End') onChange?.(tabs[tabs.length - 1]?.id ?? value);
+                if (event.key === 'Home') onChange?.(normalizedTabs[0]?.id ?? value);
+                if (event.key === 'End') onChange?.(normalizedTabs[normalizedTabs.length - 1]?.id ?? value);
               }}
             >
               {tab.label}

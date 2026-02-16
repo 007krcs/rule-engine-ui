@@ -1,10 +1,12 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { cn, intentClass, sizeClass, variantClass, type PFBaseProps, type PFIntent, type PFVariant } from './utils';
+import { cn, intentClass, sizeClass, variantClass, type PFBaseProps, type PFIntent } from './utils';
+
+export type PFButtonVariant = 'solid' | 'outline' | 'ghost';
 
 export interface PFButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'size'>,
     PFBaseProps {
-  variant?: PFVariant;
+  variant?: PFButtonVariant;
   intent?: PFIntent;
   loading?: boolean;
   startIcon?: ReactNode;
@@ -15,7 +17,7 @@ export interface PFButtonProps
 export function PFButton({
   className,
   size = 'md',
-  variant = 'contained',
+  variant = 'solid',
   intent = 'primary',
   loading = false,
   disabled,
@@ -59,7 +61,7 @@ export function PFButton({
 export interface PFIconButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'size'>,
     PFBaseProps {
-  variant?: PFVariant;
+  variant?: PFButtonVariant;
   intent?: PFIntent;
   loading?: boolean;
   label: string;

@@ -50,7 +50,7 @@ export default function ThemingPage() {
           Keep overrides in the <code>@layer overrides</code> layer so base/component layers remain stable and
           predictable.
         </p>
-        <pre className="docs-code">{`@layer overrides {\n  .pf-button--contained.pf-button--primary {\n    letter-spacing: 0.01em;\n  }\n}`}</pre>
+        <pre className="docs-code">{`@layer overrides {\n  .pf-button--solid.pf-button--primary {\n    letter-spacing: 0.01em;\n  }\n}`}</pre>
       </section>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode, TableHTMLAttributes } from 'react';
-import { cn, intentClass, sizeStyle, variantClass, type PFBaseProps, type PFIntent } from './utils';
+import { cn, intentClass, variantClass, type PFBaseProps, type PFIntent } from './utils';
 
 export interface PFCardProps extends HTMLAttributes<HTMLDivElement> {
   elevated?: boolean;
@@ -100,8 +100,9 @@ export function PFAvatar({
     .slice(0, 2)
     .map((token) => token.charAt(0).toUpperCase())
     .join('');
+  const sizeClass = sizePx <= 32 ? 'pf-avatar--sm' : sizePx >= 44 ? 'pf-avatar--lg' : 'pf-avatar--md';
   return (
-    <div className={cn('pf-avatar', className)} style={sizeStyle(sizePx, sizePx)} {...rest}>
+    <div className={cn('pf-avatar', sizeClass, className)} {...rest}>
       {src ? <img src={src} alt={alt ?? name ?? 'Avatar'} /> : <span>{initials ?? '?'}</span>}
     </div>
   );
@@ -136,7 +137,16 @@ export function PFTable<RowType extends Record<string, unknown>>({
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={String(column.id)} style={{ textAlign: column.align ?? 'left' }}>
+              <th
+                key={String(column.id)}
+                className={cn(
+                  column.align === 'center'
+                    ? 'pf-table__cell--center'
+                    : column.align === 'right'
+                      ? 'pf-table__cell--right'
+                      : 'pf-table__cell--left',
+                )}
+              >
                 {column.header}
               </th>
             ))}
@@ -159,7 +169,16 @@ export function PFTable<RowType extends Record<string, unknown>>({
                       column.cell?.(row, index) ??
                       (row[column.id as keyof RowType] as ReactNode);
                     return (
-                      <td key={String(column.id)} style={{ textAlign: column.align ?? 'left' }}>
+                      <td
+                        key={String(column.id)}
+                        className={cn(
+                          column.align === 'center'
+                            ? 'pf-table__cell--center'
+                            : column.align === 'right'
+                              ? 'pf-table__cell--right'
+                              : 'pf-table__cell--left',
+                        )}
+                      >
                         {value}
                       </td>
                     );
@@ -183,15 +202,20 @@ export function PFDivider({ className, orientation = 'horizontal', ...rest }: PF
 }
 
 export type PFTypographyVariant =
+  | 'body1'
+  | 'body2'
   | 'body-sm'
   | 'body-md'
   | 'body-lg'
-  | 'label'
   | 'h1'
   | 'h2'
   | 'h3'
+  | 'h4'
+  | 'h5'
+  | 'h6'
   | 'caption'
-  | 'code';
+  | 'code'
+  | 'label';
 
 export interface PFTypographyProps extends HTMLAttributes<HTMLElement> {
   variant?: PFTypographyVariant;
@@ -200,6 +224,8 @@ export interface PFTypographyProps extends HTMLAttributes<HTMLElement> {
 }
 
 const variantTagMap: Record<PFTypographyVariant, keyof HTMLElementTagNameMap> = {
+  body1: 'p',
+  body2: 'p',
   'body-sm': 'p',
   'body-md': 'p',
   'body-lg': 'p',
@@ -207,13 +233,16 @@ const variantTagMap: Record<PFTypographyVariant, keyof HTMLElementTagNameMap> = 
   h1: 'h1',
   h2: 'h2',
   h3: 'h3',
+  h4: 'h4',
+  h5: 'h5',
+  h6: 'h6',
   caption: 'span',
   code: 'code',
 };
 
 export function PFTypography({
   className,
-  variant = 'body-md',
+  variant = 'body1',
   as,
   muted = false,
   ...rest

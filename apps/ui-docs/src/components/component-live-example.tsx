@@ -75,7 +75,7 @@ export function ComponentLiveExample({ slug }: { slug: string }) {
   if (slug === 'button') {
     return (
       <PFStack direction="row" gap="var(--pf-space-2)">
-        <PFButton variant="contained">Approve</PFButton>
+        <PFButton variant="solid">Approve</PFButton>
         <PFButton variant="outline" intent="neutral">
           Review
         </PFButton>
@@ -100,7 +100,7 @@ export function ComponentLiveExample({ slug }: { slug: string }) {
   if (slug === 'button-group') {
     return (
       <PFButtonGroup ariaLabel="Approval actions">
-        <PFButton variant="contained">Approve</PFButton>
+        <PFButton variant="solid">Approve</PFButton>
         <PFButton variant="outline">Request Changes</PFButton>
         <PFButton variant="ghost">Escalate</PFButton>
       </PFButtonGroup>
@@ -506,7 +506,7 @@ export function ComponentLiveExample({ slug }: { slug: string }) {
 
   if (slug === 'theme-provider') {
     return (
-      <PlatformThemeProvider initialMode="light">
+      <PlatformThemeProvider initialTheme={{ mode: 'light' }}>
         <ThemeProviderDemo />
       </PlatformThemeProvider>
     );
@@ -520,7 +520,8 @@ export function ComponentLiveExample({ slug }: { slug: string }) {
 }
 
 function ThemeProviderDemo() {
-  const { mode, setMode, density, setDensity } = usePlatformTheme();
+  const { theme, setMode, setDensity } = usePlatformTheme();
+  const { mode, density } = theme;
   return (
     <PFCard>
       <PFCardHeader>

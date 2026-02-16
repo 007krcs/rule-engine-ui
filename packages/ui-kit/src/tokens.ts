@@ -1,118 +1,110 @@
-export type ThemeMode = 'light' | 'dark';
-export type Density = 'comfortable' | 'compact';
-
 export type PaletteStep = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 export type ColorScale = Record<PaletteStep, string>;
+export type DensityMode = 'comfortable' | 'compact';
 
-export interface PlatformTheme {
-  brand: {
-    name: string;
-    logoUrl?: string;
-  };
-  palette: {
+export interface PlatformDesignTokens {
+  colors: {
     primary: ColorScale;
     secondary: ColorScale;
     neutral: ColorScale;
     success: ColorScale;
-    warn: ColorScale;
+    warning: ColorScale;
     error: ColorScale;
     surface: {
       canvas: string;
       layer: string;
       layerAlt: string;
-      overlay: string;
       border: string;
       text: string;
       textMuted: string;
       focus: string;
+      overlay: string;
       inverseText: string;
     };
   };
   typography: {
-    familySans: string;
-    familyMono: string;
-    size: {
+    fontFamilySans: string;
+    fontFamilyMono: string;
+    sizes: {
       xs: string;
       sm: string;
       md: string;
       lg: string;
       xl: string;
       '2xl': string;
-      '3xl': string;
     };
-    weight: {
+    weights: {
       regular: number;
       medium: number;
       semibold: number;
       bold: number;
     };
-    lineHeight: {
+    lineHeights: {
       tight: string;
       normal: string;
       relaxed: string;
     };
   };
-  spacing: {
-    0: string;
-    1: string;
-    2: string;
-    3: string;
-    4: string;
-    5: string;
-    6: string;
-    7: string;
-    8: string;
-    9: string;
-    10: string;
-    11: string;
-    12: string;
+  spacing: Record<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12, string>;
+  radii: {
+    xs: string;
+    sm: string;
+    md: string;
+    lg: string;
+    xl: string;
+    '2xl': string;
+    full: string;
   };
-  shape: {
-    radius: {
-      none: string;
-      sm: string;
-      md: string;
-      lg: string;
-      xl: string;
-      full: string;
-    };
-    shadow: {
-      xs: string;
-      sm: string;
-      md: string;
-      lg: string;
-      xl: string;
-    };
-    zIndex: {
-      base: number;
-      dropdown: number;
-      sticky: number;
-      drawer: number;
-      modal: number;
-      popover: number;
-      tooltip: number;
-    };
+  shadows: {
+    sm: string;
+    md: string;
+    lg: string;
+    xl: string;
   };
-  motion: {
+  zIndex: {
+    dropdown: number;
+    modal: number;
+    toast: number;
+    tooltip: number;
+  };
+  transitions: {
     fast: string;
     normal: string;
     slow: string;
     easingStandard: string;
   };
-  density: Density;
+  density: {
+    controlHeights: {
+      comfortable: {
+        sm: string;
+        md: string;
+        lg: string;
+      };
+      compact: {
+        sm: string;
+        md: string;
+        lg: string;
+      };
+    };
+    controlPaddingX: {
+      comfortable: {
+        sm: string;
+        md: string;
+        lg: string;
+      };
+      compact: {
+        sm: string;
+        md: string;
+        lg: string;
+      };
+    };
+  };
 }
 
-export type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
-};
+const paletteSteps: PaletteStep[] = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
 
-const SCALE_STEPS: PaletteStep[] = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
-
-const baseTheme: PlatformTheme = {
-  brand: {
-    name: 'Platform UI',
-  },
-  palette: {
+export const lightDesignTokens: PlatformDesignTokens = {
+  colors: {
     primary: {
       50: '#ebf3ff',
       100: '#dce9ff',
@@ -161,7 +153,7 @@ const baseTheme: PlatformTheme = {
       800: '#14563e',
       900: '#104634',
     },
-    warn: {
+    warning: {
       50: '#fff8eb',
       100: '#feefcc',
       200: '#fddf97',
@@ -189,91 +181,111 @@ const baseTheme: PlatformTheme = {
       canvas: '#f5f7fb',
       layer: '#ffffff',
       layerAlt: '#eef2f7',
-      overlay: 'rgba(13, 22, 39, 0.56)',
       border: '#d9e1eb',
       text: '#152033',
       textMuted: '#4d5d73',
       focus: 'rgba(47, 106, 245, 0.34)',
+      overlay: 'rgba(13, 22, 39, 0.56)',
       inverseText: '#f8fbff',
     },
   },
   typography: {
-    familySans:
-      '"Plus Jakarta Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
-    familyMono: '"IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace',
-    size: {
-      xs: '0.75rem',
-      sm: '0.875rem',
-      md: '1rem',
-      lg: '1.125rem',
-      xl: '1.25rem',
-      '2xl': '1.5rem',
-      '3xl': '1.875rem',
+    fontFamilySans: '"Plus Jakarta Sans", "Avenir Next", "Segoe UI", Arial, sans-serif',
+    fontFamilyMono: '"IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace',
+    sizes: {
+      xs: '12px',
+      sm: '14px',
+      md: '16px',
+      lg: '18px',
+      xl: '20px',
+      '2xl': '24px',
     },
-    weight: {
+    weights: {
       regular: 400,
       medium: 500,
       semibold: 600,
       bold: 700,
     },
-    lineHeight: {
+    lineHeights: {
       tight: '1.2',
       normal: '1.45',
       relaxed: '1.65',
     },
   },
   spacing: {
-    0: '0',
-    1: '0.25rem',
-    2: '0.5rem',
-    3: '0.75rem',
-    4: '1rem',
-    5: '1.25rem',
-    6: '1.5rem',
-    7: '1.75rem',
-    8: '2rem',
-    9: '2.25rem',
-    10: '2.5rem',
-    11: '2.75rem',
-    12: '3rem',
+    0: '0px',
+    1: '2px',
+    2: '4px',
+    3: '6px',
+    4: '8px',
+    5: '12px',
+    6: '16px',
+    7: '20px',
+    8: '24px',
+    9: '32px',
+    10: '40px',
+    11: '48px',
+    12: '64px',
   },
-  shape: {
-    radius: {
-      none: '0',
-      sm: '0.375rem',
-      md: '0.625rem',
-      lg: '0.875rem',
-      xl: '1.125rem',
-      full: '9999px',
-    },
-    shadow: {
-      xs: '0 1px 1px rgba(15, 25, 38, 0.06)',
-      sm: '0 1px 2px rgba(15, 25, 38, 0.08)',
-      md: '0 10px 30px rgba(18, 29, 49, 0.12)',
-      lg: '0 14px 42px rgba(18, 29, 49, 0.18)',
-      xl: '0 24px 70px rgba(18, 29, 49, 0.22)',
-    },
-    zIndex: {
-      base: 1,
-      dropdown: 1000,
-      sticky: 1020,
-      drawer: 1080,
-      modal: 1140,
-      popover: 1200,
-      tooltip: 1260,
-    },
+  radii: {
+    xs: '4px',
+    sm: '6px',
+    md: '10px',
+    lg: '14px',
+    xl: '18px',
+    '2xl': '24px',
+    full: '9999px',
   },
-  motion: {
+  shadows: {
+    sm: '0 1px 2px rgba(15, 25, 38, 0.08)',
+    md: '0 10px 30px rgba(18, 29, 49, 0.12)',
+    lg: '0 14px 42px rgba(18, 29, 49, 0.18)',
+    xl: '0 24px 70px rgba(18, 29, 49, 0.22)',
+  },
+  zIndex: {
+    dropdown: 1000,
+    modal: 1140,
+    toast: 1210,
+    tooltip: 1260,
+  },
+  transitions: {
     fast: '120ms',
     normal: '200ms',
     slow: '320ms',
     easingStandard: 'cubic-bezier(0.2, 0, 0, 1)',
   },
-  density: 'comfortable',
+  density: {
+    controlHeights: {
+      comfortable: {
+        sm: '32px',
+        md: '40px',
+        lg: '48px',
+      },
+      compact: {
+        sm: '28px',
+        md: '34px',
+        lg: '40px',
+      },
+    },
+    controlPaddingX: {
+      comfortable: {
+        sm: '8px',
+        md: '12px',
+        lg: '16px',
+      },
+      compact: {
+        sm: '6px',
+        md: '8px',
+        lg: '12px',
+      },
+    },
+  },
 };
 
-const darkThemeOverlay: DeepPartial<PlatformTheme> = {
-  palette: {
+export const darkDesignTokens: PlatformDesignTokens = {
+  ...lightDesignTokens,
+  colors: {
+    ...lightDesignTokens.colors,
     primary: {
       50: '#dbe8ff',
       100: '#bfd4ff',
@@ -322,7 +334,7 @@ const darkThemeOverlay: DeepPartial<PlatformTheme> = {
       800: '#145a3f',
       900: '#114c36',
     },
-    warn: {
+    warning: {
       50: '#fff7e8',
       100: '#feebc5',
       200: '#fddb91',
@@ -350,125 +362,99 @@ const darkThemeOverlay: DeepPartial<PlatformTheme> = {
       canvas: '#0e1521',
       layer: '#172131',
       layerAlt: '#1f2c41',
-      overlay: 'rgba(7, 11, 18, 0.72)',
       border: '#2d3a4f',
       text: '#e7eef9',
       textMuted: '#a6b4cb',
       focus: 'rgba(79, 140, 255, 0.4)',
+      overlay: 'rgba(7, 11, 18, 0.72)',
       inverseText: '#0f1728',
     },
   },
 };
 
-export const defaultTheme: PlatformTheme = baseTheme;
-export const defaultDarkTheme = createPlatformTheme(darkThemeOverlay, baseTheme);
-
-export function createPlatformTheme(
-  overrides: DeepPartial<PlatformTheme> = {},
-  base: PlatformTheme = baseTheme,
-): PlatformTheme {
-  return deepMerge(base, overrides);
+export function getDesignTokensForMode(mode: 'light' | 'dark'): PlatformDesignTokens {
+  return mode === 'dark' ? darkDesignTokens : lightDesignTokens;
 }
 
-export function compileThemeToCssVariables(theme: PlatformTheme): Record<string, string> {
+export function tokensToCssVars(
+  tokens: PlatformDesignTokens,
+  density: DensityMode,
+): Record<string, string> {
   const vars: Record<string, string> = {
-    '--pf-font-sans': theme.typography.familySans,
-    '--pf-font-mono': theme.typography.familyMono,
-    '--pf-font-size-xs': theme.typography.size.xs,
-    '--pf-font-size-sm': theme.typography.size.sm,
-    '--pf-font-size-md': theme.typography.size.md,
-    '--pf-font-size-lg': theme.typography.size.lg,
-    '--pf-font-size-xl': theme.typography.size.xl,
-    '--pf-font-size-2xl': theme.typography.size['2xl'],
-    '--pf-font-size-3xl': theme.typography.size['3xl'],
-    '--pf-font-weight-regular': String(theme.typography.weight.regular),
-    '--pf-font-weight-medium': String(theme.typography.weight.medium),
-    '--pf-font-weight-semibold': String(theme.typography.weight.semibold),
-    '--pf-font-weight-bold': String(theme.typography.weight.bold),
-    '--pf-line-height-tight': theme.typography.lineHeight.tight,
-    '--pf-line-height-normal': theme.typography.lineHeight.normal,
-    '--pf-line-height-relaxed': theme.typography.lineHeight.relaxed,
-    '--pf-surface-canvas': theme.palette.surface.canvas,
-    '--pf-surface-layer': theme.palette.surface.layer,
-    '--pf-surface-layer-alt': theme.palette.surface.layerAlt,
-    '--pf-surface-overlay': theme.palette.surface.overlay,
-    '--pf-surface-border': theme.palette.surface.border,
-    '--pf-surface-text': theme.palette.surface.text,
-    '--pf-surface-text-muted': theme.palette.surface.textMuted,
-    '--pf-surface-focus': theme.palette.surface.focus,
-    '--pf-surface-inverse-text': theme.palette.surface.inverseText,
-    '--pf-radius-none': theme.shape.radius.none,
-    '--pf-radius-sm': theme.shape.radius.sm,
-    '--pf-radius-md': theme.shape.radius.md,
-    '--pf-radius-lg': theme.shape.radius.lg,
-    '--pf-radius-xl': theme.shape.radius.xl,
-    '--pf-radius-full': theme.shape.radius.full,
-    '--pf-shadow-xs': theme.shape.shadow.xs,
-    '--pf-shadow-sm': theme.shape.shadow.sm,
-    '--pf-shadow-md': theme.shape.shadow.md,
-    '--pf-shadow-lg': theme.shape.shadow.lg,
-    '--pf-shadow-xl': theme.shape.shadow.xl,
-    '--pf-z-base': String(theme.shape.zIndex.base),
-    '--pf-z-dropdown': String(theme.shape.zIndex.dropdown),
-    '--pf-z-sticky': String(theme.shape.zIndex.sticky),
-    '--pf-z-drawer': String(theme.shape.zIndex.drawer),
-    '--pf-z-modal': String(theme.shape.zIndex.modal),
-    '--pf-z-popover': String(theme.shape.zIndex.popover),
-    '--pf-z-tooltip': String(theme.shape.zIndex.tooltip),
-    '--pf-motion-fast': theme.motion.fast,
-    '--pf-motion-normal': theme.motion.normal,
-    '--pf-motion-slow': theme.motion.slow,
-    '--pf-motion-easing-standard': theme.motion.easingStandard,
-    '--pf-transition-standard': `all ${theme.motion.normal} ${theme.motion.easingStandard}`,
-    '--pf-density': theme.density,
-    '--pf-density-scale': theme.density === 'compact' ? '0.87' : '1',
+    '--pf-font-sans': tokens.typography.fontFamilySans,
+    '--pf-font-mono': tokens.typography.fontFamilyMono,
+    '--pf-font-size-xs': tokens.typography.sizes.xs,
+    '--pf-font-size-sm': tokens.typography.sizes.sm,
+    '--pf-font-size-md': tokens.typography.sizes.md,
+    '--pf-font-size-lg': tokens.typography.sizes.lg,
+    '--pf-font-size-xl': tokens.typography.sizes.xl,
+    '--pf-font-size-2xl': tokens.typography.sizes['2xl'],
+    '--pf-font-weight-regular': String(tokens.typography.weights.regular),
+    '--pf-font-weight-medium': String(tokens.typography.weights.medium),
+    '--pf-font-weight-semibold': String(tokens.typography.weights.semibold),
+    '--pf-font-weight-bold': String(tokens.typography.weights.bold),
+    '--pf-line-height-tight': tokens.typography.lineHeights.tight,
+    '--pf-line-height-normal': tokens.typography.lineHeights.normal,
+    '--pf-line-height-relaxed': tokens.typography.lineHeights.relaxed,
+    '--pf-surface-canvas': tokens.colors.surface.canvas,
+    '--pf-surface-layer': tokens.colors.surface.layer,
+    '--pf-surface-layer-alt': tokens.colors.surface.layerAlt,
+    '--pf-surface-border': tokens.colors.surface.border,
+    '--pf-surface-text': tokens.colors.surface.text,
+    '--pf-surface-text-muted': tokens.colors.surface.textMuted,
+    '--pf-surface-focus': tokens.colors.surface.focus,
+    '--pf-surface-overlay': tokens.colors.surface.overlay,
+    '--pf-surface-inverse-text': tokens.colors.surface.inverseText,
+    '--pf-radius-xs': tokens.radii.xs,
+    '--pf-radius-sm': tokens.radii.sm,
+    '--pf-radius-md': tokens.radii.md,
+    '--pf-radius-lg': tokens.radii.lg,
+    '--pf-radius-xl': tokens.radii.xl,
+    '--pf-radius-2xl': tokens.radii['2xl'],
+    '--pf-radius-full': tokens.radii.full,
+    '--pf-shadow-sm': tokens.shadows.sm,
+    '--pf-shadow-md': tokens.shadows.md,
+    '--pf-shadow-lg': tokens.shadows.lg,
+    '--pf-shadow-xl': tokens.shadows.xl,
+    '--pf-z-dropdown': String(tokens.zIndex.dropdown),
+    '--pf-z-modal': String(tokens.zIndex.modal),
+    '--pf-z-toast': String(tokens.zIndex.toast),
+    '--pf-z-tooltip': String(tokens.zIndex.tooltip),
+    '--pf-motion-fast': tokens.transitions.fast,
+    '--pf-motion-normal': tokens.transitions.normal,
+    '--pf-motion-slow': tokens.transitions.slow,
+    '--pf-motion-easing-standard': tokens.transitions.easingStandard,
+    '--pf-transition-standard': `all ${tokens.transitions.normal} ${tokens.transitions.easingStandard}`,
+    '--pf-density': density,
+    '--pf-control-height-sm': tokens.density.controlHeights[density].sm,
+    '--pf-control-height-md': tokens.density.controlHeights[density].md,
+    '--pf-control-height-lg': tokens.density.controlHeights[density].lg,
+    '--pf-control-padding-x-sm': tokens.density.controlPaddingX[density].sm,
+    '--pf-control-padding-x-md': tokens.density.controlPaddingX[density].md,
+    '--pf-control-padding-x-lg': tokens.density.controlPaddingX[density].lg,
   };
 
-  appendColorScaleVars(vars, 'primary', theme.palette.primary);
-  appendColorScaleVars(vars, 'secondary', theme.palette.secondary);
-  appendColorScaleVars(vars, 'neutral', theme.palette.neutral);
-  appendColorScaleVars(vars, 'success', theme.palette.success);
-  appendColorScaleVars(vars, 'warn', theme.palette.warn);
-  appendColorScaleVars(vars, 'error', theme.palette.error);
+  appendColorScale(vars, 'primary', tokens.colors.primary);
+  appendColorScale(vars, 'secondary', tokens.colors.secondary);
+  appendColorScale(vars, 'neutral', tokens.colors.neutral);
+  appendColorScale(vars, 'success', tokens.colors.success);
+  appendColorScale(vars, 'warning', tokens.colors.warning);
+  appendColorScale(vars, 'warn', tokens.colors.warning);
+  appendColorScale(vars, 'error', tokens.colors.error);
 
-  for (const [spaceKey, spaceValue] of Object.entries(theme.spacing)) {
-    vars[`--pf-space-${spaceKey}`] = spaceValue;
+  for (const [key, value] of Object.entries(tokens.spacing)) {
+    vars[`--pf-space-${key}`] = value;
   }
 
   return vars;
 }
 
-export function toCssDeclarationBlock(variables: Record<string, string>): string {
-  return Object.entries(variables)
-    .map(([name, value]) => `${name}: ${value};`)
-    .join('\n');
-}
-
-function appendColorScaleVars(target: Record<string, string>, name: string, scale: ColorScale): void {
-  for (const step of SCALE_STEPS) {
-    target[`--pf-color-${name}-${step}`] = scale[step];
+function appendColorScale(
+  target: Record<string, string>,
+  colorName: string,
+  scale: ColorScale,
+): void {
+  for (const step of paletteSteps) {
+    target[`--pf-color-${colorName}-${step}`] = scale[step];
   }
-}
-
-function deepMerge<T>(base: T, overrides: DeepPartial<T>): T {
-  return deepMergeInternal(base, overrides) as T;
-}
-
-function deepMergeInternal(base: unknown, overrides: unknown): unknown {
-  if (overrides === undefined) return base;
-  if (!isObject(base) || !isObject(overrides)) {
-    return overrides;
-  }
-
-  const merged: Record<string, unknown> = { ...base };
-  for (const [key, overrideValue] of Object.entries(overrides)) {
-    if (overrideValue === undefined) continue;
-    const baseValue = merged[key];
-    merged[key] = deepMergeInternal(baseValue, overrideValue);
-  }
-  return merged;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

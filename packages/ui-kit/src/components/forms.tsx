@@ -59,6 +59,8 @@ export interface PFTextFieldProps extends Omit<PFInputProps, 'children'> {
   label?: ReactNode;
   helperText?: ReactNode;
   error?: boolean;
+  startAdornment?: ReactNode;
+  endAdornment?: ReactNode;
 }
 
 export function PFTextField({
@@ -66,6 +68,8 @@ export function PFTextField({
   label,
   helperText,
   error = false,
+  startAdornment,
+  endAdornment,
   className,
   ...rest
 }: PFTextFieldProps) {
@@ -73,7 +77,17 @@ export function PFTextField({
   return (
     <div className={cn('pf-text-field', className)}>
       {label ? <PFFormLabel htmlFor={id}>{label}</PFFormLabel> : null}
-      <PFInput id={id} aria-invalid={error || undefined} aria-describedby={describedBy} {...rest} />
+      <span
+        className={cn(
+          'pf-text-field__control',
+          Boolean(startAdornment) && 'pf-text-field__control--start',
+          Boolean(endAdornment) && 'pf-text-field__control--end',
+        )}
+      >
+        {startAdornment ? <span className="pf-text-field__adornment pf-text-field__adornment--start">{startAdornment}</span> : null}
+        <PFInput id={id} aria-invalid={error || undefined} aria-describedby={describedBy} {...rest} />
+        {endAdornment ? <span className="pf-text-field__adornment pf-text-field__adornment--end">{endAdornment}</span> : null}
+      </span>
       {helperText ? (
         <PFFormHelperText id={describedBy} error={error}>
           {helperText}

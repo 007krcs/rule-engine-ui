@@ -1,25 +1,26 @@
-﻿'use client';
+'use client';
 
 import { Moon, Sun } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PFIconButton } from '@platform/ui-kit';
 import { useTheme } from '@/components/layout/theme-provider';
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const nextTheme = theme === 'dark' ? 'light' : 'dark';
+  const isDark = theme === 'dark';
+  const nextTheme = isDark ? 'light' : 'dark';
 
   return (
-    <Button
+    <PFIconButton
       variant="ghost"
       size="sm"
-      aria-label="Toggle theme"
+      label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       onClick={() => setTheme(nextTheme)}
     >
-      {theme === 'dark' ? (
+      {isDark ? (
         <Sun width={16} height={16} aria-hidden="true" focusable="false" />
       ) : (
         <Moon width={16} height={16} aria-hidden="true" focusable="false" />
       )}
-    </Button>
+    </PFIconButton>
   );
 }

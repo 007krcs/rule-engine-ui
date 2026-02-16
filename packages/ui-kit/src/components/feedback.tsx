@@ -1,4 +1,12 @@
-import { useEffect, useId, useState, type HTMLAttributes, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ProgressHTMLAttributes,
+  type ReactNode,
+} from 'react';
 import { cn, intentClass, sizeClass, type PFBaseProps, type PFIntent } from './utils';
 
 export interface PFAlertProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>, PFBaseProps {
@@ -40,23 +48,29 @@ export interface PFDialogProps extends Omit<HTMLAttributes<HTMLDivElement>, 'tit
   open: boolean;
   onClose?: () => void;
   title?: ReactNode;
+  description?: ReactNode;
   actions?: ReactNode;
   size?: 'sm' | 'md' | 'lg';
   closeOnBackdropClick?: boolean;
+  disableFocusTrap?: boolean;
 }
 
 export function PFDialog({
   open,
   onClose,
   title,
+  description,
   actions,
   children,
   className,
   size = 'md',
   closeOnBackdropClick = true,
+  disableFocusTrap = false,
   ...rest
 }: PFDialogProps) {
   const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -68,6 +82,47 @@ export function PFDialog({
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open || disableFocusTrap) return;
+    const node = dialogRef.current;
+    if (!node) return;
+
+    const focusable = node.querySelectorAll<HTMLElement>(
+      [
+        'button:not([disabled])',
+        'a[href]',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(','),
+    );
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Tab') return;
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    node.addEventListener('keydown', onKeyDown);
+    return () => {
+      node.removeEventListener('keydown', onKeyDown);
+    };
+  }, [disableFocusTrap, open]);
 
   if (!open) return null;
 
@@ -84,10 +139,15 @@ export function PFDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
+        aria-describedby={description ? descriptionId : undefined}
+        ref={dialogRef}
         {...rest}
       >
         {title ? <PFDialogHeader id={titleId}>{title}</PFDialogHeader> : null}
-        <PFDialogBody>{children}</PFDialogBody>
+        <PFDialogBody>
+          {description ? <p id={descriptionId} className="pf-dialog__description">{description}</p> : null}
+          {children}
+        </PFDialogBody>
         {actions ? <PFDialogActions>{actions}</PFDialogActions> : null}
       </section>
     </div>
@@ -112,7 +172,9 @@ export function PFDialogActions({ className, ...rest }: PFDialogActionsProps) {
   return <footer className={cn('pf-dialog__actions', className)} {...rest} />;
 }
 
-export interface PFProgressProps extends PFBaseProps, HTMLAttributes<HTMLDivElement> {
+export interface PFProgressProps
+  extends PFBaseProps,
+    Omit<ProgressHTMLAttributes<HTMLProgressElement>, 'size' | 'value' | 'max'> {
   variant?: 'linear' | 'circular';
   value?: number;
   indeterminate?: boolean;
@@ -135,7 +197,7 @@ export function PFProgress({
     const offset = circumference - (clampedValue / 100) * circumference;
 
     return (
-      <div className={cn('pf-progress-circular', indeterminate && 'is-indeterminate', className)} {...rest}>
+      <div className={cn('pf-progress-circular', indeterminate && 'is-indeterminate', className)}>
         <svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
           <circle
             cx={radius}
@@ -159,16 +221,15 @@ export function PFProgress({
   }
 
   return (
-    <div
+    <progress
       className={cn('pf-progress', sizeClass(size), indeterminate && 'is-indeterminate', className)}
-      role="progressbar"
+      value={indeterminate ? undefined : clampedValue}
+      max={100}
       aria-valuemin={indeterminate ? undefined : 0}
       aria-valuemax={indeterminate ? undefined : 100}
       aria-valuenow={indeterminate ? undefined : clampedValue}
       {...rest}
-    >
-      <span className="pf-progress__bar" style={{ width: indeterminate ? undefined : `${clampedValue}%` }} />
-    </div>
+    />
   );
 }
 
@@ -187,13 +248,16 @@ export function PFSkeleton({
   animated = true,
   ...rest
 }: PFSkeletonProps) {
+  const sizeToken =
+    (typeof width === 'number' && width <= 48) || (typeof height === 'number' && height <= 48)
+      ? 'pf-skeleton--sm'
+      : (typeof width === 'number' && width >= 180) || (typeof height === 'number' && height >= 180)
+        ? 'pf-skeleton--lg'
+        : undefined;
+
   return (
     <span
-      className={cn('pf-skeleton', `pf-skeleton--${variant}`, animated && 'is-animated', className)}
-      style={{
-        width: typeof width === 'number' ? `${width}px` : width,
-        height: typeof height === 'number' ? `${height}px` : height,
-      }}
+      className={cn('pf-skeleton', `pf-skeleton--${variant}`, sizeToken, animated && 'is-animated', className)}
       aria-hidden="true"
       {...rest}
     />
@@ -247,6 +311,12 @@ export function PFSnackbar({
       {action ? <div className="pf-snackbar__action">{action}</div> : null}
     </div>
   );
+}
+
+export type PFToastProps = PFSnackbarProps;
+
+export function PFToast(props: PFToastProps) {
+  return <PFSnackbar {...props} />;
 }
 
 export interface PFTooltipProps extends PFBaseProps {

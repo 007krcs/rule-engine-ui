@@ -1,15 +1,31 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  type ReactNode,
+} from 'react';
+import {
+  PlatformThemeProvider,
+  usePlatformTheme,
+  type PlatformTheme,
+} from '@platform/ui-kit';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeDensity = 'comfortable' | 'compact';
 
 type ThemeContextValue = {
-  theme: ThemeMode;
-  setTheme: (theme: ThemeMode) => void;
+  theme: Exclude<ThemeMode, 'system'>;
+  density: ThemeDensity;
+  brandPrimary?: string;
+  setTheme: (theme: Exclude<ThemeMode, 'system'>) => void;
+  setDensity: (density: ThemeDensity) => void;
+  setBrandPrimary: (primary: string) => void;
 };
 
 type TenantBranding = {
+  logoUrl?: string;
   mode: ThemeMode;
   primaryColor: string;
   secondaryColor: string;
@@ -19,90 +35,90 @@ type TenantBranding = {
   cssVariables: Record<string, unknown>;
 };
 
-const THEME_STORAGE_KEY = 'ruleflow-theme';
-
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'system',
-  setTheme: () => undefined,
-});
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   defaultTheme?: ThemeMode;
 }) {
-  const [theme, setTheme] = useState<ThemeMode>(defaultTheme);
-  const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const initialTheme = useMemo<Partial<PlatformTheme> | undefined>(() => {
+    if (defaultTheme === 'system') return undefined;
+    return { mode: defaultTheme };
+  }, [defaultTheme]);
 
-  useEffect(() => {
-    let canceled = false;
+  return (
+    <PlatformThemeProvider initialTheme={initialTheme} tenantThemeLoader={loadTenantTheme}>
+      <ThemeBridge>{children}</ThemeBridge>
+    </PlatformThemeProvider>
+  );
+}
 
-    const boot = async () => {
-      const stored = readStoredTheme();
-      if (stored) {
-        setTheme(stored);
-      }
+function ThemeBridge({ children }: { children: ReactNode }) {
+  const { theme, setMode, setDensity, setBrand } = usePlatformTheme();
 
-      try {
-        const response = await fetch('/api/branding', { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = (await response.json()) as { ok?: boolean; branding?: TenantBranding | null };
-        if (canceled || !data || data.ok !== true) return;
-        setBranding(data.branding ?? null);
-        if (!stored && data.branding?.mode) {
-          setTheme(data.branding.mode);
-        }
-      } catch {
-        // Branding endpoint is optional in demo mode.
-      }
-    };
-
-    void boot();
-    return () => {
-      canceled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    applyTheme(theme, branding);
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme, branding]);
-
-  const value = useMemo(() => ({ theme, setTheme }), [theme]);
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      theme: theme.mode,
+      density: theme.density,
+      brandPrimary: theme.brand?.primary,
+      setTheme: setMode,
+      setDensity,
+      setBrandPrimary: (primary) => {
+        setBrand({
+          ...theme.brand,
+          primary,
+        });
+      },
+    }),
+    [setBrand, setDensity, setMode, theme],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-export function useTheme() {
-  return useContext(ThemeContext);
-}
-
-function readStoredTheme(): ThemeMode | null {
-  const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : null;
-}
-
-function applyTheme(theme: ThemeMode, branding: TenantBranding | null): void {
-  const root = document.documentElement;
-  const resolved = theme === 'system' && branding?.mode ? branding.mode : theme;
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark = resolved === 'dark' || (resolved === 'system' && prefersDark);
-  root.classList.toggle('dark', isDark);
-
-  if (!branding) return;
-
-  root.style.setProperty('--tenant-primary-color', branding.primaryColor);
-  root.style.setProperty('--tenant-secondary-color', branding.secondaryColor);
-  root.style.setProperty('--tenant-typography-scale', String(branding.typographyScale));
-  root.style.setProperty('--tenant-radius', `${branding.radius}px`);
-  root.style.setProperty('--tenant-spacing', `${branding.spacing}px`);
-
-  for (const [key, value] of Object.entries(branding.cssVariables ?? {})) {
-    if (!key.startsWith('--')) continue;
-    if (typeof value === 'string' || typeof value === 'number') {
-      root.style.setProperty(key, String(value));
-    }
+export function useTheme(): ThemeContextValue {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within ThemeProvider.');
   }
+  return context;
+}
+
+async function loadTenantTheme(): Promise<Partial<PlatformTheme> | null> {
+  try {
+    const response = await fetch('/api/branding', { cache: 'no-store' });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { ok?: boolean; branding?: TenantBranding | null };
+    if (!payload?.ok || !payload.branding) return null;
+
+    const mode = resolveTenantMode(payload.branding.mode);
+    const density: ThemeDensity = payload.branding.spacing <= 7 ? 'compact' : 'comfortable';
+    const radiusScale = clamp(payload.branding.radius / 10, 0.5, 2);
+
+    return {
+      mode,
+      density,
+      brand: {
+        logoUrl: payload.branding.logoUrl,
+        primary: payload.branding.primaryColor,
+        secondary: payload.branding.secondaryColor,
+        radiusScale,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function resolveTenantMode(mode: ThemeMode): Exclude<ThemeMode, 'system'> {
+  if (mode === 'light' || mode === 'dark') return mode;
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

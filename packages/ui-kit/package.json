@@ -8,7 +8,8 @@
     "dist"
   ],
   "sideEffects": [
-    "./dist/styles.css"
+    "./dist/styles.css",
+    "./dist/styles.scss"
   ],
   "exports": {
     ".": {
@@ -16,6 +17,7 @@
       "import": "./dist/index.js"
     },
     "./styles.css": "./dist/styles.css",
+    "./styles.scss": "./dist/styles.scss",
     "./tokens": {
       "types": "./dist/tokens.d.ts",
       "import": "./dist/tokens.js"
@@ -23,6 +25,10 @@
     "./theme": {
       "types": "./dist/theme.d.ts",
       "import": "./dist/theme.js"
+    },
+    "./theme-init": {
+      "types": "./dist/theme-init.d.ts",
+      "import": "./dist/theme-init.js"
     }
   },
   "scripts": {

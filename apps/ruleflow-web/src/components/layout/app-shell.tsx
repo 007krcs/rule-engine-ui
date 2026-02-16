@@ -2,16 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Activity, BookOpen, Boxes, HeartPulse, LayoutDashboard, ListTodo, Menu, PackageOpen, Plug, ShieldCheck, Sparkles, X } from 'lucide-react';
+import {
+  PFButton,
+  PFDialog,
+  PFIconButton,
+  PFTextArea,
+  PFTextField,
+} from '@platform/ui-kit';
 import styles from './app-shell.module.css';
 import { cn } from '@/lib/utils';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
+import { DensityToggle } from '@/components/layout/density-toggle';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
-import { Button, buttonClassName } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Modal } from '@/components/ui/modal';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { apiPost, downloadFromApi } from '@/lib/demo/api-client';
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
@@ -32,6 +36,7 @@ const systemItems = [
   { href: '/console?tab=governance', label: 'Governance', icon: ShieldCheck },
   { href: '/console?tab=observability', label: 'Observability', icon: Activity },
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
+  { href: '/system/ui-kit', label: 'UI Kit', icon: Sparkles },
   { href: '/system/layout-check', label: 'Layout Check', icon: Boxes },
   { href: '/system/health', label: 'Health', icon: HeartPulse },
   { href: '/system/roadmap', label: 'Roadmap', icon: ListTodo },
@@ -44,6 +49,7 @@ function helpHrefForPathname(pathname: string): string {
   if (pathname.startsWith('/console')) return '/docs/tutorial-console';
   if (pathname.startsWith('/component-registry')) return '/docs/tutorial-component-registry';
   if (pathname.startsWith('/integrations')) return '/docs/tutorial-integrations';
+  if (pathname.startsWith('/system/ui-kit')) return '/docs';
   if (pathname.startsWith('/samples')) return '/docs/quickstart';
   if (pathname.startsWith('/docs')) return '/docs';
   return '/docs/quickstart';
@@ -67,10 +73,20 @@ function getPageTitle(pathname: string, tab?: string | null) {
   }
 
   if (pathname.startsWith('/system/health')) return 'Health';
+  if (pathname.startsWith('/system/ui-kit')) return 'UI Kit';
   if (pathname.startsWith('/system/layout-check')) return 'Layout Check';
   if (pathname.startsWith('/system/roadmap')) return 'Roadmap';
 
   return pathname.slice(1);
+}
+
+function getScreenPreset(pathname: string): 'console' | 'builder' | 'playground' | 'docs' | 'system' | 'default' {
+  if (pathname.startsWith('/console') || pathname.startsWith('/branding')) return 'console';
+  if (pathname.startsWith('/builder') || pathname.startsWith('/component-registry')) return 'builder';
+  if (pathname.startsWith('/playground') || pathname.startsWith('/samples')) return 'playground';
+  if (pathname.startsWith('/docs') || pathname.startsWith('/integrations')) return 'docs';
+  if (pathname.startsWith('/system')) return 'system';
+  return 'default';
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -93,6 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const tab = searchParams.get('tab');
   const pageTitle = useMemo(() => getPageTitle(pathname, tab), [pathname, tab]);
   const helpHref = useMemo(() => helpHrefForPathname(pathname), [pathname]);
+  const screenPreset = useMemo(() => getScreenPreset(pathname), [pathname]);
   const activeVersionId = onboarding.state.activeVersionId;
 
   useEffect(() => {
@@ -247,21 +264,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [commandActions, commandQuery]);
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-pf-screen={screenPreset}>
       {clientReady ? <span data-testid="client-ready" className={styles.clientReady} aria-hidden="true" /> : null}
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <div className={styles.headerLeft}>
-            <Button
+            <PFIconButton
               type="button"
               size="sm"
               variant="ghost"
               className={styles.menuButton}
-              aria-label="Open navigation"
+              label="Open navigation"
               onClick={() => setMobileNavOpen(true)}
             >
               <Menu width={16} height={16} aria-hidden="true" focusable="false" />
-            </Button>
+            </PFIconButton>
 
             <Link href="/" className={styles.logoLink}>
               <div className={styles.logoMark} aria-hidden="true">
@@ -275,18 +292,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className={styles.headerActions}>
-            <Button variant="outline" size="sm" onClick={exportGitOps}>
+            <PFButton variant="outline" intent="neutral" size="sm" onClick={exportGitOps}>
               Export GitOps
-            </Button>
-            <Link className={buttonClassName({ variant: 'outline', size: 'sm' })} href={helpHref}>
+            </PFButton>
+            <Link className={cn('pf-button', 'pf-size-sm', 'pf-button--outline', 'pf-button--neutral')} href={helpHref}>
               Help
             </Link>
-            <Button variant="outline" size="sm" onClick={onboarding.open}>
+            <PFButton variant="outline" intent="neutral" size="sm" onClick={onboarding.open}>
               Get Started
-            </Button>
-            <Button size="sm" onClick={() => setNewConfigOpen(true)}>
+            </PFButton>
+            <PFButton size="sm" onClick={() => setNewConfigOpen(true)}>
               New Config
-            </Button>
+            </PFButton>
+            <DensityToggle />
             <ThemeToggle />
           </div>
         </div>
@@ -303,9 +321,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className={cn(styles.drawer, 'rfScrollbar')}>
             <div className={styles.drawerHeader}>
               <p className={styles.drawerTitle}>Navigation</p>
-              <Button type="button" size="sm" variant="ghost" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}>
+              <PFIconButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                label="Close navigation"
+                onClick={() => setMobileNavOpen(false)}
+              >
                 <X width={16} height={16} aria-hidden="true" focusable="false" />
-              </Button>
+              </PFIconButton>
             </div>
             {nav}
           </div>
@@ -322,76 +346,94 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Breadcrumbs />
                 <h1 className={styles.pageTitle}>{pageTitle}</h1>
               </div>
-          <div className={styles.mobileActions}>
-            <ThemeToggle />
-            <Link className={buttonClassName({ variant: 'outline', size: 'sm' })} href={helpHref}>
-              Help
-            </Link>
-            <Button size="sm" onClick={() => setNewConfigOpen(true)}>
-              New
-            </Button>
+              <div className={styles.mobileActions}>
+                <ThemeToggle />
+                <DensityToggle />
+                <Link className={cn('pf-button', 'pf-size-sm', 'pf-button--outline', 'pf-button--neutral')} href={helpHref}>
+                  Help
+                </Link>
+                <PFButton size="sm" onClick={() => setNewConfigOpen(true)}>
+                  New
+                </PFButton>
+              </div>
+            </div>
+            {children}
           </div>
-        </div>
-        {children}
+        </main>
       </div>
-    </main>
-  </div>
 
-      <Modal
+      <PFDialog
         open={newConfigOpen}
         title="New Config Package"
         description="Create a new DRAFT package and start editing its UI schema."
         onClose={() => (newConfigBusy ? null : setNewConfigOpen(false))}
-        footer={
+        actions={(
           <div className={styles.modalFooter}>
-            <Button type="button" variant="outline" onClick={() => setNewConfigOpen(false)} disabled={newConfigBusy}>
+            <PFButton type="button" variant="outline" intent="neutral" onClick={() => setNewConfigOpen(false)} disabled={newConfigBusy}>
               Cancel
-            </Button>
-            <Button type="button" onClick={createConfig} disabled={newConfigBusy || newConfigName.trim().length === 0}>
+            </PFButton>
+            <PFButton type="button" onClick={createConfig} disabled={newConfigBusy || newConfigName.trim().length === 0}>
               {newConfigBusy ? 'Creating...' : 'Create'}
-            </Button>
+            </PFButton>
           </div>
-        }
+        )}
       >
         <div className={styles.modalBody}>
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-            <div>
-              <label className={styles.fieldLabel}>Tenant Id</label>
-              <Input value={newConfigTenantId} onChange={(e) => setNewConfigTenantId(e.target.value)} placeholder="tenant-1" />
-            </div>
-            <div>
-              <label className={styles.fieldLabel}>Config Id</label>
-              <Input value={newConfigId} onChange={(e) => setNewConfigId(e.target.value)} placeholder="checkout-flow" />
-            </div>
+          <div className={styles.modalGridTwo}>
+            <PFTextField
+              id="new-config-tenant-id"
+              label="Tenant Id"
+              value={newConfigTenantId}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setNewConfigTenantId(e.target.value)}
+              placeholder="tenant-1"
+            />
+            <PFTextField
+              id="new-config-id"
+              label="Config Id"
+              value={newConfigId}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setNewConfigId(e.target.value)}
+              placeholder="checkout-flow"
+            />
           </div>
+          <PFTextField
+            id="new-config-name"
+            label="Name"
+            value={newConfigName}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setNewConfigName(e.target.value)}
+            placeholder="Orders Bundle"
+            required
+          />
           <div>
-            <label className={styles.fieldLabel}>Name</label>
-            <Input value={newConfigName} onChange={(e) => setNewConfigName(e.target.value)} placeholder="Orders Bundle" />
-          </div>
-          <div>
-            <label className={styles.fieldLabel}>Description</label>
-            <Textarea value={newConfigDescription} onChange={(e) => setNewConfigDescription(e.target.value)} placeholder="What does this bundle power?" />
+            <label htmlFor="new-config-description" className={styles.fieldLabel}>Description</label>
+            <PFTextArea
+              id="new-config-description"
+              value={newConfigDescription}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNewConfigDescription(e.target.value)}
+              placeholder="What does this bundle power?"
+            />
           </div>
           <p className={styles.helperText}>
             This local demo stores config state in memory with JSON persistence under <span className={styles.codeInline}>.ruleflow-demo-data</span>.
           </p>
         </div>
-      </Modal>
+      </PFDialog>
 
       <OnboardingWizard />
 
-      <Modal
+      <PFDialog
         open={commandOpen}
         title="Command Palette"
         description="Type to filter. Shortcut: Ctrl+K"
         onClose={() => setCommandOpen(false)}
       >
         <div className={styles.commandBody}>
-          <Input
+          <PFTextField
+            id="command-search"
+            label="Search actions"
             autoFocus
             placeholder="Search actions..."
             value={commandQuery}
-            onChange={(e) => setCommandQuery(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setCommandQuery(e.target.value)}
           />
           <div className={styles.commandList} role="list">
             {filteredActions.map((action) => (
@@ -410,7 +452,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {filteredActions.length === 0 ? <p className={styles.commandEmpty}>No matches.</p> : null}
           </div>
         </div>
-      </Modal>
+      </PFDialog>
     </div>
   );
 }

@@ -15,7 +15,7 @@ describe('@platform/ui-kit components', () => {
   it('renders key component contracts', () => {
     const html = renderToStaticMarkup(
       <div className="pf-root">
-        <PFButton variant="contained" size="md" startIcon={<span>*</span>} loading>
+        <PFButton variant="solid" size="md" startIcon={<span>*</span>} loading>
           Save
         </PFButton>
         <PFTextField id="name" label="Name" helperText="Required field" />
@@ -31,6 +31,23 @@ describe('@platform/ui-kit components', () => {
     expect(html).toContain('Required field');
     expect(html).toContain('role="switch"');
     expect(html).toContain('Heads up');
+  });
+
+  it('marks PFButton disabled while loading', () => {
+    const loadingHtml = renderToStaticMarkup(
+      <PFButton loading>
+        Save
+      </PFButton>,
+    );
+    const disabledHtml = renderToStaticMarkup(
+      <PFButton disabled>
+        Save
+      </PFButton>,
+    );
+
+    expect(loadingHtml).toContain('disabled=""');
+    expect(loadingHtml).toContain('aria-busy="true"');
+    expect(disabledHtml).toContain('disabled=""');
   });
 
   it('renders dialog and table with semantics', () => {

@@ -1,6 +1,8 @@
 import './globals.css';
+import '@platform/ui-kit/styles.css';
 import { Manrope, JetBrains_Mono } from 'next/font/google';
 import { Suspense } from 'react';
+import { platformThemeInitScript } from '@platform/ui-kit/theme-init';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { ToastProvider } from '@/components/ui/toast';
@@ -17,6 +19,9 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script id="pf-theme-init" dangerouslySetInnerHTML={{ __html: platformThemeInitScript }} />
+      </head>
       <body suppressHydrationWarning className={`${manrope.variable} ${jetbrains.variable}`}>
         <ThemeProvider defaultTheme="system">
           <ToastProvider>

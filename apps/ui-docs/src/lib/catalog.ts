@@ -57,13 +57,13 @@ export const componentCatalog: ComponentDoc[] = [
     category: 'inputs',
     summary: 'Primary action control with variant, size, icon slots, and loading state.',
     props: [
-      { name: 'variant', type: '"contained" | "outline" | "ghost"', defaultValue: '"contained"', description: 'Visual treatment.' },
+      { name: 'variant', type: '"solid" | "outline" | "ghost"', defaultValue: '"solid"', description: 'Visual treatment.' },
       { name: 'size', type: '"sm" | "md" | "lg"', defaultValue: '"md"', description: 'Control height and font sizing.' },
       { name: 'loading', type: 'boolean', defaultValue: 'false', description: 'Shows spinner and disables action.' },
     ],
     tokens: ['--pf-color-primary-500', '--pf-radius-md', '--pf-control-height-md'],
     accessibility: [...commonFocusA11y, 'Use descriptive button labels for screen readers.'],
-    exampleSnippet: '<PFButton variant="contained" size="md">Save</PFButton>',
+    exampleSnippet: '<PFButton variant="solid" size="md">Save</PFButton>',
   },
   {
     slug: 'icon-button',
@@ -72,7 +72,7 @@ export const componentCatalog: ComponentDoc[] = [
     summary: 'Icon-only button with required accessible label.',
     props: [
       { name: 'label', type: 'string', description: 'Accessible aria-label text.' },
-      { name: 'variant', type: '"contained" | "outline" | "ghost"', defaultValue: '"ghost"', description: 'Visual style.' },
+      { name: 'variant', type: '"solid" | "outline" | "ghost"', defaultValue: '"ghost"', description: 'Visual style.' },
       { name: 'loading', type: 'boolean', defaultValue: 'false', description: 'Busy state spinner.' },
     ],
     tokens: ['--pf-control-height-md', '--pf-radius-md'],

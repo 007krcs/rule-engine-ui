@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { GitOpsPayload, JsonRecord, KillScope, RepoSession, RiskLevel } from '@platform/persistence-postgres';
+import type { GitOpsPayload, JsonRecord, KillScope, PostgresTenantRepository, RepoSession, RiskLevel } from '@platform/persistence-postgres';
 import exampleApi from '@platform/schema/examples/example.api.json';
 import exampleFlow from '@platform/schema/examples/example.flow.json';
 import exampleRules from '@platform/schema/examples/example.rules.json';
@@ -20,7 +20,6 @@ import {
 } from '@/server/policy-engine';
 
 type ProviderMode = 'demo' | 'postgres';
-type PostgresTenantRepository = import('@platform/persistence-postgres').PostgresTenantRepository;
 type PostgresRepositoryConstructor = {
   create(input: { connectionString?: string; runMigrationsOnBoot?: boolean }): Promise<PostgresTenantRepository>;
 };

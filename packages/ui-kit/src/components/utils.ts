@@ -1,7 +1,7 @@
 import type { CSSProperties, KeyboardEvent } from 'react';
 
 export type PFSize = 'sm' | 'md' | 'lg';
-export type PFVariant = 'contained' | 'outline' | 'ghost';
+export type PFVariant = 'solid' | 'outline' | 'ghost';
 export type PFIntent = 'neutral' | 'primary' | 'secondary' | 'success' | 'warn' | 'error';
 
 export interface PFBaseProps {
