@@ -124,21 +124,50 @@ export function migrateThemeConfig(input: unknown, now = new Date().toISOString(
 export function validateThemeConfig(input: unknown): ThemeConfigValidationResult {
   const errors: string[] = [];
   const value = migrateThemeConfig(input);
+  const source = isRecord(input) ? input : null;
+  const brandSource = source && isRecord(source.brand) ? source.brand : null;
 
+  if (brandSource && !isHexCandidate(brandSource.primary)) {
+    errors.push('brand.primary must be a valid hex color.');
+  }
+  if (brandSource && !isHexCandidate(brandSource.secondary)) {
+    errors.push('brand.secondary must be a valid hex color.');
+  }
   if (!isHexColor(value.brand.primary)) {
     errors.push('brand.primary must be a valid hex color.');
   }
   if (!isHexColor(value.brand.secondary)) {
     errors.push('brand.secondary must be a valid hex color.');
   }
+  if (brandSource && 'fontFamily' in brandSource && !isNonEmptyString(brandSource.fontFamily)) {
+    errors.push('brand.fontFamily is required.');
+  }
   if (value.brand.fontFamily.trim().length === 0) {
     errors.push('brand.fontFamily is required.');
+  }
+  if (brandSource && hasNumberishField(brandSource, 'radiusScale')) {
+    const parsed = toNumber(brandSource.radiusScale);
+    if (parsed === null || parsed < 0.5 || parsed > 2) {
+      errors.push('brand.radiusScale must be between 0.5 and 2.');
+    }
   }
   if (value.brand.radiusScale < 0.5 || value.brand.radiusScale > 2) {
     errors.push('brand.radiusScale must be between 0.5 and 2.');
   }
+  if (brandSource && hasNumberishField(brandSource, 'elevationIntensity')) {
+    const parsed = toNumber(brandSource.elevationIntensity);
+    if (parsed === null || parsed < 0.6 || parsed > 1.8) {
+      errors.push('brand.elevationIntensity must be between 0.6 and 1.8.');
+    }
+  }
   if (value.brand.elevationIntensity < 0.6 || value.brand.elevationIntensity > 1.8) {
     errors.push('brand.elevationIntensity must be between 0.6 and 1.8.');
+  }
+  if (brandSource && hasNumberishField(brandSource, 'noise')) {
+    const parsed = toNumber(brandSource.noise);
+    if (parsed === null || parsed < 0 || parsed > 0.08) {
+      errors.push('brand.noise must be between 0 and 0.08.');
+    }
   }
   if (value.brand.noise < 0 || value.brand.noise > 0.08) {
     errors.push('brand.noise must be between 0 and 0.08.');
@@ -320,6 +349,30 @@ function normalizeHex(value: string): string | null {
 
 function isHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function isHexCandidate(value: unknown): boolean {
+  return typeof value === 'string' && normalizeHex(value) !== null;
+}
+
+function isNonEmptyString(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function hasNumberishField(
+  value: Record<string, unknown>,
+  field: 'radiusScale' | 'elevationIntensity' | 'noise',
+): boolean {
+  return field in value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

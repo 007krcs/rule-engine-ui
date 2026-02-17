@@ -267,6 +267,9 @@ export function BuilderShell({
           role="separator"
           aria-label="Resize palette panel"
           aria-orientation="vertical"
+          aria-valuemin={MIN_PALETTE}
+          aria-valuemax={MAX_PALETTE}
+          aria-valuenow={prefs.paletteWidth}
           tabIndex={0}
           onMouseDown={(event) => startResize('left', event.clientX)}
           onKeyDown={(event) => onSplitterKeyDown('left', event)}
@@ -329,6 +332,9 @@ export function BuilderShell({
           role="separator"
           aria-label="Resize inspector panel"
           aria-orientation="vertical"
+          aria-valuemin={MIN_INSPECTOR}
+          aria-valuemax={MAX_INSPECTOR}
+          aria-valuenow={prefs.inspectorWidth}
           tabIndex={0}
           onMouseDown={(event) => startResize('right', event.clientX)}
           onKeyDown={(event) => onSplitterKeyDown('right', event)}

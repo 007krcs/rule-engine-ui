@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "dependencies": {
-    "@platform/schema": "workspace:*"
+    "@platform/schema": "workspace:*",
+    "@platform/types": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -15,4 +16,3 @@
     "test": "vitest run"
   }
 }
-

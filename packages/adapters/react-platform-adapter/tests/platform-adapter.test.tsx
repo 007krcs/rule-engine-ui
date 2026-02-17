@@ -1,9 +1,11 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { builtinComponentDefinitions } from '@platform/component-registry';
+import type { ComponentDefinition } from '@platform/component-registry';
 import type { AdapterContext } from '@platform/react-renderer';
 import type { ExecutionContext, JSONValue, UIComponent } from '@platform/schema';
-import { renderPlatformComponent } from '../src/index';
+import { getImplementedComponentIds, renderPlatformComponent } from '../src/index';
 
 const context: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -55,7 +57,25 @@ function createComponent(overrides: Partial<UIComponent>): UIComponent {
   };
 }
 
+function registryImplementedPlatformIds(definitions: ComponentDefinition[]): string[] {
+  return definitions
+    .filter((definition) => definition.adapterHint.startsWith('platform.'))
+    .filter((definition) => {
+      if (definition.availability) return definition.availability === 'implemented';
+      return definition.status !== 'planned' && definition.palette?.disabled !== true;
+    })
+    .map((definition) => definition.adapterHint);
+}
+
 describe('react-platform-adapter', () => {
+  it('matches implemented registry entries with adapter map', () => {
+    const implementedFromRegistry = registryImplementedPlatformIds(builtinComponentDefinitions())
+      .sort((a, b) => a.localeCompare(b));
+    const implementedFromAdapter = getImplementedComponentIds().sort((a, b) => a.localeCompare(b));
+
+    expect(implementedFromAdapter).toEqual(implementedFromRegistry);
+  });
+
   it('renders platform date components', () => {
     const dateField = renderPlatformComponent(
       createComponent({
@@ -85,5 +105,62 @@ describe('react-platform-adapter', () => {
 
     expect(html).toContain('type="date"');
     expect(html).toContain('pf-calendar');
+  });
+
+  it('renders chip/avatar/badge/divider components without unsupported fallback', () => {
+    const chip = renderPlatformComponent(
+      createComponent({
+        id: 'chip-1',
+        type: 'chip',
+        adapterHint: 'platform.chip',
+        props: { label: 'Review', intent: 'info' },
+      }),
+      createAdapterContext({}),
+    );
+
+    const avatar = renderPlatformComponent(
+      createComponent({
+        id: 'avatar-1',
+        type: 'avatar',
+        adapterHint: 'platform.avatar',
+        props: { name: 'Dana Chen' },
+      }),
+      createAdapterContext({}),
+    );
+
+    const badge = renderPlatformComponent(
+      createComponent({
+        id: 'badge-1',
+        type: 'badge',
+        adapterHint: 'platform.badge',
+        props: { badgeContent: 4, max: 9 },
+      }),
+      createAdapterContext({}),
+    );
+
+    const divider = renderPlatformComponent(
+      createComponent({
+        id: 'divider-1',
+        type: 'divider',
+        adapterHint: 'platform.divider',
+        props: { orientation: 'horizontal' },
+      }),
+      createAdapterContext({}),
+    );
+
+    const html = renderToStaticMarkup(
+      <div>
+        {chip}
+        {avatar}
+        {badge}
+        {divider}
+      </div>,
+    );
+
+    expect(html).toContain('pf-chip');
+    expect(html).toContain('pf-avatar');
+    expect(html).toContain('pf-badge');
+    expect(html).toContain('pf-divider');
+    expect(html).not.toContain('Unsupported platform component');
   });
 });

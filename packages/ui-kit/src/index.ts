@@ -1,4 +1,4 @@
 export * from './components/index.js';
-export * from './theme';
-export * from './theme-init';
-export * from './tokens';
+export * from './theme.js';
+export * from './theme-init.js';
+export * from './tokens.js';

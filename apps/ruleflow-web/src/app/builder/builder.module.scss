@@ -73,6 +73,14 @@
   font-size: 14px;
 }
 
+.checkboxRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rf-space-2);
+  font-size: 13px;
+  color: var(--rf-muted);
+}
+
 .paletteButton {
   width: 100%;
   display: flex;

@@ -29,7 +29,11 @@ export function PFCardActions({ className, ...rest }: PFCardActionsProps) {
 
 export interface PFChipProps extends PFBaseProps, HTMLAttributes<HTMLSpanElement> {
   variant?: 'filled' | 'outline';
-  intent?: PFIntent;
+  intent?: PFIntent | 'info';
+  size?: 'sm' | 'md';
+  icon?: ReactNode;
+  dismissLabel?: string;
+  onDismiss?: () => void;
   onDelete?: () => void;
 }
 
@@ -37,18 +41,37 @@ export function PFChip({
   className,
   variant = 'filled',
   intent = 'neutral',
+  size = 'md',
+  icon,
+  dismissLabel = 'Remove chip',
+  onDismiss,
   onDelete,
   children,
   ...rest
 }: PFChipProps) {
+  const dismissHandler = onDismiss ?? onDelete;
+  const resolvedIntent = intent === 'info' ? 'primary' : intent;
   return (
     <span
-      className={cn('pf-chip', variantClass('pf-chip', variant), intentClass('pf-chip', intent), className)}
+      className={cn(
+        'pf-chip',
+        `pf-chip--${size}`,
+        variantClass('pf-chip', variant),
+        intentClass('pf-chip', resolvedIntent),
+        intent === 'info' && 'pf-chip--info',
+        className,
+      )}
       {...rest}
     >
+      {icon ? <span className="pf-chip__icon" aria-hidden="true">{icon}</span> : null}
       <span className="pf-chip__label">{children}</span>
-      {onDelete ? (
-        <button type="button" className="pf-chip__delete" onClick={onDelete} aria-label="Remove chip">
+      {dismissHandler ? (
+        <button
+          type="button"
+          className="pf-chip__dismiss"
+          onClick={dismissHandler}
+          aria-label={dismissLabel}
+        >
           x
         </button>
       ) : null}
@@ -57,25 +80,51 @@ export function PFChip({
 }
 
 export interface PFBadgeProps extends PFBaseProps, HTMLAttributes<HTMLSpanElement> {
-  badgeContent: ReactNode;
-  intent?: Exclude<PFIntent, 'secondary'>;
+  badgeContent?: ReactNode;
+  intent?: Exclude<PFIntent, 'secondary'> | 'info';
+  dot?: boolean;
+  showZero?: boolean;
   max?: number;
 }
 
 export function PFBadge({
   className,
   badgeContent,
+  dot = false,
+  showZero = false,
   intent = 'primary',
   max = 99,
   children,
   ...rest
 }: PFBadgeProps) {
+  const resolvedIntent = intent === 'info' ? 'primary' : intent;
+  const numeric =
+    typeof badgeContent === 'number'
+      ? badgeContent
+      : typeof badgeContent === 'string' && badgeContent.trim().length > 0
+        ? Number(badgeContent)
+        : null;
+  const hiddenForZero = !dot && !showZero && numeric === 0;
+  const hiddenForEmpty = !dot && badgeContent === undefined;
+  const hidden = hiddenForZero || hiddenForEmpty;
   const normalizedCount =
-    typeof badgeContent === 'number' && badgeContent > max ? `${max}+` : badgeContent;
+    dot ? '' : typeof badgeContent === 'number' && badgeContent > max ? `${max}+` : badgeContent;
   return (
-    <span className={cn('pf-badge', className)} {...rest}>
+    <span className={cn('pf-badge', dot && 'pf-badge--dot', className)} {...rest}>
       {children}
-      <span className={cn('pf-badge__content', intentClass('pf-badge__content', intent))}>{normalizedCount}</span>
+      {!hidden ? (
+        <span
+          className={cn(
+            'pf-badge__content',
+            dot && 'pf-badge__content--dot',
+            intentClass('pf-badge__content', resolvedIntent),
+            intent === 'info' && 'pf-badge__content--info',
+          )}
+          aria-label={dot ? 'Status indicator' : undefined}
+        >
+          {normalizedCount}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -84,6 +133,7 @@ export interface PFAvatarProps extends PFBaseProps, HTMLAttributes<HTMLDivElemen
   src?: string;
   alt?: string;
   name?: string;
+  size?: 'sm' | 'md' | 'lg';
   sizePx?: number;
 }
 
@@ -92,6 +142,7 @@ export function PFAvatar({
   src,
   alt,
   name,
+  size,
   sizePx = 36,
   ...rest
 }: PFAvatarProps) {
@@ -100,7 +151,9 @@ export function PFAvatar({
     .slice(0, 2)
     .map((token) => token.charAt(0).toUpperCase())
     .join('');
-  const sizeClass = sizePx <= 32 ? 'pf-avatar--sm' : sizePx >= 44 ? 'pf-avatar--lg' : 'pf-avatar--md';
+  const resolvedSize =
+    size ?? (sizePx <= 32 ? 'sm' : sizePx >= 44 ? 'lg' : 'md');
+  const sizeClass = `pf-avatar--${resolvedSize}`;
   return (
     <div className={cn('pf-avatar', sizeClass, className)} {...rest}>
       {src ? <img src={src} alt={alt ?? name ?? 'Avatar'} /> : <span>{initials ?? '?'}</span>}
@@ -195,10 +248,21 @@ export function PFTable<RowType extends Record<string, unknown>>({
 
 export interface PFDividerProps extends HTMLAttributes<HTMLHRElement> {
   orientation?: 'horizontal' | 'vertical';
+  inset?: boolean;
 }
 
-export function PFDivider({ className, orientation = 'horizontal', ...rest }: PFDividerProps) {
-  return <hr className={cn('pf-divider', `pf-divider--${orientation}`, className)} {...rest} />;
+export function PFDivider({
+  className,
+  orientation = 'horizontal',
+  inset = false,
+  ...rest
+}: PFDividerProps) {
+  return (
+    <hr
+      className={cn('pf-divider', `pf-divider--${orientation}`, inset && 'pf-divider--inset', className)}
+      {...rest}
+    />
+  );
 }
 
 export type PFTypographyVariant =

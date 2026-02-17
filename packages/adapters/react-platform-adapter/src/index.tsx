@@ -1,4 +1,6 @@
 import React from 'react';
+import { builtinComponentDefinitions } from '@platform/component-registry';
+import type { ComponentDefinition } from '@platform/component-registry';
 import {
   PFAlert,
   PFAvatar,
@@ -11,11 +13,13 @@ import {
   PFChip,
   PFDateField,
   PFDateTimeField,
+  PFDivider,
   PFEmptyState,
   PFPageShell,
   PFPagination,
   PFSection,
   PFSelect,
+  PFStack,
   PFSplitLayout,
   PFTable,
   PFTab,
@@ -31,9 +35,47 @@ import { registerAdapter } from '@platform/react-renderer';
 import type { JSONValue, UIComponent } from '@platform/schema';
 
 let registered = false;
+let reportedHandshake = false;
+
+const PLATFORM_IMPLEMENTED_COMPONENT_IDS = [
+  'platform.pageShell',
+  'platform.section',
+  'platform.splitLayout',
+  'platform.toolbar',
+  'platform.cardGrid',
+  'platform.emptyState',
+  'platform.button',
+  'platform.textField',
+  'platform.select',
+  'platform.table',
+  'platform.pagination',
+  'platform.tabs',
+  'platform.alert',
+  'platform.avatar',
+  'platform.badge',
+  'platform.chip',
+  'platform.divider',
+  'platform.dateField',
+  'platform.timeField',
+  'platform.dateTimeField',
+  'platform.calendar',
+  'platform.clock',
+] as const;
+
+type ReplaceComponentRequestEvent = {
+  componentId: string;
+  adapterHint: string;
+};
+
+export function getImplementedComponentIds(): string[] {
+  return [...PLATFORM_IMPLEMENTED_COMPONENT_IDS];
+}
 
 export function registerPlatformAdapter(): void {
   if (registered) return;
+  if (process.env.NODE_ENV !== 'production') {
+    assertRegistryAdapterHandshake();
+  }
   registered = true;
   registerAdapter('platform.', (component, ctx) => renderPlatformComponent(component, ctx));
 }
@@ -342,12 +384,34 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
       );
     case 'platform.badge':
       return (
-        <PFBadge badgeContent={asNumber(resolveBindingValue(component, ctx, 'badgeContent') ?? component.props?.badgeContent, 0)}>
+        <PFBadge
+          badgeContent={asNumber(resolveBindingValue(component, ctx, 'badgeContent') ?? component.props?.badgeContent, 0)}
+          max={asNumber(component.props?.max, 99)}
+          intent={toBadgeIntent(component.props?.intent)}
+          dot={asBoolean(component.props?.dot, false)}
+        >
           <PFChip intent="neutral">{label}</PFChip>
         </PFBadge>
       );
     case 'platform.chip':
-      return <PFChip intent={toChipIntent(component.props?.intent)}>{label}</PFChip>;
+      return (
+        <PFChip
+          intent={toChipIntent(component.props?.intent)}
+          size={toChipSize(component.props?.size)}
+          icon={asOptionalString(component.props?.icon) ? <span aria-hidden="true">{asString(component.props?.icon, '')}</span> : undefined}
+          dismissLabel={asString(component.props?.dismissLabel, `Remove ${label}`)}
+          onDismiss={asBoolean(component.props?.dismissible, false) ? () => ctx.events.onClick?.({ componentId: component.id }) : undefined}
+        >
+          {label}
+        </PFChip>
+      );
+    case 'platform.divider':
+      return (
+        <PFDivider
+          orientation={component.props?.orientation === 'vertical' ? 'vertical' : 'horizontal'}
+          inset={asBoolean(component.props?.inset, false)}
+        />
+      );
 
     case 'platform.dateField':
       return (
@@ -421,7 +485,12 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
         />
       );
     default:
-      return <div data-unsupported>Unsupported platform component: {component.adapterHint}</div>;
+      return (
+        <UnavailableComponentCard
+          component={component}
+          reason="unsupported-platform-component"
+        />
+      );
   }
 }
 
@@ -602,6 +671,18 @@ function toChipIntent(value: unknown): 'neutral' | 'primary' | 'secondary' | 'su
   return 'neutral';
 }
 
+function toBadgeIntent(value: unknown): 'primary' | 'neutral' | 'success' | 'warn' | 'error' {
+  if (value === 'primary' || value === 'neutral' || value === 'success' || value === 'warn' || value === 'error') {
+    return value;
+  }
+  return 'primary';
+}
+
+function toChipSize(value: unknown): 'sm' | 'md' {
+  if (value === 'sm' || value === 'md') return value;
+  return 'md';
+}
+
 function toButtonVariant(value: unknown): 'solid' | 'outline' | 'ghost' {
   if (value === 'solid' || value === 'outline' || value === 'ghost') return value;
   return 'solid';
@@ -637,6 +718,116 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
 
 function isRecord(value: unknown): value is Record<string, JSONValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertRegistryAdapterHandshake(): void {
+  if (reportedHandshake) return;
+  reportedHandshake = true;
+
+  const registryPlatformImplemented = new Set(getRegistryImplementedPlatformIds(builtinComponentDefinitions()));
+  const adapterImplemented = new Set(getImplementedComponentIds());
+
+  const missingInAdapter = [...registryPlatformImplemented].filter((hint) => !adapterImplemented.has(hint));
+  const missingInRegistry = [...adapterImplemented].filter((hint) => !registryPlatformImplemented.has(hint));
+
+  if (missingInAdapter.length === 0 && missingInRegistry.length === 0) return;
+
+  const message = [
+    '[platform-adapter] Registry/adapter availability mismatch detected.',
+    missingInAdapter.length > 0
+      ? `  Implemented in registry but missing in adapter: ${missingInAdapter.join(', ')}`
+      : null,
+    missingInRegistry.length > 0
+      ? `  Implemented in adapter but not marked implemented in registry: ${missingInRegistry.join(', ')}`
+      : null,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join('\n');
+
+  // eslint-disable-next-line no-console
+  console.error(message);
+}
+
+function getRegistryImplementedPlatformIds(definitions: ComponentDefinition[]): string[] {
+  return definitions
+    .filter((definition) => definition.adapterHint.startsWith('platform.'))
+    .filter((definition) => {
+      if (definition.availability) return definition.availability === 'implemented';
+      return definition.status !== 'planned' && definition.palette?.disabled !== true;
+    })
+    .map((definition) => definition.adapterHint);
+}
+
+function dispatchReplaceComponentRequest(detail: ReplaceComponentRequestEvent): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent<ReplaceComponentRequestEvent>('ruleflow:replace-component-request', {
+      detail,
+    }),
+  );
+}
+
+function copyAdminRequestText(component: UIComponent): void {
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+  const requestText =
+    `Please enable support for ${component.adapterHint} in the Platform adapter.\n` +
+    `Component id: ${component.id}\n` +
+    'Reason: this component is used by a schema but is unavailable in this environment.';
+  void navigator.clipboard.writeText(requestText);
+}
+
+function UnavailableComponentCard({
+  component,
+  reason,
+}: {
+  component: UIComponent;
+  reason: 'unsupported-platform-component' | 'missing-adapter';
+}): React.ReactElement {
+  const adapterPrefix = component.adapterHint.split('.')[0] ?? 'unknown';
+  const actionHint =
+    reason === 'missing-adapter'
+      ? `Install and register the "${adapterPrefix}" adapter package.`
+      : `Add "${component.adapterHint}" to the platform adapter map.`;
+
+  return (
+    <PFCard data-unsupported data-unsupported-reason={reason}>
+      <PFCardContent>
+        <PFTypography variant="h6">Component not available</PFTypography>
+        <PFTypography variant="body2">
+          This page uses <code>{component.adapterHint}</code>, but it is not enabled in this environment.
+        </PFTypography>
+        <PFTypography variant="body2" muted>
+          {actionHint}
+        </PFTypography>
+        <PFStack direction="row" wrap="wrap" gap="var(--pf-space-2)" align="center">
+          <a href={`/component-registry?c=${encodeURIComponent(component.adapterHint)}`}>
+            View in Component Registry
+          </a>
+          <PFButton
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              dispatchReplaceComponentRequest({
+                componentId: component.id,
+                adapterHint: component.adapterHint,
+              })
+            }
+          >
+            Replace component
+          </PFButton>
+          <PFButton
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => copyAdminRequestText(component)}
+          >
+            Contact admin
+          </PFButton>
+        </PFStack>
+      </PFCardContent>
+    </PFCard>
+  );
 }
 
 function resolveText(

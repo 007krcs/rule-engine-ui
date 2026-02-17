@@ -206,6 +206,9 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@platform/theme-config':
+        specifier: workspace:*
+        version: link:../../packages/theme-config
       '@platform/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
@@ -487,6 +490,9 @@ importers:
 
   packages/adapters/react-platform-adapter:
     dependencies:
+      '@platform/component-registry':
+        specifier: workspace:*
+        version: link:../../component-registry
       '@platform/react-renderer':
         specifier: workspace:*
         version: link:../react-renderer
@@ -634,6 +640,8 @@ importers:
         version: link:../schema
 
   packages/schema: {}
+
+  packages/theme-config: {}
 
   packages/ui-kit:
     dependencies:

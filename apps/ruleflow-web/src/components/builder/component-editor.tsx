@@ -938,6 +938,7 @@ export function ComponentEditor({
           {registry && registry.length > 0 ? (
             <Select
               value={component.adapterHint}
+              data-testid="component-editor-adapter-select"
               onChange={(event) => {
                 const nextHint = event.target.value;
                 const nextDef = registry.find((item) => item.adapterHint === nextHint) ?? null;

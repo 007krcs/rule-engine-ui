@@ -137,11 +137,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
 
     const adapter = resolveAdapter(component.adapterHint);
     if (!adapter) {
-      const rendered = (
-        <div data-component-id={component.id} data-missing-adapter>
-          No adapter for {component.adapterHint}
-        </div>
-      );
+      const rendered = renderUnavailableComponent(component, 'missing-adapter');
       const wrapped = props.componentWrapper ? props.componentWrapper(component, rendered) : rendered;
       return React.cloneElement(wrapped, { key: component.id });
     }
@@ -450,6 +446,65 @@ function resolveBreakpoint(device: ExecutionContext['device']): 'lg' | 'md' | 's
 
 function resolveAdapter(adapterHint: string): AdapterRenderFn | undefined {
   return registry.find((entry) => adapterHint.startsWith(entry.prefix))?.render;
+}
+
+function renderUnavailableComponent(
+  component: UIComponent,
+  reason: 'missing-adapter' | 'unsupported-component',
+): React.ReactElement {
+  const adapterPrefix = component.adapterHint.split('.')[0] ?? 'unknown';
+  const instructions =
+    reason === 'missing-adapter'
+      ? `Install and register the "${adapterPrefix}" adapter.`
+      : `Enable support for "${component.adapterHint}".`;
+
+  return (
+    <section
+      data-component-id={component.id}
+      data-component-not-available
+      data-component-reason={reason}
+    >
+      <h3>Component not available</h3>
+      <p>
+        This page uses <code>{component.adapterHint}</code>, but it is not enabled in this environment.
+      </p>
+      <p>{instructions}</p>
+      <div>
+        <a href={`/component-registry?c=${encodeURIComponent(component.adapterHint)}`}>
+          View in Component Registry
+        </a>
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window === 'undefined') return;
+            window.dispatchEvent(
+              new CustomEvent('ruleflow:replace-component-request', {
+                detail: {
+                  componentId: component.id,
+                  adapterHint: component.adapterHint,
+                },
+              }),
+            );
+          }}
+        >
+          Replace component
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+            const requestText =
+              `Please enable support for ${component.adapterHint}.\n` +
+              `Component id: ${component.id}\n` +
+              'This component is required by an active schema.';
+            void navigator.clipboard.writeText(requestText);
+          }}
+        >
+          Contact admin
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function assertAccessibility(component: UIComponent): void {

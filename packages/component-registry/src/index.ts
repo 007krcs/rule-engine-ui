@@ -1,8 +1,15 @@
 import type { JSONValue } from '@platform/schema';
+import type {
+  JSONSchema as PlatformJsonSchema,
+  PlatformComponentAvailability,
+  PlatformComponentCategory,
+  PlatformComponentMeta,
+} from '@platform/types';
 
 export type RegistryScope = 'global' | 'tenant';
 
 export type ComponentStatus = 'stable' | 'beta' | 'planned';
+export type ComponentAvailability = PlatformComponentAvailability;
 
 export type ComponentCategory =
   | 'Inputs'
@@ -27,6 +34,7 @@ export type ComponentExample = {
 };
 
 export type ComponentDefinition = {
+  id: string;
   adapterHint: string;
   displayName: string;
   description: string;
@@ -59,6 +67,8 @@ export type ComponentDefinition = {
   };
   tokensUsed?: string[];
   status?: ComponentStatus;
+  availability: ComponentAvailability;
+  supportsDrag: boolean;
   palette?: {
     disabled?: boolean;
     reason?: string;
@@ -132,6 +142,7 @@ type SeedComponent = {
   category: ComponentCategory;
   description: string;
   status: ComponentStatus;
+  availability?: ComponentAvailability;
   propsSchema?: JsonSchema;
   defaultProps?: Record<string, JSONValue>;
   examples?: ComponentExample[];
@@ -150,6 +161,33 @@ const COMMON_RULES: Array<'visibleWhen' | 'disabledWhen' | 'requiredWhen' | 'set
   'requiredWhen',
   'setValueWhen',
 ];
+
+const PLATFORM_IMPLEMENTED_COMPONENT_HINTS = new Set<string>([
+  'platform.pageShell',
+  'platform.section',
+  'platform.splitLayout',
+  'platform.toolbar',
+  'platform.cardGrid',
+  'platform.emptyState',
+  'platform.button',
+  'platform.textField',
+  'platform.select',
+  'platform.table',
+  'platform.pagination',
+  'platform.tabs',
+  'platform.alert',
+  'platform.avatar',
+  'platform.badge',
+  'platform.chip',
+  'platform.divider',
+  'platform.dateField',
+  'platform.datePicker',
+  'platform.timeField',
+  'platform.timePicker',
+  'platform.dateTimeField',
+  'platform.calendar',
+  'platform.clock',
+]);
 
 const CATALOG_SEEDS: SeedComponent[] = [
   // Inputs
@@ -262,6 +300,22 @@ const CATALOG_SEEDS: SeedComponent[] = [
     bindings: { data: ['valuePath'], context: ['locale', 'timezone'] },
     tokensUsed: ['--pf-control-height-md', '--pf-font-size-sm', '--pf-surface-border'],
   }),
+  seed('platform.datePicker', 'DatePicker', 'Inputs', 'Date picker with calendar view and keyboard navigation.', 'stable', {
+    propsSchema: objectSchema('Date picker', {
+      label: stringSchema('Label'),
+      helperText: stringSchema('Helper Text'),
+      minDate: stringSchema('Min Date'),
+      maxDate: stringSchema('Max Date'),
+      displayFormat: stringEnumSchema('Display Format', ['short', 'medium', 'long']),
+      showCalendar: booleanSchema('Show calendar'),
+    }),
+    defaultProps: {
+      displayFormat: 'medium',
+      showCalendar: true,
+    },
+    bindings: { data: ['valuePath'], context: ['locale', 'timezone'] },
+    tokensUsed: ['--pf-control-height-md', '--pf-space-3', '--pf-color-primary-500'],
+  }),
   seed('platform.timeField', 'TimeField', 'Inputs', 'Time input with step and min/max constraints.', 'stable', {
     propsSchema: objectSchema('Time field', {
       label: stringSchema('Label'),
@@ -277,6 +331,24 @@ const CATALOG_SEEDS: SeedComponent[] = [
     },
     bindings: { data: ['valuePath'], context: ['timezone'] },
     tokensUsed: ['--pf-control-height-md', '--pf-font-size-sm', '--pf-surface-border'],
+  }),
+  seed('platform.timePicker', 'TimePicker', 'Inputs', 'Time picker with clock surface and keyboard-friendly input.', 'stable', {
+    propsSchema: objectSchema('Time picker', {
+      label: stringSchema('Label'),
+      helperText: stringSchema('Helper Text'),
+      step: numberSchema('Step (seconds)'),
+      minTime: stringSchema('Min Time'),
+      maxTime: stringSchema('Max Time'),
+      picker: booleanSchema('Show clock picker'),
+      timezone: stringSchema('Timezone'),
+    }),
+    defaultProps: {
+      step: 300,
+      picker: true,
+      timezone: 'UTC',
+    },
+    bindings: { data: ['valuePath'], context: ['timezone', 'locale'] },
+    tokensUsed: ['--pf-control-height-md', '--pf-space-3', '--pf-color-primary-500'],
   }),
   seed('platform.dateTimeField', 'DateTimeField', 'Inputs', 'Date-time input for scheduling with ISO output.', 'stable', {
     propsSchema: objectSchema('Date time field', {
@@ -770,9 +842,20 @@ export function validateComponentDefinition(value: unknown): RegistryValidationR
   }
 
   const rec = value as Record<string, unknown>;
+  const id = typeof rec.id === 'string' ? rec.id.trim() : '';
+  if (!id) {
+    issues.push({ path: 'id', message: 'id is required', severity: 'error' });
+  }
   const adapterHint = typeof rec.adapterHint === 'string' ? rec.adapterHint.trim() : '';
   if (!adapterHint) {
     issues.push({ path: 'adapterHint', message: 'adapterHint is required', severity: 'error' });
+  }
+  if (id && adapterHint && id !== adapterHint) {
+    issues.push({
+      path: 'id',
+      message: 'id should match adapterHint to preserve lifecycle consistency',
+      severity: 'warning',
+    });
   }
   if (adapterHint && !adapterHint.includes('.')) {
     issues.push({ path: 'adapterHint', message: 'adapterHint should be namespaced (e.g. platform.textField)', severity: 'warning' });
@@ -809,6 +892,41 @@ export function validateComponentDefinition(value: unknown): RegistryValidationR
 
   if (rec.status !== undefined && rec.status !== 'stable' && rec.status !== 'beta' && rec.status !== 'planned') {
     issues.push({ path: 'status', message: 'status must be stable|beta|planned', severity: 'error' });
+  }
+  if (rec.availability === undefined) {
+    issues.push({
+      path: 'availability',
+      message: 'availability is required and must be implemented|planned|external',
+      severity: 'error',
+    });
+  } else if (
+    rec.availability !== 'implemented' &&
+    rec.availability !== 'planned' &&
+    rec.availability !== 'external'
+  ) {
+    issues.push({
+      path: 'availability',
+      message: 'availability must be implemented|planned|external',
+      severity: 'error',
+    });
+  }
+  if (rec.supportsDrag !== undefined && typeof rec.supportsDrag !== 'boolean') {
+    issues.push({
+      path: 'supportsDrag',
+      message: 'supportsDrag must be a boolean when provided',
+      severity: 'error',
+    });
+  }
+  if (
+    rec.availability !== undefined &&
+    rec.supportsDrag === true &&
+    rec.availability !== 'implemented'
+  ) {
+    issues.push({
+      path: 'supportsDrag',
+      message: 'supportsDrag must be false when availability is planned or external',
+      severity: 'error',
+    });
   }
 
   if (rec.i18n !== undefined) {
@@ -850,15 +968,54 @@ export function mergeComponentDefinitions(
   });
 }
 
+export function listImplemented(
+  definitions: ComponentDefinition[] = builtinComponentDefinitions(),
+): ComponentDefinition[] {
+  return definitions
+    .map((definition) => enrichComponentDefinition(definition))
+    .filter((definition) => definition.availability === 'implemented');
+}
+
+export function isImplemented(
+  adapterHint: string,
+  definitions: ComponentDefinition[] = builtinComponentDefinitions(),
+): boolean {
+  return listImplemented(definitions).some((definition) => definition.adapterHint === adapterHint);
+}
+
+export function toPlatformComponentMeta(definition: ComponentDefinition): PlatformComponentMeta {
+  const enriched = enrichComponentDefinition(definition);
+  return {
+    id: enriched.adapterHint,
+    category: mapToPlatformCategory(enriched.category),
+    availability: enriched.availability,
+    propsSchema: enriched.propsSchema as PlatformJsonSchema,
+    supportsDrag: enriched.supportsDrag,
+  };
+}
+
+export function listPlatformComponentMeta(
+  definitions: ComponentDefinition[] = builtinComponentDefinitions(),
+): PlatformComponentMeta[] {
+  return definitions.map((definition) => toPlatformComponentMeta(definition));
+}
+
 export function isPaletteComponentEnabled(definition: ComponentDefinition): boolean {
-  return definition.status !== 'planned' && !definition.palette?.disabled;
+  const enriched = enrichComponentDefinition(definition);
+  if (enriched.availability !== 'implemented') return false;
+  if (!enriched.supportsDrag) return false;
+  return !enriched.palette?.disabled;
 }
 
 export function enrichComponentDefinition(definition: ComponentDefinition): ComponentDefinition {
   const fallbackBase = `registry.components.${toKeySegment(definition.adapterHint)}`;
   const allowedProps = readSchemaPropertyKeys(definition.propsSchema);
+  const availability =
+    definition.availability ?? inferAvailability(definition.adapterHint, definition.status ?? 'stable');
+  const supportsDrag = availability === 'implemented' && (definition.supportsDrag ?? true);
   return {
     ...definition,
+    id: definition.id || definition.adapterHint,
     description: definition.description || definition.propsSchema.description || definition.displayName,
     examples: definition.examples?.length
       ? definition.examples
@@ -889,9 +1046,17 @@ export function enrichComponentDefinition(definition: ComponentDefinition): Comp
       ...(definition.accessibility ?? {}),
     },
     tokensUsed: definition.tokensUsed ?? [],
+    availability,
+    supportsDrag,
     palette: {
-      disabled: definition.palette?.disabled ?? definition.status === 'planned',
-      reason: definition.palette?.reason ?? (definition.status === 'planned' ? 'Not implemented yet' : undefined),
+      disabled: definition.palette?.disabled ?? !supportsDrag,
+      reason:
+        definition.palette?.reason ??
+        (availability === 'planned'
+          ? 'Not implemented yet'
+          : availability === 'external'
+            ? 'Requires external adapter'
+            : undefined),
     },
   };
 }
@@ -903,6 +1068,7 @@ function seed(
   description: string,
   status: ComponentStatus,
   overrides?: {
+    availability?: ComponentAvailability;
     propsSchema?: JsonSchema;
     defaultProps?: Record<string, JSONValue>;
     examples?: ComponentExample[];
@@ -921,6 +1087,7 @@ function seed(
     category,
     description,
     status,
+    availability: overrides?.availability,
     propsSchema: overrides?.propsSchema,
     defaultProps: overrides?.defaultProps,
     examples: overrides?.examples,
@@ -934,8 +1101,11 @@ function toDefinition(seedComponent: SeedComponent): ComponentDefinition {
   const keySegment = toKeySegment(seedComponent.adapterHint);
   const propsSchema = seedComponent.propsSchema ?? objectSchema(seedComponent.description, {});
   const schemaProps = readSchemaPropertyKeys(propsSchema);
+  const availability = seedComponent.availability ?? inferAvailability(seedComponent.adapterHint, seedComponent.status);
+  const supportsDrag = availability === 'implemented';
 
   return {
+    id: seedComponent.adapterHint,
     adapterHint: seedComponent.adapterHint,
     displayName: seedComponent.displayName,
     description: seedComponent.description,
@@ -960,9 +1130,11 @@ function toDefinition(seedComponent: SeedComponent): ComponentDefinition {
       },
       supportsRules: COMMON_RULES,
       notes: [
-        seedComponent.status === 'planned'
+        availability === 'planned'
           ? 'Planned component. Disabled in builder palette until implementation is available.'
-          : 'Available in builder palette and runtime renderer.',
+          : availability === 'external'
+            ? 'Provided by optional adapter integration.'
+            : 'Available in builder palette and runtime renderer.',
       ],
     },
     accessibility: {
@@ -974,11 +1146,36 @@ function toDefinition(seedComponent: SeedComponent): ComponentDefinition {
     },
     tokensUsed: seedComponent.tokensUsed ?? [],
     status: seedComponent.status,
+    availability,
+    supportsDrag,
     palette: {
-      disabled: seedComponent.status === 'planned',
-      reason: seedComponent.status === 'planned' ? 'Not implemented yet' : undefined,
+      disabled: !supportsDrag,
+      reason:
+        availability === 'planned'
+          ? 'Not implemented yet'
+          : availability === 'external'
+            ? 'Requires external adapter'
+            : undefined,
     },
   };
+}
+
+function inferAvailability(
+  adapterHint: string,
+  status: ComponentStatus,
+): ComponentAvailability {
+  if (!adapterHint.startsWith('platform.')) return 'external';
+  if (status === 'planned') return 'planned';
+  return PLATFORM_IMPLEMENTED_COMPONENT_HINTS.has(adapterHint) ? 'implemented' : 'planned';
+}
+
+function mapToPlatformCategory(category: ComponentCategory | string): PlatformComponentCategory {
+  const normalized = category.trim().toLowerCase();
+  if (normalized.includes('input')) return 'input';
+  if (normalized.includes('layout')) return 'layout';
+  if (normalized.includes('navigation')) return 'navigation';
+  if (normalized.includes('feedback')) return 'feedback';
+  return 'display';
 }
 
 function objectSchema(description: string, properties: Record<string, JsonSchema>): JsonSchema {

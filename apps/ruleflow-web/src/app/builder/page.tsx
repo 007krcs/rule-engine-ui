@@ -18,7 +18,7 @@ import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
 import { registerD3Adapter } from '@platform/react-d3-adapter';
 import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import type { ComponentDefinition } from '@platform/component-registry';
-import { builtinComponentDefinitions } from '@platform/component-registry';
+import { builtinComponentDefinitions, isPaletteComponentEnabled } from '@platform/component-registry';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { ConfigVersion } from '@/lib/demo/types';
@@ -429,6 +429,9 @@ function PaletteItem({
   onSelect: () => void;
 }) {
   const id = `palette:${def.adapterHint}`;
+  const availability = def.availability ?? (def.status === 'planned' ? 'planned' : 'implemented');
+  const planned = availability === 'planned';
+  const disabledReason = def.palette?.reason ?? 'Not available yet';
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,
     data: { kind: 'palette', adapterHint: def.adapterHint, label: def.displayName },
@@ -446,15 +449,17 @@ function PaletteItem({
       type="button"
       style={style}
       data-testid={`palette-item-${toTestIdSuffix(def.adapterHint)}`}
+      data-availability={availability}
       className={`${styles.paletteButton} ${selected ? styles.paletteButtonActive : ''}`}
       onClick={onSelect}
       disabled={disabled}
+      title={planned ? disabledReason : undefined}
       {...attributes}
       {...listeners}
     >
       <span>{def.displayName}</span>
       <Badge variant="muted">{def.adapterHint}</Badge>
-      {def.palette?.disabled ? <Badge variant="warning">{def.palette.reason ?? 'Planned'}</Badge> : null}
+      {planned ? <Badge variant="warning">{disabledReason}</Badge> : null}
     </button>
   );
 }
@@ -477,6 +482,9 @@ export default function BuilderPage() {
   const [loading, setLoading] = useState(Boolean(versionId));
   const [registryLoading, setRegistryLoading] = useState(false);
   const [registry, setRegistry] = useState<ComponentDefinition[]>(() => BUILTIN_COMPONENT_DEFS);
+  const [showPlannedComponents, setShowPlannedComponents] = useState(false);
+  const [replaceTargetComponentId, setReplaceTargetComponentId] = useState<string | null>(null);
+  const [replacementAdapterHint, setReplacementAdapterHint] = useState('');
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
   const [templateSummary, setTemplateSummary] = useState<TemplateSummary | null>(null);
   const [setupChecklistOpen, setSetupChecklistOpen] = useState(checklistFromUrl);
@@ -585,6 +593,26 @@ export default function BuilderPage() {
   useEffect(() => {
     setDragReady(true);
   }, []);
+
+  useEffect(() => {
+    const onReplaceRequest = (rawEvent: Event) => {
+      const event = rawEvent as CustomEvent<{ componentId?: string; adapterHint?: string }>;
+      const componentId = event.detail?.componentId;
+      if (!componentId) return;
+      setSelectedComponentId(componentId);
+      setReplaceTargetComponentId(componentId);
+      toast({
+        variant: 'info',
+        title: 'Choose a replacement',
+        description: 'Pick a supported component in the inspector and apply replacement.',
+      });
+    };
+
+    window.addEventListener('ruleflow:replace-component-request', onReplaceRequest as EventListener);
+    return () => {
+      window.removeEventListener('ruleflow:replace-component-request', onReplaceRequest as EventListener);
+    };
+  }, [toast]);
 
   useEffect(() => {
     if (previewFromUrl === '1') setPreviewMode(true);
@@ -784,11 +812,11 @@ export default function BuilderPage() {
 
     const def = registry.find((item) => item.adapterHint === draft.adapterHint) ?? registry[0];
     if (!def) return;
-    if (def.palette?.disabled) {
+    if (!isPaletteComponentEnabled(def)) {
       toast({
         variant: 'error',
         title: 'Component unavailable',
-        description: def.palette.reason ?? 'This component is planned but not implemented yet.',
+        description: def.palette?.reason ?? 'This component is planned and not available yet.',
       });
       return;
     }
@@ -861,6 +889,39 @@ export default function BuilderPage() {
     : -1;
   const selectedDefinition =
     selectedComponent ? registry.find((def) => def.adapterHint === selectedComponent.adapterHint) ?? null : null;
+  const visiblePaletteDefinitions = useMemo(
+    () =>
+      registry.filter(
+        (definition) => showPlannedComponents || definition.availability !== 'planned',
+      ),
+    [registry, showPlannedComponents],
+  );
+  const supportedReplacementDefinitions = useMemo(
+    () =>
+      registry.filter(
+        (definition) =>
+          definition.availability === 'implemented' &&
+          isPaletteComponentEnabled(definition),
+      ),
+    [registry],
+  );
+  const replaceTargetComponent = useMemo(
+    () =>
+      replaceTargetComponentId
+        ? components.find((component) => component.id === replaceTargetComponentId) ?? null
+        : null,
+    [components, replaceTargetComponentId],
+  );
+
+  useEffect(() => {
+    if (!selectedComponent) return;
+    const unsupported =
+      !selectedDefinition ||
+      selectedDefinition.availability === 'planned' ||
+      !isPaletteComponentEnabled(selectedDefinition);
+    if (!unsupported) return;
+    setReplaceTargetComponentId(selectedComponent.id);
+  }, [selectedComponent, selectedDefinition]);
 
   const focusComponent = (componentId: string) => {
     setSelectedComponentId(componentId);
@@ -871,6 +932,52 @@ export default function BuilderPage() {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }, 50);
+  };
+
+  useEffect(() => {
+    if (!replaceTargetComponent) {
+      setReplacementAdapterHint('');
+      return;
+    }
+    setReplacementAdapterHint((current) => {
+      if (
+        current &&
+        supportedReplacementDefinitions.some((definition) => definition.adapterHint === current)
+      ) {
+        return current;
+      }
+      return supportedReplacementDefinitions[0]?.adapterHint ?? '';
+    });
+  }, [replaceTargetComponent, supportedReplacementDefinitions]);
+
+  const applyReplacementComponent = () => {
+    if (!replaceTargetComponent || !replacementAdapterHint) return;
+    const nextDefinition = supportedReplacementDefinitions.find(
+      (definition) => definition.adapterHint === replacementAdapterHint,
+    );
+    if (!nextDefinition) return;
+
+    setSchema((current) =>
+      withUpdatedComponents(current, (currentComponents) =>
+        currentComponents.map((component) => {
+          if (component.id !== replaceTargetComponent.id) return component;
+          return {
+            ...component,
+            type: deriveType(nextDefinition.adapterHint),
+            adapterHint: nextDefinition.adapterHint,
+            props: nextDefinition.defaultProps
+              ? stripRawI18nProps(deepCloneJson(nextDefinition.defaultProps))
+              : component.props,
+          };
+        }),
+      ),
+    );
+    setReplaceTargetComponentId(null);
+    toast({
+      variant: 'success',
+      title: 'Component replaced',
+      description: `${replaceTargetComponent.id} now uses ${nextDefinition.displayName}.`,
+    });
   };
 
   const effectivePreviewContext = useMemo(
@@ -1149,11 +1256,11 @@ export default function BuilderPage() {
       const adapterHint = activeId.slice('palette:'.length);
       const def = registry.find((item) => item.adapterHint === adapterHint);
       if (!def) return;
-      if (def.palette?.disabled) {
+      if (!isPaletteComponentEnabled(def)) {
         toast({
           variant: 'error',
           title: 'Component unavailable',
-          description: def.palette.reason ?? 'This component is not implemented yet.',
+          description: def.palette?.reason ?? 'This component is planned and not available yet.',
         });
         return;
       }
@@ -1411,12 +1518,21 @@ export default function BuilderPage() {
                 </CardHeader>
                 <CardContent className={cn(styles.paletteContent, styles.panelContentScrollable)}>
                   {registryLoading ? <p className={styles.canvasHint}>Loading registry...</p> : null}
-                  {registry.map((def) => (
+                  <label className={styles.checkboxRow}>
+                    <input
+                      type="checkbox"
+                      checked={showPlannedComponents}
+                      onChange={(event) => setShowPlannedComponents(Boolean(event.target.checked))}
+                      data-testid="builder-toggle-show-planned"
+                    />
+                    <span>Show planned components</span>
+                  </label>
+                  {visiblePaletteDefinitions.map((def) => (
                     <PaletteItem
                       key={def.adapterHint}
                       def={def}
                       selected={draft.adapterHint === def.adapterHint}
-                      disabled={loading || registryLoading || Boolean(def.palette?.disabled)}
+                      disabled={loading || registryLoading || !isPaletteComponentEnabled(def)}
                       onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
                     />
                   ))}
@@ -1677,6 +1793,49 @@ export default function BuilderPage() {
                   </Card>
                 ) : null}
 
+                {replaceTargetComponent ? (
+                  <Card data-testid="builder-replace-component-card">
+                    <CardHeader>
+                      <CardTitle>Replace Unsupported Component</CardTitle>
+                    </CardHeader>
+                    <CardContent className={styles.addStack}>
+                      <p className={styles.canvasHint}>
+                        <code>{replaceTargetComponent.adapterHint}</code> is unavailable. Choose a supported replacement.
+                      </p>
+                      <Select
+                        value={replacementAdapterHint}
+                        onChange={(event) => setReplacementAdapterHint(event.target.value)}
+                        data-testid="builder-replace-component-select"
+                      >
+                        {supportedReplacementDefinitions.map((definition) => (
+                          <option key={definition.adapterHint} value={definition.adapterHint}>
+                            {definition.category} - {definition.displayName} ({definition.adapterHint})
+                          </option>
+                        ))}
+                      </Select>
+                      <div className={styles.actions}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={applyReplacementComponent}
+                          disabled={!replacementAdapterHint}
+                          data-testid="builder-replace-component-apply"
+                        >
+                          Apply replacement
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setReplaceTargetComponentId(null)}
+                        >
+                          Dismiss
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 {selectedComponent ? (
                   <ComponentEditor
                     component={selectedComponent}
@@ -1770,4 +1929,8 @@ export default function BuilderPage() {
 function deriveType(adapterHint: string): string {
   const parts = adapterHint.split('.');
   return parts[parts.length - 1] || adapterHint;
+}
+
+function deepCloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }

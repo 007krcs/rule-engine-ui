@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { builtinComponentDefinitions, validateComponentRegistryManifest } from '../src/index';
+import {
+  builtinComponentDefinitions,
+  isImplemented,
+  isPaletteComponentEnabled,
+  listImplemented,
+  validateComponentRegistryManifest,
+} from '../src/index';
 
 describe('@platform/component-registry', () => {
   it('validates a manifest with builtin components', () => {
@@ -50,5 +56,21 @@ describe('@platform/component-registry', () => {
 
     expect(clock).toBeTruthy();
     expect(clock?.i18n?.nameKey).toContain('registry.components.platform.clock');
+  });
+
+  it('tracks implemented availability explicitly', () => {
+    const definitions = builtinComponentDefinitions();
+    const implemented = listImplemented(definitions);
+    expect(implemented.length).toBeGreaterThan(0);
+    expect(isImplemented('platform.chip', definitions)).toBe(true);
+    expect(isImplemented('platform.svgIcon', definitions)).toBe(false);
+  });
+
+  it('marks planned entries as non-draggable by default', () => {
+    const definitions = builtinComponentDefinitions();
+    const planned = definitions.find((definition) => definition.adapterHint === 'platform.svgIcon');
+    expect(planned).toBeTruthy();
+    expect(planned?.availability).toBe('planned');
+    expect(planned ? isPaletteComponentEnabled(planned) : true).toBe(false);
   });
 });

@@ -1843,6 +1843,16 @@
     font-size: var(--pf-font-size-sm);
   }
 
+  .pf-chip--sm {
+    min-block-size: 1.375rem;
+    padding: 2px var(--pf-space-2);
+    font-size: var(--pf-font-size-xs);
+  }
+
+  .pf-chip--md {
+    min-block-size: 1.75rem;
+  }
+
   .pf-chip--filled {
     background: color-mix(in srgb, var(--pf-color-neutral-100) 65%, transparent);
   }
@@ -1872,6 +1882,17 @@
     color: var(--pf-color-error-700);
   }
 
+  .pf-chip--info {
+    color: var(--pf-color-primary-700);
+    background: color-mix(in srgb, var(--pf-color-primary-100) 48%, transparent);
+  }
+
+  .pf-chip__icon {
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .pf-chip__dismiss,
   .pf-chip__delete {
     border: 0;
     background: transparent;
@@ -1905,6 +1926,17 @@
     border: 1px solid var(--pf-surface-layer);
   }
 
+  .pf-badge--dot .pf-badge__content {
+    min-inline-size: 0.7rem;
+    block-size: 0.7rem;
+    padding-inline: 0;
+  }
+
+  .pf-badge__content--dot {
+    font-size: 0;
+    line-height: 0;
+  }
+
   .pf-badge__content--neutral {
     background: var(--pf-color-neutral-700);
   }
@@ -1919,6 +1951,10 @@
 
   .pf-badge__content--error {
     background: var(--pf-color-error-500);
+  }
+
+  .pf-badge__content--info {
+    background: var(--pf-color-primary-500);
   }
 
   .pf-avatar {
@@ -2020,6 +2056,10 @@
     border-block-end: 0;
     border-inline-end: 1px solid var(--pf-surface-border);
     margin: 0 var(--pf-space-2);
+  }
+
+  .pf-divider--inset:not(.pf-divider--vertical) {
+    margin-inline: var(--pf-space-4);
   }
 
   .pf-typography {

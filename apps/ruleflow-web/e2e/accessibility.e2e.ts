@@ -53,3 +53,10 @@ test('axe scan on translation editor has no serious or critical violations', asy
   await expect(page.getByText('Translation Editor')).toBeVisible();
   await runAxe(page);
 });
+
+test('axe scan on theme studio has no serious or critical violations', async ({ page }) => {
+  await page.goto('/system/theme-studio');
+  await waitForClientReady(page);
+  await expect(page.getByRole('main').getByRole('heading', { level: 1, name: 'Theme Studio' })).toBeVisible();
+  await runAxe(page);
+});
