@@ -89,4 +89,35 @@ describe('validator', () => {
     expect(result.valid).toBe(false);
     expect(result.issues[0]?.message).toContain('Missing translation');
   });
+
+  it('validates date and time validation ranges', () => {
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'date-validation',
+      layout: { id: 'root', type: 'section', componentIds: ['dateField'] },
+      components: [
+        {
+          id: 'dateField',
+          type: 'input',
+          adapterHint: 'platform.dateField',
+          validations: {
+            minDate: '2026-12-10',
+            maxDate: '2026-01-10',
+            minTime: '18:30',
+            maxTime: '10:30',
+          },
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.customerName.aria',
+            keyboardNav: true,
+            focusOrder: 1,
+          },
+        },
+      ],
+    };
+
+    const result = validateUISchema(schema);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((issue) => issue.message.includes('minDate'))).toBe(true);
+    expect(result.issues.some((issue) => issue.message.includes('minTime'))).toBe(true);
+  });
 });

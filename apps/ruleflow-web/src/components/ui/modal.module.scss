@@ -1,0 +1,134 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+:global([data-density='compact']) .overlay {
+  padding: 16px 12px;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(960px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  box-shadow: var(--rf-shadow-soft);
+}
+
+.sizeSm {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.sizeMd {
+  width: min(820px, calc(100vw - 32px));
+}
+
+.sizeLg {
+  width: min(1100px, calc(100vw - 32px));
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-4);
+  padding: var(--rf-space-5) var(--rf-space-6);
+  border-bottom: 1px solid var(--rf-border);
+  background: color-mix(in srgb, var(--rf-surface) 92%, transparent);
+}
+
+.titleWrap {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.description {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--rf-space-5) var(--rf-space-6);
+}
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  padding: var(--rf-space-5) var(--rf-space-6);
+  border-top: 1px solid var(--rf-border);
+  background: color-mix(in srgb, var(--rf-surface) 94%, transparent);
+}
+
+@media (max-width: 900px) {
+  .overlay {
+    padding: 8px;
+  }
+
+  .dialog,
+  .sizeSm,
+  .sizeMd,
+  .sizeLg {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .header,
+  .body,
+  .footer {
+    padding: var(--rf-space-4);
+  }
+}
+
+@media (max-width: 600px) {
+  .overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .dialog,
+  .sizeSm,
+  .sizeMd,
+  .sizeLg {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+}

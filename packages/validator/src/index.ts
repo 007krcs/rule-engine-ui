@@ -38,6 +38,7 @@ export function validateUISchema(value: UISchema): ValidationResult {
     validateWithSchema(validators.ui, value),
     validateAccessibility(value),
     validateI18nKeyUsage(value),
+    validateComponentDateValidations(value),
   );
 }
 
@@ -252,6 +253,66 @@ function validateI18nKeyUsage(uiSchemaValue: UISchema): ValidationResult {
   return { valid: issues.length === 0, issues };
 }
 
+function validateComponentDateValidations(uiSchemaValue: UISchema): ValidationResult {
+  const issues: ValidationIssue[] = [];
+
+  for (const component of uiSchemaValue.components) {
+    const validations = component.validations;
+    if (!validations) continue;
+    const basePath = `components.${component.id}.validations`;
+
+    if (validations.minDate && !isIsoDateString(validations.minDate)) {
+      issues.push({
+        path: `${basePath}.minDate`,
+        message: 'minDate must use YYYY-MM-DD format',
+        severity: 'error',
+      });
+    }
+
+    if (validations.maxDate && !isIsoDateString(validations.maxDate)) {
+      issues.push({
+        path: `${basePath}.maxDate`,
+        message: 'maxDate must use YYYY-MM-DD format',
+        severity: 'error',
+      });
+    }
+
+    if (validations.minDate && validations.maxDate && validations.minDate > validations.maxDate) {
+      issues.push({
+        path: basePath,
+        message: 'minDate cannot be after maxDate',
+        severity: 'error',
+      });
+    }
+
+    if (validations.minTime && !isTimeString(validations.minTime)) {
+      issues.push({
+        path: `${basePath}.minTime`,
+        message: 'minTime must use HH:mm format',
+        severity: 'error',
+      });
+    }
+
+    if (validations.maxTime && !isTimeString(validations.maxTime)) {
+      issues.push({
+        path: `${basePath}.maxTime`,
+        message: 'maxTime must use HH:mm format',
+        severity: 'error',
+      });
+    }
+
+    if (validations.minTime && validations.maxTime && validations.minTime > validations.maxTime) {
+      issues.push({
+        path: basePath,
+        message: 'minTime cannot be after maxTime',
+        severity: 'error',
+      });
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
 function assertValid(label: string, result: ValidationResult): void {
   if (result.valid) return;
   const details = result.issues.map((issue) => `${issue.path || 'root'}: ${issue.message}`).join('; ');
@@ -310,6 +371,14 @@ function hasMessage(bundles: TranslationBundle[], locale: string, namespace: str
     if (bundle.messages[key] !== undefined) return true;
   }
   return false;
+}
+
+function isIsoDateString(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+}
+
+function isTimeString(value: string): boolean {
+  return /^\d{2}:\d{2}$/.test(value.trim());
 }
 
 function validateDateOperators(value: RuleSet): ValidationResult {

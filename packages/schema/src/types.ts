@@ -73,6 +73,7 @@ export interface UIGridItem {
   y: number;
   w: number;
   h: number;
+  layer?: number;
   breakpoint?: LayoutBreakpoint;
   props?: Record<string, JSONValue>;
   bindings?: BindingSpec;
@@ -119,6 +120,10 @@ export interface ValidationSpec {
   min?: number;
   max?: number;
   regex?: string;
+  minDate?: string;
+  maxDate?: string;
+  minTime?: string;
+  maxTime?: string;
   rules?: string[];
 }
 

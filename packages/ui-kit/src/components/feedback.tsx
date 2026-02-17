@@ -74,6 +74,40 @@ export function PFDialog({
 
   useEffect(() => {
     if (!open) return;
+
+    const body = document.body;
+    const root = document.documentElement;
+    const lockCount = Number(body.getAttribute('data-rf-modal-lock-count') ?? '0');
+
+    body.setAttribute('data-rf-modal-lock-count', String(lockCount + 1));
+    if (lockCount === 0) {
+      const scrollbarWidth = window.innerWidth - root.clientWidth;
+      body.setAttribute('data-rf-modal-prev-overflow', body.style.overflow);
+      body.setAttribute('data-rf-modal-prev-padding-right', body.style.paddingRight);
+      root.setAttribute('data-rf-modal-prev-overflow', root.style.overflow);
+      body.style.overflow = 'hidden';
+      root.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+    }
+
+    return () => {
+      const nextCount = Math.max(0, Number(body.getAttribute('data-rf-modal-lock-count') ?? '1') - 1);
+      body.setAttribute('data-rf-modal-lock-count', String(nextCount));
+      if (nextCount === 0) {
+        body.style.overflow = body.getAttribute('data-rf-modal-prev-overflow') ?? '';
+        body.style.paddingRight = body.getAttribute('data-rf-modal-prev-padding-right') ?? '';
+        root.style.overflow = root.getAttribute('data-rf-modal-prev-overflow') ?? '';
+        body.removeAttribute('data-rf-modal-prev-overflow');
+        body.removeAttribute('data-rf-modal-prev-padding-right');
+        root.removeAttribute('data-rf-modal-prev-overflow');
+      }
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose?.();
     };

@@ -1,0 +1,57 @@
+.panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border-left: 1px solid var(--pf-surface-border);
+  background: color-mix(in srgb, var(--pf-surface-layer) 97%, var(--pf-color-neutral-50));
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.header {
+  display: grid;
+  gap: 12px;
+}
+
+.controls {
+  display: grid;
+  gap: 14px;
+}
+
+.controlBlock {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-layer);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  margin: 0;
+  font-size: var(--pf-font-size-xs);
+  font-weight: var(--pf-font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pf-surface-text-muted);
+}
+
+.helper {
+  margin: 0;
+  font-size: var(--pf-font-size-xs);
+  color: var(--pf-surface-text-muted);
+}
+
+.unsupported {
+  margin: 0;
+  font-size: var(--pf-font-size-sm);
+  color: var(--pf-surface-text-muted);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--pf-font-size-sm);
+  color: var(--pf-surface-text-muted);
+}

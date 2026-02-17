@@ -1,0 +1,199 @@
+.shell {
+  --builder-palette-width: 320px;
+  --builder-inspector-width: 360px;
+  display: grid;
+  grid-template-columns:
+    var(--builder-palette-width)
+    10px
+    minmax(0, 1fr)
+    10px
+    var(--builder-inspector-width);
+  gap: 0;
+  width: 100%;
+  height: calc(100dvh - var(--builder-shell-offset, 260px));
+  min-height: 0;
+  border: 1px solid color-mix(in srgb, var(--rf-border) 72%, transparent);
+  border-radius: var(--rf-radius-lg);
+  background: color-mix(in srgb, var(--rf-surface) 90%, transparent);
+  box-shadow: var(--rf-shadow-soft);
+  overflow: hidden;
+}
+
+.mobileShell {
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid color-mix(in srgb, var(--rf-border) 72%, transparent);
+}
+
+.sidePane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  z-index: 3;
+  padding: var(--rf-space-3);
+  background: color-mix(in srgb, var(--rf-surface) 95%, transparent);
+}
+
+.splitter {
+  min-height: 0;
+  position: relative;
+  cursor: col-resize;
+  background: color-mix(in srgb, var(--rf-border) 30%, transparent);
+}
+
+.splitter::before {
+  content: '';
+  position: absolute;
+  inset: 20px 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rf-border) 76%, transparent);
+  transition: background-color 120ms ease;
+}
+
+.splitter:hover::before,
+.splitter:focus-visible::before {
+  background: color-mix(in srgb, var(--rf-primary) 42%, var(--rf-border));
+}
+
+.splitter:focus-visible {
+  outline: 2px solid var(--rf-focus);
+  outline-offset: -2px;
+}
+
+.workspace {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--rf-accent) 10%, transparent), transparent 52%),
+    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--rf-primary) 10%, transparent), transparent 48%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rf-surface) 96%, transparent), color-mix(in srgb, var(--rf-surface-2) 92%, transparent));
+}
+
+.workspace::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image:
+    radial-gradient(circle at 20% 30%, var(--rf-fg) 0.8px, transparent 0.9px),
+    radial-gradient(circle at 70% 65%, var(--rf-fg) 0.8px, transparent 0.9px);
+  background-size: 18px 18px, 22px 22px;
+}
+
+.toolbar {
+  min-width: 0;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  gap: var(--rf-space-3);
+  padding: var(--rf-space-3);
+  border-bottom: 1px solid color-mix(in srgb, var(--rf-border) 80%, transparent);
+  background: color-mix(in srgb, var(--rf-surface) 90%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.panelActionButton {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-sm);
+  background: var(--rf-surface);
+  color: var(--rf-fg);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.panelActionButton:hover {
+  background: color-mix(in srgb, var(--rf-surface-2) 82%, transparent);
+}
+
+.panelActionButtonActive {
+  border-color: color-mix(in srgb, var(--rf-primary) 40%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface));
+}
+
+.viewport {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  contain: layout paint size;
+  padding: var(--rf-space-3);
+  scrollbar-gutter: stable both-edges;
+}
+
+.mobileControls {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-2);
+}
+
+.mobilePanelsButton {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-sm);
+  background: var(--rf-surface);
+  color: var(--rf-fg);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.mobilePanelsButton:hover {
+  background: var(--rf-surface-2);
+}
+
+.mobileTabs {
+  display: inline-flex;
+  gap: var(--rf-space-2);
+}
+
+.mobileTab {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-sm);
+  background: var(--rf-surface);
+  color: var(--rf-muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.mobileTabActive {
+  color: var(--rf-fg);
+  border-color: color-mix(in srgb, var(--rf-primary) 36%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 8%, var(--rf-surface));
+}
+
+.mobilePanel {
+  min-height: 0;
+  max-height: min(45vh, 420px);
+  overflow: auto;
+  border-bottom: 1px solid var(--rf-border);
+  padding: var(--rf-space-3);
+  background: var(--rf-surface);
+}
+
+@media (max-width: 1199px) {
+  .shell {
+    height: calc(100dvh - var(--builder-shell-offset-mobile, 218px));
+    border-radius: var(--rf-radius-md);
+  }
+
+  .mobileControls {
+    display: flex;
+  }
+}

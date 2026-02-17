@@ -9,13 +9,51 @@ import {
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import type { I18nProvider } from '@platform/i18n';
 import type { ExecutionContext, JSONValue, UIComponent, UIGridItem, UISchema } from '@platform/schema';
 import { RenderPage } from '@platform/react-renderer';
 import { cn } from '@/lib/utils';
+import {
+  clampGridRect,
+  clampNumber,
+  clientToLogicalPoint,
+  gridRectToPx,
+  maxRowsFromArtboard,
+  pxRectToGrid,
+  withRowStep,
+  deriveGridUnitMetrics,
+  type GridRect,
+  type PxRect,
+} from './canvas-coordinates';
 import styles from './grid-canvas.module.scss';
+
+type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+export type CanvasInteraction = {
+  componentId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  mode: 'drag' | 'resize';
+  px: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+};
+
+export type GridCanvasMetrics = {
+  cellWidth: number;
+  colStep: number;
+  rowStep: number;
+  rowHeight: number;
+  gap: number;
+  zoom: number;
+  surfaceRect: DOMRect | null;
+  viewportRect: DOMRect | null;
+};
 
 export type GridCanvasProps = {
   components: UIComponent[];
@@ -29,16 +67,19 @@ export type GridCanvasProps = {
   i18n: I18nProvider;
   disabled?: boolean;
   showGrid?: boolean;
+  showRulers?: boolean;
+  showGuides?: boolean;
+  showMarginGuides?: boolean;
+  lockAspectRatio?: boolean;
+  artboardWidth?: number;
+  artboardHeight?: number;
+  zoom?: number;
+  snap?: boolean;
   onSelect: (componentId: string) => void;
   onRemove: (componentId: string) => void;
-  onMove: (componentId: string, x: number, y: number) => void;
-  onResize: (componentId: string, w: number, h: number) => void;
-  onMetricsChange?: (metrics: {
-    cellWidth: number;
-    rowHeight: number;
-    gap: number;
-    canvasRect: DOMRect | null;
-  }) => void;
+  onUpdateLayout: (componentId: string, next: GridRect) => void;
+  onInteractionChange?: (interaction: CanvasInteraction | null) => void;
+  onMetricsChange?: (metrics: GridCanvasMetrics) => void;
 };
 
 type GridItemCardProps = {
@@ -46,18 +87,48 @@ type GridItemCardProps = {
   component: UIComponent | null;
   selected: boolean;
   disabled: boolean;
-  cellWidth: number;
-  rowHeight: number;
-  gap: number;
   columns: number;
+  maxRows: number;
+  gap: number;
+  zoom: number;
+  snap: boolean;
+  lockAspectRatio: boolean;
+  showGuides: boolean;
+  metrics: ReturnType<typeof withRowStep>;
+  getSurfaceRect: () => DOMRect | null;
   data: Record<string, JSONValue>;
   context: ExecutionContext;
   i18n: I18nProvider;
   onSelect: (componentId: string) => void;
   onRemove: (componentId: string) => void;
-  onMove: (componentId: string, x: number, y: number) => void;
-  onResize: (componentId: string, w: number, h: number) => void;
+  onUpdateLayout: (componentId: string, next: GridRect) => void;
+  onInteractionChange?: (interaction: CanvasInteraction | null) => void;
+  onGuideLinesChange: (guides: { x: number[]; y: number[] } | null) => void;
+  layerOrder: number;
 };
+
+type PointerMoveMode =
+  | {
+      kind: 'drag';
+      startRect: GridRect;
+      startPx: PxRect;
+      startPointer: { x: number; y: number };
+    }
+  | {
+      kind: 'resize';
+      handle: ResizeDirection;
+      startRect: GridRect;
+      startPx: PxRect;
+      startPointer: { x: number; y: number };
+      aspect: number;
+    };
+
+const RULER_SIZE = 24;
+const FRAME_PADDING = 40;
+const MARGIN_GUIDE_PX = 24;
+const RULER_TICK_STEP = 50;
+
+const RESIZE_HANDLES: ResizeDirection[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
 export function GridCanvas({
   components,
@@ -71,26 +142,22 @@ export function GridCanvas({
   i18n,
   disabled = false,
   showGrid = true,
+  showRulers = true,
+  showGuides = true,
+  showMarginGuides = true,
+  lockAspectRatio = false,
+  artboardWidth = 1440,
+  artboardHeight = 900,
+  zoom = 100,
+  snap = true,
   onSelect,
   onRemove,
-  onMove,
-  onResize,
+  onUpdateLayout,
+  onInteractionChange,
   onMetricsChange,
 }: GridCanvasProps) {
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const [canvasWidth, setCanvasWidth] = useState(1200);
-
-  useEffect(() => {
-    const node = canvasRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      setCanvasWidth(Math.max(360, Math.floor(entry.contentRect.width)));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
 
   const componentById = useMemo(
     () => new Map(components.map((component) => [component.id, component])),
@@ -98,61 +165,207 @@ export function GridCanvas({
   );
 
   const safeColumns = Math.max(1, columns);
-  const safeGap = Math.max(1, gap);
-  const safeRowHeight = Math.max(20, rowHeight);
-  const totalGap = safeGap * Math.max(0, safeColumns - 1);
-  const cellWidth = Math.max(48, (canvasWidth - totalGap) / safeColumns);
+  const safeGap = Math.max(0, gap);
+  const safeRowHeight = Math.max(12, rowHeight);
+  const safeWidth = Math.max(375, Math.trunc(artboardWidth));
+  const safeHeight = Math.max(500, Math.trunc(artboardHeight));
+  const safeZoom = clampNumber(zoom / 100, 0.5, 2);
 
-  const rows = useMemo(
-    () => Math.max(6, ...items.map((item) => item.y + item.h + 1)),
-    [items],
-  );
-  const minHeight = rows * safeRowHeight + Math.max(0, rows - 1) * safeGap + 16;
+  const baseMetrics = deriveGridUnitMetrics(safeWidth, safeColumns, safeGap);
+  const metrics = withRowStep(baseMetrics, safeRowHeight, safeGap);
+  const maxRows = maxRowsFromArtboard(safeHeight, safeRowHeight, safeGap);
 
-  useEffect(() => {
+  const [guideLines, setGuideLines] = useState<{ x: number[]; y: number[] } | null>(null);
+
+  const getSurfaceRect = () => surfaceRef.current?.getBoundingClientRect() ?? null;
+
+  const scaledWidth = Math.round(safeWidth * safeZoom);
+  const scaledHeight = Math.round(safeHeight * safeZoom);
+  const rulerOffset = showRulers ? RULER_SIZE : 0;
+  const frameWidth = scaledWidth + FRAME_PADDING * 2 + rulerOffset;
+  const frameHeight = scaledHeight + FRAME_PADDING * 2 + rulerOffset;
+  const artboardLeft = FRAME_PADDING + rulerOffset;
+  const artboardTop = FRAME_PADDING;
+
+  const publishMetrics = () => {
     onMetricsChange?.({
-      cellWidth,
+      cellWidth: metrics.cellWidth,
+      colStep: metrics.colStep,
+      rowStep: metrics.rowStep,
       rowHeight: safeRowHeight,
       gap: safeGap,
-      canvasRect: canvasRef.current?.getBoundingClientRect() ?? null,
+      zoom: safeZoom,
+      surfaceRect: getSurfaceRect(),
+      viewportRect: viewportRef.current?.getBoundingClientRect() ?? null,
     });
-  }, [cellWidth, onMetricsChange, safeGap, safeRowHeight]);
+  };
 
-  const canvasStyle: CSSProperties = {
-    minHeight,
-    '--builder-grid-col-size': `${cellWidth + safeGap}px`,
-    '--builder-grid-row-size': `${safeRowHeight + safeGap}px`,
-  } as CSSProperties;
+  useEffect(() => {
+    publishMetrics();
+    const viewportNode = viewportRef.current;
+    const surfaceNode = surfaceRef.current;
+    if (!viewportNode || !surfaceNode) return;
+
+    const observer = new ResizeObserver(() => publishMetrics());
+    observer.observe(viewportNode);
+    observer.observe(surfaceNode);
+    window.addEventListener('resize', publishMetrics);
+    window.addEventListener('scroll', publishMetrics, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', publishMetrics);
+      window.removeEventListener('scroll', publishMetrics, true);
+    };
+  }, [metrics.cellWidth, metrics.colStep, metrics.rowStep, safeGap, safeRowHeight, safeZoom]);
+
+  const layeredItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const aLayer = typeof a.layer === 'number' ? a.layer : 0;
+      const bLayer = typeof b.layer === 'number' ? b.layer : 0;
+      if (aLayer !== bLayer) return aLayer - bLayer;
+      if (a.y !== b.y) return a.y - b.y;
+      if (a.x !== b.x) return a.x - b.x;
+      return a.componentId.localeCompare(b.componentId);
+    });
+  }, [items]);
+
+  const xTicks = useMemo(() => {
+    const count = Math.floor(safeWidth / RULER_TICK_STEP) + 1;
+    return Array.from({ length: count }, (_, index) => index * RULER_TICK_STEP);
+  }, [safeWidth]);
+
+  const yTicks = useMemo(() => {
+    const count = Math.floor(safeHeight / RULER_TICK_STEP) + 1;
+    return Array.from({ length: count }, (_, index) => index * RULER_TICK_STEP);
+  }, [safeHeight]);
 
   return (
-    <div
-      ref={canvasRef}
-      className={styles.canvas}
-      style={canvasStyle}
-      data-grid-visible={showGrid}
-      data-testid="builder-grid-canvas"
-    >
-      {items.length === 0 ? <p className={styles.empty}>Drag from the palette to place a component.</p> : null}
-      {items.map((item) => (
-        <GridItemCard
-          key={item.id}
-          item={item}
-          component={componentById.get(item.componentId) ?? null}
-          selected={selectedComponentId === item.componentId}
-          disabled={disabled}
-          cellWidth={cellWidth}
-          rowHeight={safeRowHeight}
-          gap={safeGap}
-          columns={safeColumns}
-          data={data}
-          context={context}
-          i18n={i18n}
-          onSelect={onSelect}
-          onRemove={onRemove}
-          onMove={onMove}
-          onResize={onResize}
-        />
-      ))}
+    <div className={styles.viewport} ref={viewportRef} data-testid="builder-canvas-scrollable">
+      <div
+        className={styles.frame}
+        style={
+          {
+            width: `${frameWidth}px`,
+            height: `${frameHeight}px`,
+            '--builder-grid-col-size': `${metrics.colStep}px`,
+            '--builder-grid-row-size': `${metrics.rowStep}px`,
+          } as CSSProperties
+        }
+      >
+        {showRulers ? (
+          <>
+            <div
+              className={styles.rulerTop}
+              style={{ left: `${artboardLeft}px`, top: '0px', width: `${scaledWidth}px` }}
+            >
+              {xTicks.map((tick) => (
+                <span
+                  key={`x-${tick}`}
+                  className={styles.rulerTick}
+                  style={{ left: `${tick * safeZoom}px` }}
+                >
+                  {tick % 100 === 0 ? <em>{tick}</em> : null}
+                </span>
+              ))}
+            </div>
+            <div
+              className={styles.rulerLeft}
+              style={{ left: '0px', top: `${artboardTop}px`, height: `${scaledHeight}px` }}
+            >
+              {yTicks.map((tick) => (
+                <span
+                  key={`y-${tick}`}
+                  className={styles.rulerTick}
+                  style={{ top: `${tick * safeZoom}px` }}
+                >
+                  {tick % 100 === 0 ? <em>{tick}</em> : null}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        <div
+          className={styles.artboardShell}
+          style={{
+            left: `${artboardLeft}px`,
+            top: `${artboardTop}px`,
+            width: `${scaledWidth}px`,
+            height: `${scaledHeight}px`,
+          }}
+        >
+          <div
+            className={styles.scaleWrapper}
+            style={{
+              width: `${safeWidth}px`,
+              height: `${safeHeight}px`,
+              transform: `scale(${safeZoom})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            <div
+              ref={surfaceRef}
+              className={styles.surface}
+              style={{
+                width: `${safeWidth}px`,
+                height: `${safeHeight}px`,
+              }}
+              data-grid-visible={showGrid}
+              data-testid="builder-grid-canvas"
+            >
+              {showMarginGuides ? (
+                <>
+                  <div className={cn(styles.marginGuide, styles.marginGuideLeft)} style={{ left: `${MARGIN_GUIDE_PX}px` }} />
+                  <div className={cn(styles.marginGuide, styles.marginGuideRight)} style={{ right: `${MARGIN_GUIDE_PX}px` }} />
+                </>
+              ) : null}
+
+              {showGuides && guideLines ? (
+                <div className={styles.guidesLayer} aria-hidden="true">
+                  {guideLines.x.map((x) => (
+                    <span key={`gx-${x}`} className={styles.guideVertical} style={{ left: `${x}px` }} />
+                  ))}
+                  {guideLines.y.map((y) => (
+                    <span key={`gy-${y}`} className={styles.guideHorizontal} style={{ top: `${y}px` }} />
+                  ))}
+                </div>
+              ) : null}
+
+              {layeredItems.length === 0 ? (
+                <p className={styles.empty}>Drag from the palette to place a component.</p>
+              ) : null}
+
+              {layeredItems.map((item, index) => (
+                <GridItemCard
+                  key={item.id}
+                  item={item}
+                  component={componentById.get(item.componentId) ?? null}
+                  selected={selectedComponentId === item.componentId}
+                  disabled={disabled}
+                  columns={safeColumns}
+                  maxRows={maxRows}
+                  gap={safeGap}
+                  zoom={safeZoom}
+                  snap={snap}
+                  lockAspectRatio={lockAspectRatio}
+                  showGuides={showGuides}
+                  metrics={metrics}
+                  getSurfaceRect={getSurfaceRect}
+                  data={data}
+                  context={context}
+                  i18n={i18n}
+                  onSelect={onSelect}
+                  onRemove={onRemove}
+                  onUpdateLayout={onUpdateLayout}
+                  onInteractionChange={onInteractionChange}
+                  onGuideLinesChange={setGuideLines}
+                  layerOrder={typeof item.layer === 'number' ? item.layer : index}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -162,43 +375,223 @@ function GridItemCard({
   component,
   selected,
   disabled,
-  cellWidth,
-  rowHeight,
-  gap,
   columns,
+  maxRows,
+  gap,
+  zoom,
+  snap,
+  lockAspectRatio,
+  showGuides,
+  metrics,
+  getSurfaceRect,
   data,
   context,
   i18n,
   onSelect,
   onRemove,
-  onMove,
-  onResize,
+  onUpdateLayout,
+  onInteractionChange,
+  onGuideLinesChange,
+  layerOrder,
 }: GridItemCardProps) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `canvas:${item.componentId}`,
-    disabled,
-    data: {
-      kind: 'item',
-      componentId: item.componentId,
-      x: item.x,
-      y: item.y,
-      w: item.w,
-      h: item.h,
-    },
-  });
+  const interactionRef = useRef<PointerMoveMode | null>(null);
+  const lastRectRef = useRef<GridRect>({ x: item.x, y: item.y, w: item.w, h: item.h });
 
-  const left = item.x * (cellWidth + gap);
-  const top = item.y * (rowHeight + gap);
-  const width = item.w * cellWidth + Math.max(0, item.w - 1) * gap;
-  const height = item.h * rowHeight + Math.max(0, item.h - 1) * gap;
+  const currentRect = clampGridRect(
+    { x: item.x, y: item.y, w: item.w, h: item.h },
+    columns,
+    maxRows,
+  );
+  const currentPx = gridRectToPx(currentRect, metrics, gap);
 
   const style: CSSProperties = {
-    left,
-    top,
-    width,
-    height,
-    transform: CSS.Transform.toString(transform),
-    zIndex: selected ? 8 : 2,
+    left: `${currentPx.left}px`,
+    top: `${currentPx.top}px`,
+    width: `${currentPx.width}px`,
+    height: `${currentPx.height}px`,
+    zIndex: selected ? 1000 : 10 + Math.max(0, layerOrder),
+  };
+
+  useEffect(() => {
+    lastRectRef.current = currentRect;
+  }, [currentRect.h, currentRect.w, currentRect.x, currentRect.y]);
+
+  const emitInteraction = (nextRect: GridRect, mode: 'drag' | 'resize') => {
+    const nextPx = gridRectToPx(nextRect, metrics, gap);
+    onInteractionChange?.({
+      componentId: item.componentId,
+      x: nextRect.x,
+      y: nextRect.y,
+      w: nextRect.w,
+      h: nextRect.h,
+      mode,
+      px: nextPx,
+    });
+  };
+
+  const setGuides = (nextRect: GridRect) => {
+    if (!showGuides) return;
+    const px = gridRectToPx(nextRect, metrics, gap);
+    onGuideLinesChange({
+      x: [px.left, px.left + px.width],
+      y: [px.top, px.top + px.height],
+    });
+  };
+
+  const stopPointerInteraction = () => {
+    interactionRef.current = null;
+    onGuideLinesChange(null);
+    onInteractionChange?.(null);
+    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('mouseup', stopPointerInteraction);
+  };
+
+  const applyNextRect = (nextRectRaw: GridRect, mode: 'drag' | 'resize') => {
+    const nextRect = clampGridRect(nextRectRaw, columns, maxRows);
+    const previous = lastRectRef.current;
+    if (
+      previous.x === nextRect.x &&
+      previous.y === nextRect.y &&
+      previous.w === nextRect.w &&
+      previous.h === nextRect.h
+    ) {
+      emitInteraction(nextRect, mode);
+      setGuides(nextRect);
+      return;
+    }
+    lastRectRef.current = nextRect;
+    onUpdateLayout(item.componentId, nextRect);
+    emitInteraction(nextRect, mode);
+    setGuides(nextRect);
+  };
+
+  const onPointerMove = (event: MouseEvent) => {
+    const interaction = interactionRef.current;
+    if (!interaction) return;
+    const surfaceRect = getSurfaceRect();
+    if (!surfaceRect) return;
+
+    const logical = clientToLogicalPoint(event.clientX, event.clientY, surfaceRect, zoom);
+    const deltaX = logical.x - interaction.startPointer.x;
+    const deltaY = logical.y - interaction.startPointer.y;
+
+    if (interaction.kind === 'drag') {
+      const nextPxRect: PxRect = {
+        ...interaction.startPx,
+        left: clampNumber(interaction.startPx.left + deltaX, 0, Math.max(0, surfaceRect.width / zoom - interaction.startPx.width)),
+        top: clampNumber(interaction.startPx.top + deltaY, 0, Math.max(0, surfaceRect.height / zoom - interaction.startPx.height)),
+      };
+      const nextGridRect = clampGridRect(pxRectToGrid(nextPxRect, metrics, gap, snap), columns, maxRows);
+      applyNextRect(
+        {
+          ...interaction.startRect,
+          x: nextGridRect.x,
+          y: nextGridRect.y,
+        },
+        'drag',
+      );
+      return;
+    }
+
+    const minWidth = Math.max(12, metrics.colStep - gap);
+    const minHeight = Math.max(12, metrics.rowStep - gap);
+    const artboardWidth = Math.max(320, surfaceRect.width / zoom);
+    const artboardHeight = Math.max(320, surfaceRect.height / zoom);
+    let left = interaction.startPx.left;
+    let top = interaction.startPx.top;
+    let right = interaction.startPx.left + interaction.startPx.width;
+    let bottom = interaction.startPx.top + interaction.startPx.height;
+
+    if (interaction.handle.includes('e')) {
+      right += deltaX;
+    }
+    if (interaction.handle.includes('w')) {
+      left += deltaX;
+    }
+    if (interaction.handle.includes('s')) {
+      bottom += deltaY;
+    }
+    if (interaction.handle.includes('n')) {
+      top += deltaY;
+    }
+
+    if (lockAspectRatio && interaction.handle.length === 2) {
+      const rawWidth = Math.max(minWidth, right - left);
+      const rawHeight = Math.max(minHeight, bottom - top);
+      let width = rawWidth;
+      let height = rawHeight;
+      if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+        height = Math.max(minHeight, width / interaction.aspect);
+      } else {
+        width = Math.max(minWidth, height * interaction.aspect);
+      }
+      if (interaction.handle.includes('w')) {
+        left = right - width;
+      } else {
+        right = left + width;
+      }
+      if (interaction.handle.includes('n')) {
+        top = bottom - height;
+      } else {
+        bottom = top + height;
+      }
+    }
+
+    left = clampNumber(left, 0, artboardWidth - minWidth);
+    top = clampNumber(top, 0, artboardHeight - minHeight);
+    right = clampNumber(right, left + minWidth, artboardWidth);
+    bottom = clampNumber(bottom, top + minHeight, artboardHeight);
+
+    const nextPxRect: PxRect = {
+      left,
+      top,
+      width: right - left,
+      height: bottom - top,
+    };
+    const nextGridRect = clampGridRect(pxRectToGrid(nextPxRect, metrics, gap, snap), columns, maxRows);
+    applyNextRect(nextGridRect, 'resize');
+  };
+
+  const startDrag = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    const surfaceRect = getSurfaceRect();
+    if (!surfaceRect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(item.componentId);
+    const startPointer = clientToLogicalPoint(event.clientX, event.clientY, surfaceRect, zoom);
+    interactionRef.current = {
+      kind: 'drag',
+      startRect: currentRect,
+      startPx: currentPx,
+      startPointer,
+    };
+    emitInteraction(currentRect, 'drag');
+    setGuides(currentRect);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', stopPointerInteraction);
+  };
+
+  const startResize = (direction: ResizeDirection) => (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    const surfaceRect = getSurfaceRect();
+    if (!surfaceRect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(item.componentId);
+    const startPointer = clientToLogicalPoint(event.clientX, event.clientY, surfaceRect, zoom);
+    interactionRef.current = {
+      kind: 'resize',
+      handle: direction,
+      startRect: currentRect,
+      startPx: currentPx,
+      startPointer,
+      aspect: Math.max(0.1, currentPx.width / Math.max(1, currentPx.height)),
+    };
+    emitInteraction(currentRect, 'resize');
+    setGuides(currentRect);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', stopPointerInteraction);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -212,67 +605,49 @@ function GridItemCard({
     if (event.shiftKey) {
       if (event.key === 'ArrowRight') {
         event.preventDefault();
-        onResize(item.componentId, Math.min(columns - item.x, item.w + 1), item.h);
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        onResize(item.componentId, Math.max(1, item.w - 1), item.h);
-      } else if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        onResize(item.componentId, item.w, item.h + 1);
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        onResize(item.componentId, item.w, Math.max(1, item.h - 1));
+        applyNextRect({ ...currentRect, w: currentRect.w + 1 }, 'resize');
+        return;
       }
-      return;
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        applyNextRect({ ...currentRect, w: currentRect.w - 1 }, 'resize');
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        applyNextRect({ ...currentRect, h: currentRect.h + 1 }, 'resize');
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        applyNextRect({ ...currentRect, h: currentRect.h - 1 }, 'resize');
+        return;
+      }
     }
 
     if (event.key === 'ArrowRight') {
       event.preventDefault();
-      onMove(item.componentId, item.x + 1, item.y);
-    } else if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      onMove(item.componentId, item.x - 1, item.y);
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      onMove(item.componentId, item.x, item.y + 1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      onMove(item.componentId, item.x, Math.max(0, item.y - 1));
+      applyNextRect({ ...currentRect, x: currentRect.x + 1 }, 'drag');
+      return;
     }
-  };
-
-  const startResize = (event: ReactMouseEvent<HTMLButtonElement>): void => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (disabled) return;
-
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const stepX = cellWidth + gap;
-    const stepY = rowHeight + gap;
-    const startWidth = item.w;
-    const startHeight = item.h;
-
-    const onMovePointer = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
-      const nextWidth = Math.max(1, Math.min(columns - item.x, startWidth + Math.round(deltaX / stepX)));
-      const nextHeight = Math.max(1, startHeight + Math.round(deltaY / stepY));
-      onResize(item.componentId, nextWidth, nextHeight);
-    };
-
-    const onStop = () => {
-      window.removeEventListener('mousemove', onMovePointer);
-      window.removeEventListener('mouseup', onStop);
-    };
-
-    window.addEventListener('mousemove', onMovePointer);
-    window.addEventListener('mouseup', onStop);
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      applyNextRect({ ...currentRect, x: currentRect.x - 1 }, 'drag');
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      applyNextRect({ ...currentRect, y: currentRect.y + 1 }, 'drag');
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      applyNextRect({ ...currentRect, y: currentRect.y - 1 }, 'drag');
+    }
   };
 
   return (
     <div
-      ref={setNodeRef}
       className={styles.item}
       style={style}
       data-selected={selected}
@@ -281,7 +656,7 @@ function GridItemCard({
       onKeyDown={onKeyDown}
       tabIndex={0}
       role="group"
-      aria-label={`Grid item ${item.componentId} at ${item.x},${item.y}`}
+      aria-label={`Grid item ${item.componentId} at ${currentRect.x},${currentRect.y}`}
     >
       <div className={styles.itemHeader}>
         <div className={styles.meta}>
@@ -291,15 +666,15 @@ function GridItemCard({
         <div className={styles.itemActions}>
           <span className={styles.chip}>
             <span data-testid={`builder-grid-item-meta-${item.componentId}`}>
-            {item.x},{item.y} {item.w}x{item.h}
+              {currentRect.x},{currentRect.y} {currentRect.w}x{currentRect.h}
             </span>
           </span>
           <button
             type="button"
             className={cn(styles.actionButton, styles.dragHandle)}
             aria-label={`Move ${item.componentId}`}
-            {...attributes}
-            {...listeners}
+            data-testid={`builder-drag-${item.componentId}`}
+            onMouseDown={startDrag}
           >
             ::
           </button>
@@ -329,12 +704,21 @@ function GridItemCard({
           <p>Component is missing from schema components.</p>
         )}
       </div>
-      <button
-        type="button"
-        className={styles.resizeHandle}
-        aria-label={`Resize ${item.componentId}`}
-        onMouseDown={startResize}
-      />
+
+      <div className={styles.measureOverlay}>
+        {Math.round(currentPx.left)}px, {Math.round(currentPx.top)}px - {Math.round(currentPx.width)}x{Math.round(currentPx.height)}px
+      </div>
+
+      {RESIZE_HANDLES.map((handle) => (
+        <button
+          key={handle}
+          type="button"
+          className={cn(styles.resizeHandle, styles[`resizeHandle${handle.toUpperCase()}` as keyof typeof styles])}
+          aria-label={`Resize ${item.componentId} ${handle}`}
+          data-testid={`builder-resize-${item.componentId}-${handle}`}
+          onMouseDown={startResize(handle)}
+        />
+      ))}
     </div>
   );
 }

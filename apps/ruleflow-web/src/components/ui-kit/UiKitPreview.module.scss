@@ -1,0 +1,80 @@
+.preview {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.empty {
+  border: 1px dashed color-mix(in srgb, var(--pf-surface-border) 78%, transparent);
+  border-radius: var(--pf-radius-lg);
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 38%, transparent);
+  padding: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.placeholderCard {
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 56%, transparent);
+}
+
+.formContent {
+  display: grid;
+  gap: 12px;
+}
+
+.inlineLabel {
+  font-size: var(--pf-font-size-xs);
+  font-weight: var(--pf-font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pf-surface-text-muted);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.boxDemo {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: color-mix(in srgb, var(--pf-color-primary-100) 14%, var(--pf-surface-layer));
+  padding: 12px;
+}
+
+.containerDemo {
+  border: 1px dashed color-mix(in srgb, var(--pf-surface-border) 75%, transparent);
+  border-radius: var(--pf-radius-md);
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 46%, transparent);
+  padding: 14px;
+}
+
+.popoverTrigger {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 52%, transparent);
+  color: var(--pf-surface-text);
+  min-height: var(--pf-control-height-sm);
+  padding: 0 12px;
+  font-size: var(--pf-font-size-sm);
+  font-weight: var(--pf-font-weight-semibold);
+}

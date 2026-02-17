@@ -5,6 +5,10 @@ import {
   PFAccordion,
   PFAlert,
   PFButton,
+  PFCalendar,
+  PFClock,
+  PFDateField,
+  PFDateTimeField,
   PFDialog,
   PFMenuItem,
   PFMenu,
@@ -12,6 +16,7 @@ import {
   PFProgressLinear,
   PFSwitch,
   PFTable,
+  PFTimeField,
   PFTextField,
 } from '../src';
 
@@ -113,7 +118,7 @@ describe('@platform/ui-kit components', () => {
 
   it('renders composable PFMenuItem', () => {
     const html = renderToStaticMarkup(
-      <PFMenu triggerLabel="Open">
+      <PFMenu triggerLabel="Open" open>
         <li role="none">
           <PFMenuItem selected>Edit</PFMenuItem>
         </li>
@@ -122,5 +127,23 @@ describe('@platform/ui-kit components', () => {
 
     expect(html).toContain('pf-menu__item');
     expect(html).toContain('is-selected');
+  });
+
+  it('renders date/time family components with expected semantics', () => {
+    const html = renderToStaticMarkup(
+      <div>
+        <PFDateField id="date" label="Start date" value="2026-05-01" />
+        <PFTimeField id="time" label="Start time" value="09:30" />
+        <PFDateTimeField id="date-time" label="Start datetime" value="2026-05-01T09:30" />
+        <PFCalendar value="2026-05-01" />
+        <PFClock timezone="UTC" picker value="12:30" />
+      </div>,
+    );
+
+    expect(html).toContain('type="date"');
+    expect(html).toContain('type="time"');
+    expect(html).toContain('type="datetime-local"');
+    expect(html).toContain('pf-calendar');
+    expect(html).toContain('pf-clock');
   });
 });

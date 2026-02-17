@@ -1,6 +1,7 @@
 .steps {
   display: grid;
   gap: var(--rf-space-4);
+  min-height: 0;
 }
 
 .stepCard {
@@ -8,6 +9,7 @@
   border-radius: var(--rf-radius-md);
   padding: var(--rf-space-4);
   background: var(--rf-surface);
+  min-width: 0;
 }
 
 .stepHeader {
@@ -79,5 +81,56 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
+.helperLink,
+.helperTextMuted {
+  margin: 0;
+}
+
+.createFormWrap {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.createFormGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.createActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sectionSpacer {
+  height: 16px;
+}
+
+@media (max-width: 900px) {
+  .metaRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 720px) {
+  .createFormGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .footerRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .footerLeft,
+  .footerRight {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

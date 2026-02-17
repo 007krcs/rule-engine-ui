@@ -194,6 +194,9 @@ importers:
       '@platform/react-material-adapter':
         specifier: workspace:*
         version: link:../../packages/adapters/react-material-adapter
+      '@platform/react-platform-adapter':
+        specifier: workspace:*
+        version: link:../../packages/adapters/react-platform-adapter
       '@platform/react-renderer':
         specifier: workspace:*
         version: link:../../packages/adapters/react-renderer
@@ -477,6 +480,28 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@platform/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+
+  packages/adapters/react-platform-adapter:
+    dependencies:
+      '@platform/react-renderer':
+        specifier: workspace:*
+        version: link:../react-renderer
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      '@platform/ui-kit':
+        specifier: workspace:*
+        version: link:../../ui-kit
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.4(react@19.2.4)
     devDependencies:
       '@platform/i18n':
         specifier: workspace:*

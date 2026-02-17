@@ -12,6 +12,13 @@ import type {
 import type { ValidationIssue } from '@platform/validator';
 import { evaluateCondition } from '@platform/rules-engine';
 import { AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react';
+import {
+  PFCalendar,
+  PFClock,
+  PFDateField,
+  PFDateTimeField,
+  PFTimeField,
+} from '@platform/ui-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +26,23 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import styles from './component-editor.module.css';
+import styles from './component-editor.module.scss';
 import type { ComponentDefinition, JsonSchema } from '@platform/component-registry';
+
+type LayoutEditorModel = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  layer: number;
+  colStep: number;
+  rowStep: number;
+  gap: number;
+  columns: number;
+  maxRows: number;
+};
+
+type LayoutPatch = Partial<Pick<LayoutEditorModel, 'x' | 'y' | 'w' | 'h' | 'layer'>>;
 
 function pickFieldIssues(issues: ValidationIssue[] | undefined, predicate: (path: string) => boolean) {
   if (!issues || issues.length === 0) return [];
@@ -435,6 +457,17 @@ export function ComponentEditor({
   onMoveDown,
   onChange,
   onRemove,
+  layout,
+  onLayoutChange,
+  onAlign,
+  onDistribute,
+  onBringForward,
+  onSendBackward,
+  onResetLayoutSize,
+  onAlignToGrid,
+  onFitToContent,
+  onToggleMarginGuides,
+  marginGuidesEnabled,
   previewData,
   previewContext,
   translate,
@@ -449,6 +482,17 @@ export function ComponentEditor({
   onMoveDown?: () => void;
   onChange: (component: UIComponent) => void;
   onRemove: () => void;
+  layout?: LayoutEditorModel;
+  onLayoutChange?: (patch: LayoutPatch) => void;
+  onAlign?: (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+  onDistribute?: (direction: 'horizontal' | 'vertical') => void;
+  onBringForward?: () => void;
+  onSendBackward?: () => void;
+  onResetLayoutSize?: () => void;
+  onAlignToGrid?: () => void;
+  onFitToContent?: () => void;
+  onToggleMarginGuides?: () => void;
+  marginGuidesEnabled?: boolean;
   previewData?: Record<string, JSONValue>;
   previewContext?: ExecutionContext;
   translate?: (key: string) => string;
@@ -476,6 +520,12 @@ export function ComponentEditor({
 
   const propsSchema = resolvedDefinition?.propsSchema ?? null;
   const props = isPlainRecord(component.props) ? (component.props as Record<string, JSONValue>) : {};
+  const isDateComponent =
+    component.adapterHint === 'platform.dateField' ||
+    component.adapterHint === 'platform.timeField' ||
+    component.adapterHint === 'platform.dateTimeField' ||
+    component.adapterHint === 'platform.calendar' ||
+    component.adapterHint === 'platform.clock';
 
   const [advancedPropsOpen, setAdvancedPropsOpen] = useState(false);
   const [propsText, setPropsText] = useState(() => JSON.stringify(props, null, 2));
@@ -514,6 +564,13 @@ export function ComponentEditor({
     setPropsError(null);
   }, [advancedPropsOpen, propsJson]);
 
+  const updateLayoutField = (key: keyof LayoutPatch, raw: string) => {
+    if (!layout || !onLayoutChange) return;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return;
+    onLayoutChange({ [key]: Math.trunc(parsed) } as LayoutPatch);
+  };
+
   const applyPropsJson = () => {
     try {
       const parsed = JSON.parse(propsText) as unknown;
@@ -540,6 +597,25 @@ export function ComponentEditor({
     }
     const merged: NonNullable<UIComponent['bindings']> = { ...nextBindings, [group]: nextBucket };
     onChange({ ...component, bindings: merged });
+  };
+
+  const updatePropsPatch = (patch: Record<string, JSONValue | undefined>) => {
+    const nextProps: Record<string, JSONValue> = { ...props };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined || value === null || (typeof value === 'string' && value.trim().length === 0)) {
+        delete nextProps[key];
+      } else {
+        nextProps[key] = value;
+      }
+    }
+    onChange({ ...component, props: nextProps });
+  };
+
+  const updateValidationPatch = (
+    patch: Partial<NonNullable<UIComponent['validations']>>,
+  ) => {
+    const next = { ...(component.validations ?? {}), ...patch };
+    onChange({ ...component, validations: next });
   };
 
   const resetPropsToDefaults = () => {
@@ -713,6 +789,145 @@ export function ComponentEditor({
           </div>
         ) : null}
 
+        {layout ? (
+          <>
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Layout</p>
+              <p className={styles.sectionDesc}>Position and size controls for non-code editing.</p>
+            </div>
+
+            <div className={styles.layoutGrid}>
+              <div className={styles.field}>
+                <label className="rfFieldLabel" title="Distance from the left edge of the artboard in grid columns.">
+                  Left
+                </label>
+                <Input
+                  type="number"
+                  value={layout.x}
+                  onChange={(event) => updateLayoutField('x', event.target.value)}
+                  data-testid="builder-layout-left"
+                />
+                <p className={styles.helperText}>{Math.round(layout.x * layout.colStep)}px</p>
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel" title="Distance from the top edge of the artboard in rows.">
+                  Top
+                </label>
+                <Input
+                  type="number"
+                  value={layout.y}
+                  onChange={(event) => updateLayoutField('y', event.target.value)}
+                  data-testid="builder-layout-top"
+                />
+                <p className={styles.helperText}>{Math.round(layout.y * layout.rowStep)}px</p>
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel" title="Width of the selected component in grid columns.">
+                  Width
+                </label>
+                <Input
+                  type="number"
+                  value={layout.w}
+                  onChange={(event) => updateLayoutField('w', event.target.value)}
+                  data-testid="builder-layout-width"
+                />
+                <p className={styles.helperText}>
+                  {Math.round(layout.w * layout.colStep - layout.gap)}px ({layout.w} cols)
+                </p>
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel" title="Height of the selected component in grid rows.">
+                  Height
+                </label>
+                <Input
+                  type="number"
+                  value={layout.h}
+                  onChange={(event) => updateLayoutField('h', event.target.value)}
+                  data-testid="builder-layout-height"
+                />
+                <p className={styles.helperText}>
+                  {Math.round(layout.h * layout.rowStep - layout.gap)}px ({layout.h} rows)
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.layoutGrid}>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Col Start</label>
+                <Input
+                  type="number"
+                  value={layout.x}
+                  onChange={(event) => updateLayoutField('x', event.target.value)}
+                  data-testid="builder-layout-col-start"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Row Start</label>
+                <Input
+                  type="number"
+                  value={layout.y}
+                  onChange={(event) => updateLayoutField('y', event.target.value)}
+                  data-testid="builder-layout-row-start"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Col Span</label>
+                <Input
+                  type="number"
+                  value={layout.w}
+                  onChange={(event) => updateLayoutField('w', event.target.value)}
+                  data-testid="builder-layout-col-span"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Row Span</label>
+                <Input
+                  type="number"
+                  value={layout.h}
+                  onChange={(event) => updateLayoutField('h', event.target.value)}
+                  data-testid="builder-layout-row-span"
+                />
+              </div>
+            </div>
+
+            <div className={styles.layoutActions}>
+              <Button type="button" variant="outline" size="sm" onClick={() => onAlign?.('left')} data-testid="builder-align-left">Align Left</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onAlign?.('center')} data-testid="builder-align-center">Align Center</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onAlign?.('right')} data-testid="builder-align-right">Align Right</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onAlign?.('top')} data-testid="builder-align-top">Align Top</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onAlign?.('middle')} data-testid="builder-align-middle">Align Middle</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onAlign?.('bottom')} data-testid="builder-align-bottom">Align Bottom</Button>
+            </div>
+
+            <div className={styles.layoutActions}>
+              <Button type="button" variant="outline" size="sm" onClick={() => onDistribute?.('horizontal')} data-testid="builder-distribute-horizontal">
+                Distribute Horizontally
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onDistribute?.('vertical')} data-testid="builder-distribute-vertical">
+                Distribute Vertically
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onBringForward} data-testid="builder-layer-forward">
+                Bring Forward
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onSendBackward} data-testid="builder-layer-backward">
+                Send Backward
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onResetLayoutSize} data-testid="builder-layout-reset-size">
+                Reset Size
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onAlignToGrid} data-testid="builder-layout-align-grid">
+                Align to Grid
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onFitToContent} data-testid="builder-layout-fit-content">
+                Fit to Content
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onToggleMarginGuides} data-testid="builder-toggle-margin-guides">
+                {marginGuidesEnabled ? 'Hide Margin Guides' : 'Show Margin Guides'}
+              </Button>
+            </div>
+          </>
+        ) : null}
+
         <div className={styles.sectionHeader}>
           <p className={styles.sectionTitle}>Basics</p>
           <p className={styles.sectionDesc}>Adapter selection + metadata.</p>
@@ -758,10 +973,255 @@ export function ComponentEditor({
           {firstMessage(adapterHintIssues) ? <p className={styles.fieldError}>{firstMessage(adapterHintIssues)}</p> : null}
         </div>
 
-        <div className={styles.sectionHeader}>
-          <p className={styles.sectionTitle}>Props</p>
-          <p className={styles.sectionDesc}>Schema-driven form generated from the Component Registry.</p>
-        </div>
+        {isDateComponent ? (
+          <>
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Data Binding</p>
+              <p className={styles.sectionDesc}>Where should this value be saved in your data model?</p>
+            </div>
+            <div className={styles.field}>
+              <label className="rfFieldLabel">Save value to</label>
+              <Input
+                value={component.bindings?.data?.valuePath ?? component.bindings?.data?.value ?? ''}
+                onChange={(event) => {
+                  updateBinding('data', 'valuePath', event.target.value);
+                  updateBinding('data', 'value', event.target.value);
+                }}
+                placeholder="data.customer.appointmentDate"
+              />
+            </div>
+
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Label &amp; Help</p>
+              <p className={styles.sectionDesc}>Use translation keys so labels work in every language.</p>
+            </div>
+            <div className={styles.validationGrid}>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Label Key</label>
+                <Input
+                  value={component.i18n?.labelKey ?? ''}
+                  onChange={(event) =>
+                    onChange({ ...component, i18n: { ...(component.i18n ?? {}), labelKey: event.target.value } })
+                  }
+                  placeholder="runtime.schedule.startDate.label"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Help Text Key</label>
+                <Input
+                  value={component.i18n?.helperTextKey ?? ''}
+                  onChange={(event) =>
+                    onChange({ ...component, i18n: { ...(component.i18n ?? {}), helperTextKey: event.target.value } })
+                  }
+                  placeholder="runtime.schedule.startDate.help"
+                />
+              </div>
+            </div>
+
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Validation</p>
+              <p className={styles.sectionDesc}>Set required and allowed date/time ranges.</p>
+            </div>
+            <div className={styles.validationGrid}>
+              <label className={styles.checkboxRow} title="Require a value before submit">
+                <input
+                  type="checkbox"
+                  checked={component.validations?.required ?? false}
+                  onChange={(event) => updateValidationPatch({ required: Boolean(event.target.checked) })}
+                />
+                <span>Required field</span>
+              </label>
+              {component.adapterHint === 'platform.timeField' ? (
+                <>
+                  <div className={styles.field}>
+                    <label className="rfFieldLabel">Earliest Time</label>
+                    <Input
+                      type="time"
+                      value={component.validations?.minTime ?? ''}
+                      onChange={(event) =>
+                        updateValidationPatch({ minTime: event.target.value.trim() || undefined })
+                      }
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label className="rfFieldLabel">Latest Time</label>
+                    <Input
+                      type="time"
+                      value={component.validations?.maxTime ?? ''}
+                      onChange={(event) =>
+                        updateValidationPatch({ maxTime: event.target.value.trim() || undefined })
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.field}>
+                    <label className="rfFieldLabel">Earliest Date</label>
+                    <Input
+                      type="date"
+                      value={component.validations?.minDate ?? ''}
+                      onChange={(event) =>
+                        updateValidationPatch({ minDate: event.target.value.trim() || undefined })
+                      }
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label className="rfFieldLabel">Latest Date</label>
+                    <Input
+                      type="date"
+                      value={component.validations?.maxDate ?? ''}
+                      onChange={(event) =>
+                        updateValidationPatch({ maxDate: event.target.value.trim() || undefined })
+                      }
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Behavior</p>
+              <p className={styles.sectionDesc}>Set default value and read-only behavior.</p>
+            </div>
+            <div className={styles.validationGrid}>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Default Value</label>
+                <Input
+                  type={
+                    component.adapterHint === 'platform.timeField'
+                      ? 'time'
+                      : component.adapterHint === 'platform.dateTimeField'
+                        ? 'datetime-local'
+                        : 'date'
+                  }
+                  value={typeof props.defaultValue === 'string' ? props.defaultValue : ''}
+                  onChange={(event) => updatePropsPatch({ defaultValue: event.target.value })}
+                />
+              </div>
+              <label className={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(props.readOnly)}
+                  onChange={(event) => updatePropsPatch({ readOnly: Boolean(event.target.checked) })}
+                />
+                <span>Read-only</span>
+              </label>
+            </div>
+
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Display</p>
+              <p className={styles.sectionDesc}>Control timezone and display format.</p>
+            </div>
+            <div className={styles.validationGrid}>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Timezone</label>
+                <Input
+                  value={typeof props.timezone === 'string' ? props.timezone : ''}
+                  onChange={(event) => updatePropsPatch({ timezone: event.target.value })}
+                  placeholder="America/New_York"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Display Format</label>
+                <Select
+                  value={typeof props.displayFormat === 'string' ? props.displayFormat : 'medium'}
+                  onChange={(event) => updatePropsPatch({ displayFormat: event.target.value })}
+                >
+                  <option value="short">Short</option>
+                  <option value="medium">Medium</option>
+                  <option value="long">Long</option>
+                </Select>
+              </div>
+            </div>
+
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Live Preview</p>
+              <p className={styles.sectionDesc}>Preview updates instantly while you edit this component.</p>
+            </div>
+            <div className={styles.previewBox}>
+              {component.adapterHint === 'platform.dateField' ? (
+                <PFDateField
+                  id={`preview-${component.id}`}
+                  label={translate ? translate(component.i18n?.labelKey ?? '') : component.i18n?.labelKey}
+                  helperText={translate ? translate(component.i18n?.helperTextKey ?? '') : component.i18n?.helperTextKey}
+                  value={typeof props.defaultValue === 'string' ? props.defaultValue : '2026-02-01'}
+                  minDate={component.validations?.minDate}
+                  maxDate={component.validations?.maxDate}
+                  timezone={typeof props.timezone === 'string' ? props.timezone : undefined}
+                  displayFormat={
+                    props.displayFormat === 'short' || props.displayFormat === 'long' ? props.displayFormat : 'medium'
+                  }
+                />
+              ) : null}
+              {component.adapterHint === 'platform.timeField' ? (
+                <PFTimeField
+                  id={`preview-${component.id}`}
+                  label={translate ? translate(component.i18n?.labelKey ?? '') : component.i18n?.labelKey}
+                  helperText={translate ? translate(component.i18n?.helperTextKey ?? '') : component.i18n?.helperTextKey}
+                  value={typeof props.defaultValue === 'string' ? props.defaultValue : '09:00'}
+                  minTime={component.validations?.minTime}
+                  maxTime={component.validations?.maxTime}
+                />
+              ) : null}
+              {component.adapterHint === 'platform.dateTimeField' ? (
+                <PFDateTimeField
+                  id={`preview-${component.id}`}
+                  label={translate ? translate(component.i18n?.labelKey ?? '') : component.i18n?.labelKey}
+                  helperText={translate ? translate(component.i18n?.helperTextKey ?? '') : component.i18n?.helperTextKey}
+                  value={typeof props.defaultValue === 'string' ? props.defaultValue : '2026-02-01T10:30'}
+                />
+              ) : null}
+              {component.adapterHint === 'platform.calendar' ? (
+                <PFCalendar
+                  value={typeof props.defaultValue === 'string' ? props.defaultValue : '2026-02-01'}
+                  minDate={component.validations?.minDate}
+                  maxDate={component.validations?.maxDate}
+                  timezone={typeof props.timezone === 'string' ? props.timezone : undefined}
+                />
+              ) : null}
+              {component.adapterHint === 'platform.clock' ? (
+                <PFClock
+                  picker={Boolean(props.picker)}
+                  value={typeof props.defaultValue === 'string' ? props.defaultValue : '11:15'}
+                  timezone={typeof props.timezone === 'string' ? props.timezone : 'UTC'}
+                  showSeconds={Boolean(props.showSeconds)}
+                />
+              ) : null}
+            </div>
+
+            <details className={styles.details}>
+              <summary className={styles.detailsSummary}>Advanced: Edit as JSON</summary>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Props JSON</label>
+                <Textarea
+                  value={propsText}
+                  onChange={(event) => {
+                    setPropsText(event.target.value);
+                    setPropsError(null);
+                  }}
+                  className={styles.textarea}
+                />
+                {propsError ? <p className={styles.fieldError}>{propsError}</p> : null}
+                <div className={styles.inlineRow}>
+                  <Button type="button" size="sm" onClick={applyPropsJson}>
+                    Apply JSON
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={resetPropsToDefaults}>
+                    Reset to defaults
+                  </Button>
+                </div>
+              </div>
+            </details>
+          </>
+        ) : null}
+
+        {!isDateComponent ? (
+          <>
+            <div className={styles.sectionHeader}>
+              <p className={styles.sectionTitle}>Props</p>
+              <p className={styles.sectionDesc}>Schema-driven form generated from the Component Registry.</p>
+            </div>
 
         {propsSchema ? (
           <>
@@ -887,6 +1347,8 @@ export function ComponentEditor({
               </div>
             ))}
           </div>
+        ) : null}
+          </>
         ) : null}
 
         <div className={styles.sectionHeader}>

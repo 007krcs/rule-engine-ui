@@ -1,0 +1,145 @@
+.sidebar {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid var(--pf-surface-border);
+  background: color-mix(in srgb, var(--pf-surface-layer) 96%, var(--pf-color-neutral-50));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.searchWrap {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-bottom: 1px solid var(--pf-surface-border);
+  background: color-mix(in srgb, var(--pf-surface-layer) 94%, transparent);
+}
+
+.searchLabel {
+  font-size: var(--pf-font-size-xs);
+  font-weight: var(--pf-font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pf-surface-text-muted);
+}
+
+.searchInput {
+  width: 100%;
+  min-height: var(--pf-control-height-sm);
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-layer);
+  color: var(--pf-surface-text);
+  font-size: var(--pf-font-size-sm);
+  padding: 0 12px;
+}
+
+.searchInput:focus-visible {
+  outline: var(--pf-ring-width) solid var(--pf-surface-focus);
+  outline-offset: 2px;
+}
+
+.sectionList {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+}
+
+.section {
+  padding: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pf-surface-border) 74%, transparent);
+}
+
+.sectionTitle {
+  margin: 0 0 10px;
+  font-size: var(--pf-font-size-xs);
+  font-weight: var(--pf-font-weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pf-surface-text-muted);
+}
+
+.items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.itemButton {
+  width: 100%;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-layer);
+  color: var(--pf-surface-text);
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  cursor: pointer;
+  transition:
+    border-color var(--pf-motion-fast) var(--pf-motion-easing-standard),
+    background-color var(--pf-motion-fast) var(--pf-motion-easing-standard);
+}
+
+.itemButton:hover {
+  border-color: color-mix(in srgb, var(--pf-color-primary-400) 36%, var(--pf-surface-border));
+  background: color-mix(in srgb, var(--pf-color-primary-100) 16%, var(--pf-surface-layer));
+}
+
+.itemButtonActive {
+  border-color: color-mix(in srgb, var(--pf-color-primary-500) 52%, var(--pf-surface-border));
+  background: color-mix(in srgb, var(--pf-color-primary-100) 22%, var(--pf-surface-layer));
+}
+
+.itemText {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.itemName {
+  font-size: var(--pf-font-size-sm);
+  font-weight: var(--pf-font-weight-semibold);
+}
+
+.itemHint {
+  font-size: var(--pf-font-size-xs);
+  color: var(--pf-surface-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  border-radius: 999px;
+  border: 1px solid var(--pf-surface-border);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: var(--pf-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.badgeStable {
+  color: var(--pf-color-success-700);
+  background: color-mix(in srgb, var(--pf-color-success-100) 45%, transparent);
+}
+
+.badgeBeta {
+  color: var(--pf-color-warn-700);
+  background: color-mix(in srgb, var(--pf-color-warn-100) 45%, transparent);
+}
+
+.badgePlanned {
+  color: var(--pf-color-neutral-700);
+  background: color-mix(in srgb, var(--pf-color-neutral-100) 55%, transparent);
+}

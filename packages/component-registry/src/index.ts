@@ -19,12 +19,21 @@ export type ComponentRegistryManifest = {
   components: ComponentDefinition[];
 };
 
+export type ComponentExample = {
+  id: string;
+  title: string;
+  description: string;
+  code: string;
+};
+
 export type ComponentDefinition = {
   adapterHint: string;
   displayName: string;
+  description: string;
   category: ComponentCategory | string;
   propsSchema: JsonSchema;
   defaultProps?: Record<string, JSONValue>;
+  examples?: ComponentExample[];
   bindings?: {
     data?: string[];
     context?: string[];
@@ -125,6 +134,7 @@ type SeedComponent = {
   status: ComponentStatus;
   propsSchema?: JsonSchema;
   defaultProps?: Record<string, JSONValue>;
+  examples?: ComponentExample[];
   bindings?: {
     data?: string[];
     context?: string[];
@@ -218,6 +228,83 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     bindings: { data: ['value', 'query'] },
     tokensUsed: ['--pf-control-bg', '--pf-surface-border', '--pf-z-dropdown'],
+  }),
+  seed('platform.dateField', 'DateField', 'Inputs', 'Date input with locale preview and ISO date storage.', 'stable', {
+    propsSchema: objectSchema('Date field', {
+      label: stringSchema('Label'),
+      helperText: stringSchema('Helper Text'),
+      displayFormat: stringEnumSchema('Display Format', ['short', 'medium', 'long']),
+      timezone: stringSchema('Timezone'),
+      minDate: stringSchema('Min Date'),
+      maxDate: stringSchema('Max Date'),
+    }),
+    defaultProps: {
+      displayFormat: 'medium',
+      timezone: 'UTC',
+      defaultValue: '2026-01-01',
+    },
+    bindings: { data: ['valuePath'], context: ['locale', 'timezone'] },
+    tokensUsed: ['--pf-control-height-md', '--pf-font-size-sm', '--pf-surface-border'],
+  }),
+  seed('platform.timeField', 'TimeField', 'Inputs', 'Time input with step and min/max constraints.', 'stable', {
+    propsSchema: objectSchema('Time field', {
+      label: stringSchema('Label'),
+      helperText: stringSchema('Helper Text'),
+      step: numberSchema('Step (seconds)'),
+      minTime: stringSchema('Min Time'),
+      maxTime: stringSchema('Max Time'),
+    }),
+    defaultProps: {
+      step: 300,
+      timezone: 'UTC',
+      defaultValue: '09:00',
+    },
+    bindings: { data: ['valuePath'], context: ['timezone'] },
+    tokensUsed: ['--pf-control-height-md', '--pf-font-size-sm', '--pf-surface-border'],
+  }),
+  seed('platform.dateTimeField', 'DateTimeField', 'Inputs', 'Date-time input for scheduling with ISO output.', 'stable', {
+    propsSchema: objectSchema('Date time field', {
+      label: stringSchema('Label'),
+      helperText: stringSchema('Helper Text'),
+      timezone: stringSchema('Timezone'),
+      minDateTime: stringSchema('Min Date Time'),
+      maxDateTime: stringSchema('Max Date Time'),
+    }),
+    defaultProps: {
+      timezone: 'UTC',
+      defaultValue: '2026-01-01T09:30',
+    },
+    bindings: { data: ['valuePath'], context: ['timezone', 'locale'] },
+    tokensUsed: ['--pf-control-height-md', '--pf-font-size-sm', '--pf-surface-border'],
+  }),
+  seed('platform.calendar', 'Calendar', 'Inputs', 'Month calendar for date selection with keyboard navigation.', 'stable', {
+    propsSchema: objectSchema('Calendar', {
+      timezone: stringSchema('Timezone'),
+      minDate: stringSchema('Min Date'),
+      maxDate: stringSchema('Max Date'),
+      disabledDates: arraySchema('Disabled Dates', stringSchema('ISO Date')),
+    }),
+    defaultProps: {
+      timezone: 'UTC',
+      defaultValue: '2026-01-01',
+    },
+    bindings: { data: ['valuePath'], context: ['locale', 'timezone'] },
+    tokensUsed: ['--pf-surface-layer', '--pf-surface-border', '--pf-color-primary-500'],
+  }),
+  seed('platform.clock', 'Clock', 'Data Display', 'Digital clock display with optional time picker mode.', 'stable', {
+    propsSchema: objectSchema('Clock', {
+      timezone: stringSchema('Timezone'),
+      picker: booleanSchema('Enable Picker'),
+      showSeconds: booleanSchema('Show Seconds'),
+    }),
+    defaultProps: {
+      timezone: 'UTC',
+      picker: false,
+      showSeconds: false,
+      defaultValue: '09:00',
+    },
+    bindings: { data: ['valuePath'], context: ['timezone', 'locale'] },
+    tokensUsed: ['--pf-font-size-2xl', '--pf-surface-border', '--pf-surface-text'],
   }),
   seed('platform.textareaAutosize', 'TextareaAutosize', 'Inputs', 'Multi-line text input that grows by content.', 'beta', {
     propsSchema: objectSchema('Textarea autosize', {
@@ -317,6 +404,7 @@ const CATALOG_SEEDS: SeedComponent[] = [
   }),
   seed('platform.dialog', 'Dialog', 'Feedback', 'Modal dialog with focus management.', 'stable', {
     propsSchema: objectSchema('Dialog', {
+      open: booleanSchema('Open'),
       title: stringSchema('Title'),
       description: stringSchema('Description'),
       size: stringEnumSchema('Size', ['sm', 'md', 'lg']),
@@ -359,9 +447,18 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-surface-layer', '--pf-z-sticky'],
   }),
-  seed('platform.toolbar', 'Toolbar', 'Surfaces', 'Horizontal toolbar content row.', 'stable', {
-    propsSchema: objectSchema('Toolbar', {}),
-    tokensUsed: ['--pf-space-3', '--pf-control-height-lg'],
+  seed('platform.toolbar', 'Toolbar', 'Layout', 'Horizontal action row for filters, search, and commands.', 'stable', {
+    propsSchema: objectSchema('Toolbar', {
+      align: stringEnumSchema('Align', ['left', 'right', 'space-between']),
+      wrap: booleanSchema('Wrap'),
+      density: stringEnumSchema('Density', ['comfortable', 'compact']),
+    }),
+    defaultProps: {
+      align: 'space-between',
+      wrap: true,
+      density: 'comfortable',
+    },
+    tokensUsed: ['--pf-space-3', '--pf-control-height-lg', '--pf-surface-border'],
   }),
   seed('platform.card', 'Card', 'Surfaces', 'Card surface with header/body/actions slots.', 'stable', {
     propsSchema: objectSchema('Card', {
@@ -432,6 +529,47 @@ const CATALOG_SEEDS: SeedComponent[] = [
     propsSchema: objectSchema('Box', {}),
     tokensUsed: ['--pf-space-4'],
   }),
+  seed('platform.pageShell', 'PageShell', 'Layout', 'Full-page shell with header, sidebar, content, and optional right panel.', 'stable', {
+    propsSchema: objectSchema('Page shell', {
+      sidebarWidth: numberSchema('Sidebar Width'),
+      collapsedSidebarWidth: numberSchema('Collapsed Sidebar Width'),
+      hasRightPanel: booleanSchema('Has Right Panel'),
+      headerHeight: numberSchema('Header Height'),
+      stickyHeader: booleanSchema('Sticky Header'),
+    }),
+    defaultProps: {
+      sidebarWidth: 280,
+      collapsedSidebarWidth: 84,
+      hasRightPanel: false,
+      headerHeight: 64,
+      stickyHeader: true,
+    },
+    bindings: { data: ['sidebarItems', 'rightPanelItems'], context: ['device'] },
+    tokensUsed: ['--pf-page-shell-header-height', '--pf-page-shell-sidebar-width', '--pf-surface-layer'],
+  }),
+  seed('platform.section', 'Section', 'Layout', 'Content block with title, plain-language description, and optional actions.', 'stable', {
+    propsSchema: objectSchema('Section', {
+      titleKey: stringSchema('Title Key'),
+      descriptionKey: stringSchema('Description Key'),
+      intent: stringEnumSchema('Intent', ['neutral', 'info', 'warn']),
+    }),
+    bindings: { data: ['items'] },
+    tokensUsed: ['--pf-space-4', '--pf-surface-border', '--pf-radius-lg'],
+  }),
+  seed('platform.splitLayout', 'SplitLayout', 'Layout', 'Two-column responsive split with adjustable ratio.', 'stable', {
+    propsSchema: objectSchema('Split layout', {
+      leftWidthPercent: numberSchema('Left Width Percent'),
+      gap: numberSchema('Gap'),
+      stackOnMobile: booleanSchema('Stack on Mobile'),
+    }),
+    defaultProps: {
+      leftWidthPercent: 40,
+      gap: 16,
+      stackOnMobile: true,
+    },
+    bindings: { data: ['leftItems', 'rightItems'] },
+    tokensUsed: ['--pf-split-left-percent', '--pf-split-gap'],
+  }),
   seed('platform.container', 'Container', 'Layout', 'Page width container with max-width presets.', 'stable', {
     propsSchema: objectSchema('Container', {
       maxWidth: stringSchema('Max Width'),
@@ -452,6 +590,33 @@ const CATALOG_SEEDS: SeedComponent[] = [
       gap: numberSchema('Gap'),
     }),
     tokensUsed: ['--pf-stack-gap'],
+  }),
+  seed('platform.cardGrid', 'CardGrid', 'Layout', 'Responsive grid of cards for dashboards, files, and summaries.', 'stable', {
+    propsSchema: objectSchema('Card grid', {
+      columns: objectSchema('Columns', {
+        sm: numberSchema('SM Columns'),
+        md: numberSchema('MD Columns'),
+        lg: numberSchema('LG Columns'),
+        xl: numberSchema('XL Columns'),
+      }),
+      gap: numberSchema('Gap'),
+    }),
+    defaultProps: {
+      columns: { sm: 1, md: 2, lg: 3, xl: 4 },
+      gap: 16,
+    },
+    bindings: { data: ['items'] },
+    tokensUsed: ['--pf-card-grid-cols-lg', '--pf-card-grid-gap'],
+  }),
+  seed('platform.emptyState', 'EmptyState', 'Layout', 'Guided empty-state with title, help text, and action CTA.', 'stable', {
+    propsSchema: objectSchema('Empty state', {
+      icon: stringSchema('Icon'),
+      titleKey: stringSchema('Title Key'),
+      descriptionKey: stringSchema('Description Key'),
+      actionLabelKey: stringSchema('Action Label Key'),
+    }),
+    bindings: { data: ['actionPath'] },
+    tokensUsed: ['--pf-radius-lg', '--pf-color-primary-100', '--pf-surface-border'],
   }),
   seed('platform.masonry', 'Masonry', 'Layout', 'Masonry layout with variable row heights.', 'planned'),
   seed('platform.noSsr', 'NoSSR', 'Layout', 'Client-only rendering wrapper.', 'planned'),
@@ -602,6 +767,11 @@ export function validateComponentDefinition(value: unknown): RegistryValidationR
     issues.push({ path: 'displayName', message: 'displayName is required', severity: 'error' });
   }
 
+  const description = typeof rec.description === 'string' ? rec.description.trim() : '';
+  if (!description) {
+    issues.push({ path: 'description', message: 'description is recommended', severity: 'warning' });
+  }
+
   const category = typeof rec.category === 'string' ? rec.category.trim() : '';
   if (!category) {
     issues.push({ path: 'category', message: 'category is required', severity: 'error' });
@@ -673,6 +843,10 @@ export function enrichComponentDefinition(definition: ComponentDefinition): Comp
   const allowedProps = readSchemaPropertyKeys(definition.propsSchema);
   return {
     ...definition,
+    description: definition.description || definition.propsSchema.description || definition.displayName,
+    examples: definition.examples?.length
+      ? definition.examples
+      : [createDefaultExample(definition.adapterHint, definition.displayName, definition.defaultProps)],
     status: definition.status ?? 'stable',
     i18n: definition.i18n ?? {
       nameKey: `${fallbackBase}.name`,
@@ -715,6 +889,7 @@ function seed(
   overrides?: {
     propsSchema?: JsonSchema;
     defaultProps?: Record<string, JSONValue>;
+    examples?: ComponentExample[];
     bindings?: {
       data?: string[];
       context?: string[];
@@ -732,6 +907,7 @@ function seed(
     status,
     propsSchema: overrides?.propsSchema,
     defaultProps: overrides?.defaultProps,
+    examples: overrides?.examples,
     bindings: overrides?.bindings,
     accessibilityRequirements: overrides?.accessibilityRequirements,
     tokensUsed: overrides?.tokensUsed,
@@ -746,9 +922,14 @@ function toDefinition(seedComponent: SeedComponent): ComponentDefinition {
   return {
     adapterHint: seedComponent.adapterHint,
     displayName: seedComponent.displayName,
+    description: seedComponent.description,
     category: seedComponent.category,
     propsSchema,
     defaultProps: seedComponent.defaultProps,
+    examples:
+      seedComponent.examples && seedComponent.examples.length > 0
+        ? seedComponent.examples
+        : [createDefaultExample(seedComponent.adapterHint, seedComponent.displayName, seedComponent.defaultProps)],
     bindings: seedComponent.bindings,
     i18n: {
       nameKey: `registry.components.${keySegment}.name`,
@@ -836,6 +1017,47 @@ function readSchemaPropertyKeys(schema: JsonSchema): string[] {
   if (!isPlainObject(schema)) return [];
   if (schema.type !== 'object') return [];
   return Object.keys(schema.properties ?? {}).sort((a, b) => a.localeCompare(b));
+}
+
+function createDefaultExample(
+  adapterHint: string,
+  displayName: string,
+  defaultProps?: Record<string, JSONValue>,
+): ComponentExample {
+  return {
+    id: `${toKeySegment(adapterHint)}.basic`,
+    title: `Basic ${displayName}`,
+    description: `Baseline ${displayName} configuration.`,
+    code: buildExampleCode(adapterHint, defaultProps),
+  };
+}
+
+function buildExampleCode(
+  adapterHint: string,
+  defaultProps?: Record<string, JSONValue>,
+): string {
+  const componentName = toUiKitComponentName(adapterHint);
+  if (!componentName) {
+    return `// ${adapterHint} is provided by adapter integration.\n// Register an adapter and render via schema.`;
+  }
+  const props = defaultProps ?? {};
+  const propEntries = Object.entries(props);
+  if (propEntries.length === 0) {
+    return `<${componentName} />`;
+  }
+  const serializedProps = propEntries
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}={${JSON.stringify(value)}}`)
+    .join('\n  ');
+  return `<${componentName}\n  ${serializedProps}\n/>`;
+}
+
+function toUiKitComponentName(adapterHint: string): string | null {
+  const name = adapterHint.split('.')[1] ?? '';
+  if (!name || adapterHint.startsWith('material.') || adapterHint.startsWith('aggrid.') || adapterHint.startsWith('highcharts.') || adapterHint.startsWith('d3.') || adapterHint.startsWith('company.')) {
+    return null;
+  }
+  return `PF${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 }
 
 function toKeySegment(adapterHint: string): string {

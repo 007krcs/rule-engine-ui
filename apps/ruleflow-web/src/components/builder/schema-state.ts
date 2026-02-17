@@ -103,6 +103,10 @@ function sanitizeItem(
   const maxX = Math.max(0, safeColumns - w);
   const x = Math.max(0, Math.min(maxX, Math.trunc(Number(item.x) || 0)));
   const y = Math.max(0, Math.trunc(Number(item.y) || index * 2));
+  const layer =
+    Number.isFinite(item.layer) && typeof item.layer === 'number'
+      ? Math.max(0, Math.trunc(item.layer))
+      : undefined;
 
   return {
     ...cloneItem(item),
@@ -113,6 +117,7 @@ function sanitizeItem(
     y,
     w,
     h,
+    layer,
   };
 }
 

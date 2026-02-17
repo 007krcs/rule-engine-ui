@@ -2,6 +2,7 @@ import type {
   ChangeEvent,
   HTMLAttributes,
   InputHTMLAttributes,
+  KeyboardEvent as ReactKeyboardEvent,
   LabelHTMLAttributes,
   ReactNode,
   SelectHTMLAttributes,
@@ -513,6 +514,392 @@ export function PFAutocomplete({
             })
           )}
         </ul>
+      ) : null}
+    </div>
+  );
+}
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^\d{2}:\d{2}$/;
+
+function normalizeIsoDate(value: string | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (ISO_DATE_PATTERN.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+}
+
+function normalizeTime(value: string | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (TIME_PATTERN.test(trimmed)) return trimmed;
+  return '';
+}
+
+function normalizeDateTimeInput(value: string | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getDate()).padStart(2, '0');
+  const hh = String(parsed.getHours()).padStart(2, '0');
+  const min = String(parsed.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+function formatDatePreview(
+  isoDate: string,
+  locale: string,
+  timezone: string | undefined,
+  displayFormat: 'short' | 'medium' | 'long' | Intl.DateTimeFormatOptions,
+): string {
+  if (!ISO_DATE_PATTERN.test(isoDate)) return '';
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  const options =
+    typeof displayFormat === 'string'
+      ? displayFormat === 'short'
+        ? ({ month: 'short', day: '2-digit', year: 'numeric', timeZone: timezone } as Intl.DateTimeFormatOptions)
+        : displayFormat === 'long'
+          ? ({ month: 'long', day: '2-digit', year: 'numeric', weekday: 'short', timeZone: timezone } as Intl.DateTimeFormatOptions)
+          : ({ month: 'short', day: '2-digit', year: 'numeric', timeZone: timezone } as Intl.DateTimeFormatOptions)
+      : { ...displayFormat, timeZone: timezone ?? displayFormat.timeZone };
+  return new Intl.DateTimeFormat(locale, options).format(date);
+}
+
+function toIsoDateFromDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function toIsoDateTime(value: string): string {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toISOString();
+}
+
+export interface PFDateFieldProps extends Omit<PFTextFieldProps, 'type' | 'value'> {
+  value?: string;
+  minDate?: string;
+  maxDate?: string;
+  locale?: string;
+  timezone?: string;
+  displayFormat?: 'short' | 'medium' | 'long' | Intl.DateTimeFormatOptions;
+  onValueChange?: (value: string) => void;
+}
+
+export function PFDateField({
+  value,
+  minDate,
+  maxDate,
+  helperText,
+  locale = 'en-US',
+  timezone,
+  displayFormat = 'medium',
+  onValueChange,
+  onChange,
+  ...rest
+}: PFDateFieldProps) {
+  const isoValue = normalizeIsoDate(value);
+  const preview = isoValue ? formatDatePreview(isoValue, locale, timezone, displayFormat) : '';
+  const nextHelper =
+    helperText && preview ? (
+      <>
+        {helperText}
+        <span className="pf-date-field__preview">Displayed as {preview}</span>
+      </>
+    ) : preview ? (
+      <span className="pf-date-field__preview">Displayed as {preview}</span>
+    ) : (
+      helperText
+    );
+
+  return (
+    <PFTextField
+      {...rest}
+      type="date"
+      value={isoValue}
+      min={normalizeIsoDate(minDate) || undefined}
+      max={normalizeIsoDate(maxDate) || undefined}
+      helperText={nextHelper}
+      onChange={(event) => {
+        onChange?.(event);
+        onValueChange?.(normalizeIsoDate(event.target.value));
+      }}
+    />
+  );
+}
+
+export interface PFTimeFieldProps extends Omit<PFTextFieldProps, 'type' | 'value'> {
+  value?: string;
+  minTime?: string;
+  maxTime?: string;
+  step?: number;
+  onValueChange?: (value: string) => void;
+}
+
+export function PFTimeField({
+  value,
+  minTime,
+  maxTime,
+  step = 60,
+  onValueChange,
+  onChange,
+  ...rest
+}: PFTimeFieldProps) {
+  return (
+    <PFTextField
+      {...rest}
+      type="time"
+      value={normalizeTime(value)}
+      min={normalizeTime(minTime) || undefined}
+      max={normalizeTime(maxTime) || undefined}
+      step={step}
+      onChange={(event) => {
+        onChange?.(event);
+        onValueChange?.(normalizeTime(event.target.value));
+      }}
+    />
+  );
+}
+
+export interface PFDateTimeFieldProps extends Omit<PFTextFieldProps, 'type' | 'value'> {
+  value?: string;
+  minDateTime?: string;
+  maxDateTime?: string;
+  step?: number;
+  onValueChange?: (value: string) => void;
+}
+
+export function PFDateTimeField({
+  value,
+  minDateTime,
+  maxDateTime,
+  step = 60,
+  onValueChange,
+  onChange,
+  ...rest
+}: PFDateTimeFieldProps) {
+  return (
+    <PFTextField
+      {...rest}
+      type="datetime-local"
+      value={normalizeDateTimeInput(value)}
+      min={normalizeDateTimeInput(minDateTime) || undefined}
+      max={normalizeDateTimeInput(maxDateTime) || undefined}
+      step={step}
+      onChange={(event) => {
+        onChange?.(event);
+        onValueChange?.(toIsoDateTime(event.target.value));
+      }}
+    />
+  );
+}
+
+export interface PFCalendarProps extends HTMLAttributes<HTMLDivElement>, PFBaseProps {
+  value?: string;
+  minDate?: string;
+  maxDate?: string;
+  locale?: string;
+  timezone?: string;
+  disabledDates?: string[] | ((isoDate: string) => boolean);
+  onValueChange?: (value: string) => void;
+}
+
+export function PFCalendar({
+  className,
+  value,
+  minDate,
+  maxDate,
+  locale = 'en-US',
+  timezone,
+  disabledDates,
+  onValueChange,
+  ...rest
+}: PFCalendarProps) {
+  const selected = normalizeIsoDate(value);
+  const now = new Date();
+  const initial = selected ? new Date(`${selected}T00:00:00`) : now;
+  const [cursor, setCursor] = useState(() => ({
+    year: initial.getFullYear(),
+    month: initial.getMonth(),
+  }));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const minValue = normalizeIsoDate(minDate);
+  const maxValue = normalizeIsoDate(maxDate);
+
+  const monthDate = useMemo(() => new Date(cursor.year, cursor.month, 1), [cursor.month, cursor.year]);
+  const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate();
+  const firstWeekday = monthDate.getDay();
+  const weekdayLabels = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: timezone });
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(2026, 0, 4 + index);
+      return formatter.format(date);
+    });
+  }, [locale, timezone]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const next = new Date(`${selected}T00:00:00`);
+    if (Number.isNaN(next.getTime())) return;
+    setCursor({ year: next.getFullYear(), month: next.getMonth() });
+  }, [selected]);
+
+  const isDisabled = (isoDate: string) => {
+    if (minValue && isoDate < minValue) return true;
+    if (maxValue && isoDate > maxValue) return true;
+    if (Array.isArray(disabledDates)) return disabledDates.includes(isoDate);
+    if (typeof disabledDates === 'function') return disabledDates(isoDate);
+    return false;
+  };
+
+  const focusDateButton = (isoDate: string) => {
+    window.requestAnimationFrame(() => {
+      const target = rootRef.current?.querySelector<HTMLButtonElement>(`[data-pf-date="${isoDate}"]`);
+      target?.focus();
+    });
+  };
+
+  const navigateMonth = (offset: number) => {
+    const next = new Date(cursor.year, cursor.month + offset, 1);
+    setCursor({ year: next.getFullYear(), month: next.getMonth() });
+  };
+
+  const onDateKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, isoDate: string) => {
+    let delta = 0;
+    if (event.key === 'ArrowRight') delta = 1;
+    if (event.key === 'ArrowLeft') delta = -1;
+    if (event.key === 'ArrowDown') delta = 7;
+    if (event.key === 'ArrowUp') delta = -7;
+    if (delta === 0) return;
+    event.preventDefault();
+    const current = new Date(`${isoDate}T00:00:00`);
+    current.setDate(current.getDate() + delta);
+    const nextIso = toIsoDateFromDate(current);
+    setCursor({ year: current.getFullYear(), month: current.getMonth() });
+    focusDateButton(nextIso);
+  };
+
+  return (
+    <div className={cn('pf-calendar', sizeClass('md'), className)} ref={rootRef} {...rest}>
+      <div className="pf-calendar__header">
+        <button type="button" className="pf-calendar__nav" onClick={() => navigateMonth(-1)} aria-label="Previous month">
+          {'<'}
+        </button>
+        <p className="pf-calendar__title">
+          {new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: timezone }).format(monthDate)}
+        </p>
+        <button type="button" className="pf-calendar__nav" onClick={() => navigateMonth(1)} aria-label="Next month">
+          {'>'}
+        </button>
+      </div>
+
+      <div className="pf-calendar__weekdays" role="row">
+        {weekdayLabels.map((label) => (
+          <span key={label} className="pf-calendar__weekday" role="columnheader">
+            {label}
+          </span>
+        ))}
+      </div>
+
+      <div className="pf-calendar__grid" role="grid" aria-label="Calendar month view">
+        {Array.from({ length: firstWeekday }).map((_, index) => (
+          <span key={`blank-${index}`} className="pf-calendar__blank" aria-hidden="true" />
+        ))}
+        {Array.from({ length: daysInMonth }, (_, index) => index + 1).map((day) => {
+          const iso = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const disabled = isDisabled(iso);
+          const selectedDay = selected === iso;
+          return (
+            <button
+              key={iso}
+              type="button"
+              className={cn(
+                'pf-calendar__day',
+                selectedDay && 'is-selected',
+                disabled && 'is-disabled',
+              )}
+              data-pf-date={iso}
+              disabled={disabled}
+              aria-pressed={selectedDay}
+              onClick={() => onValueChange?.(iso)}
+              onKeyDown={(event) => onDateKeyDown(event, iso)}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export interface PFClockProps extends HTMLAttributes<HTMLDivElement>, PFBaseProps {
+  value?: string;
+  locale?: string;
+  timezone?: string;
+  picker?: boolean;
+  live?: boolean;
+  showSeconds?: boolean;
+  label?: ReactNode;
+  onValueChange?: (value: string) => void;
+}
+
+export function PFClock({
+  className,
+  value,
+  locale = 'en-US',
+  timezone = 'UTC',
+  picker = false,
+  live = true,
+  showSeconds = false,
+  label,
+  onValueChange,
+  ...rest
+}: PFClockProps) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!live) return;
+    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(interval);
+  }, [live]);
+
+  const formatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: showSeconds ? '2-digit' : undefined,
+        timeZone: timezone,
+      }),
+    [locale, showSeconds, timezone],
+  );
+
+  const pickerValue = normalizeTime(value);
+
+  return (
+    <div className={cn('pf-clock', className)} {...rest}>
+      <div className="pf-clock__face">
+        <p className="pf-clock__time">{picker && pickerValue ? pickerValue : formatter.format(now)}</p>
+        <p className="pf-clock__zone">{timezone}</p>
+      </div>
+      {picker ? (
+        <label className="pf-clock__picker">
+          <span className="pf-form-label">{label ?? 'Set time'}</span>
+          <input
+            type="time"
+            value={pickerValue}
+            className={cn('pf-input', 'pf-size-md', 'pf-input--outline')}
+            onChange={(event) => onValueChange?.(normalizeTime(event.target.value))}
+          />
+        </label>
       ) : null}
     </div>
   );

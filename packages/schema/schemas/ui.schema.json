@@ -167,6 +167,7 @@
         "y": { "type": "integer", "minimum": 0 },
         "w": { "type": "integer", "minimum": 1 },
         "h": { "type": "integer", "minimum": 1 },
+        "layer": { "type": "integer", "minimum": 0 },
         "breakpoint": { "type": "string", "enum": ["lg", "md", "sm"] },
         "props": { "type": "object", "additionalProperties": true },
         "bindings": { "$ref": "#/$defs/bindings" },
@@ -217,6 +218,10 @@
         "min": { "type": "number" },
         "max": { "type": "number" },
         "regex": { "type": "string" },
+        "minDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "maxDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "minTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+        "maxTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
         "rules": { "type": "array", "items": { "type": "string" } }
       }
     },

@@ -1,0 +1,26 @@
+{
+  "name": "@platform/react-platform-adapter",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "dependencies": {
+    "@platform/react-renderer": "workspace:*",
+    "@platform/schema": "workspace:*",
+    "@platform/ui-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "@platform/i18n": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  }
+}

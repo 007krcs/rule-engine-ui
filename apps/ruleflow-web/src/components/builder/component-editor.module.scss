@@ -164,6 +164,18 @@
   align-items: end;
 }
 
+.layoutGrid {
+  display: grid;
+  gap: var(--rf-space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.layoutActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
 .arrayList {
   display: grid;
   gap: var(--rf-space-3);
@@ -204,6 +216,15 @@
   min-height: 90px;
   font-family: var(--rf-font-mono);
   font-size: 12px;
+}
+
+.previewBox {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  background: color-mix(in srgb, var(--rf-surface-2) 65%, transparent);
+  padding: 12px;
+  display: grid;
+  gap: var(--rf-space-2);
 }
 
 .details {

@@ -1,17 +1,19 @@
 .page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rf-space-6);
+  --builder-shell-offset: 324px;
+  --builder-shell-offset-mobile: 296px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--rf-space-4);
   width: 100%;
-  min-height: 0;
+  min-height: calc(100dvh - 160px);
 }
 
 .builderRoot {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
   min-height: 0;
-  overflow: auto;
+}
+
+.headerCard {
+  min-width: 0;
 }
 
 .headerRow {
@@ -44,13 +46,25 @@
   margin-top: 6px;
 }
 
-.builderGrid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rf-space-6);
-  align-items: stretch;
-  width: 100%;
+.builderShell {
   min-height: 0;
+}
+
+.panelCard {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.panelHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.panelContentScrollable {
+  min-height: 0;
+  overflow: auto;
 }
 
 .paletteContent {
@@ -98,7 +112,7 @@
   margin: 0;
   font-size: 12px;
   font-weight: 850;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rf-muted);
 }
@@ -109,18 +123,130 @@
   gap: var(--rf-space-2);
 }
 
+.workspaceToolbar {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.workspaceTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--rf-fg);
+}
+
 .canvasHeaderRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--rf-space-3);
 }
 
-.canvasContent {
+.canvasControlsRow {
+  display: grid;
+  gap: var(--rf-space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.canvasControlGroup {
+  min-width: 0;
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.zoomControls {
+  display: grid;
+  grid-template-columns: auto minmax(74px, 92px) auto auto auto auto;
+  gap: var(--rf-space-2);
+  align-items: center;
+}
+
+.artboardCustomGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rf-space-2);
+}
+
+.togglePills {
   display: flex;
-  flex-direction: column;
-  gap: var(--rf-space-4);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.togglePill {
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  color: var(--rf-fg);
+  border-radius: var(--rf-radius-pill);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.togglePillActive {
+  border-color: color-mix(in srgb, var(--rf-primary) 45%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface));
+}
+
+.canvasContent {
+  display: grid;
+  gap: var(--rf-space-3);
+  min-height: 100%;
+  align-content: start;
+}
+
+.canvasZone {
+  position: relative;
+  width: 100%;
+  min-width: 100%;
+  min-height: 680px;
+  border-radius: var(--rf-radius-lg);
+  border: 1px dashed color-mix(in srgb, var(--rf-border) 70%, var(--rf-primary));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--rf-surface-2) 82%, transparent),
+      color-mix(in srgb, var(--rf-surface) 86%, transparent)
+    );
+  padding: var(--rf-space-4);
+  overflow: hidden;
+  touch-action: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rf-border) 30%, transparent);
+}
+
+.builderCanvas {
+  display: grid;
+  align-content: start;
+  justify-content: start;
+  min-width: 0;
   min-height: 0;
+}
+
+.canvasZoneOver {
+  border-color: color-mix(in srgb, var(--rf-primary) 65%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface-2));
+}
+
+.inspectorStack {
+  display: grid;
+  gap: var(--rf-space-4);
+  min-height: 100%;
+  align-content: start;
+}
+
+.canvasEmptyHint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.canvasHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-muted);
 }
 
 .previewContent {
@@ -141,57 +267,6 @@
   padding: var(--rf-space-4);
   box-shadow: var(--rf-shadow-soft);
   overflow: hidden;
-}
-
-.canvasZone {
-  width: 100%;
-  max-width: 100%;
-  border-radius: var(--rf-radius-lg);
-  border: 1px dashed color-mix(in srgb, var(--rf-border) 70%, var(--rf-primary));
-  background: color-mix(in srgb, var(--rf-surface-2) 35%, transparent);
-  padding: var(--rf-space-4);
-  min-height: 220px;
-  overflow: auto;
-  touch-action: none;
-}
-
-.builderCanvas {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  min-height: 0;
-  overflow: auto;
-}
-
-.paletteColumn {
-  width: 100%;
-}
-
-.canvasColumn {
-  width: 100%;
-  min-width: 0;
-}
-
-.sideColumn {
-  width: 100%;
-  min-width: 0;
-}
-
-.canvasZoneOver {
-  border-color: color-mix(in srgb, var(--rf-primary) 65%, var(--rf-border));
-  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface-2));
-}
-
-.canvasEmptyHint {
-  margin: 0;
-  font-size: 14px;
-  color: var(--rf-muted);
-}
-
-.canvasHint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--rf-muted);
 }
 
 .dragOverlay {
@@ -225,23 +300,24 @@
   }
 }
 
-@media (min-width: 1024px) {
-  .builderGrid {
-    flex-direction: row;
-    align-items: flex-start;
+@media (max-width: 1199px) {
+  .page {
+    --builder-shell-offset-mobile: 324px;
   }
 
-  .paletteColumn {
-    flex: 0 0 260px;
-    width: 260px;
+  .panelCard {
+    min-height: auto;
   }
 
-  .canvasColumn {
-    flex: 1 1 auto;
+  .canvasControlsRow {
+    grid-template-columns: 1fr;
   }
 
-  .sideColumn {
-    flex: 0 0 420px;
-    width: 420px;
+  .zoomControls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .canvasZone {
+    min-height: 520px;
   }
 }

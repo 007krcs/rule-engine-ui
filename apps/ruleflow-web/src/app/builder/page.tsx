@@ -11,6 +11,7 @@ import type {
 } from '@platform/schema';
 import { validateUISchema, type ValidationIssue } from '@platform/validator';
 import { RenderPage } from '@platform/react-renderer';
+import { registerPlatformAdapter } from '@platform/react-platform-adapter';
 import { registerMaterialAdapters } from '@platform/react-material-adapter';
 import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
 import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
@@ -29,7 +30,14 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ComponentEditor } from '@/components/builder/component-editor';
 import { SchemaPreview } from '@/components/builder/schema-preview';
-import { GridCanvas } from '@/components/builder/grid-canvas';
+import { GridCanvas, type CanvasInteraction, type GridCanvasMetrics } from '@/components/builder/grid-canvas';
+import { BuilderShell } from '@/components/builder/BuilderShell';
+import {
+  clampGridRect,
+  clampNumber,
+  clientToLogicalPoint,
+  maxRowsFromArtboard,
+} from '@/components/builder/canvas-coordinates';
 import {
   createSchemaFromComponents,
   getSchemaGridSpec,
@@ -136,6 +144,29 @@ const previewData: Record<string, JSONValue> = {
 const BUILTIN_COMPONENT_DEFS = builtinComponentDefinitions();
 const DEFAULT_ADAPTER_HINT = BUILTIN_COMPONENT_DEFS[0]?.adapterHint ?? 'material.input';
 
+type ArtboardPresetId =
+  | 'desktop-1440'
+  | 'desktop-1600'
+  | 'desktop-1920'
+  | 'tablet-1024'
+  | 'mobile-375'
+  | 'custom';
+
+type ArtboardPreset = {
+  id: ArtboardPresetId;
+  label: string;
+  width: number;
+  height: number;
+};
+
+const ARTBOARD_PRESETS: ArtboardPreset[] = [
+  { id: 'desktop-1440', label: 'Desktop 1440 x 900', width: 1440, height: 900 },
+  { id: 'desktop-1600', label: 'Desktop 1600 x 1000', width: 1600, height: 1000 },
+  { id: 'desktop-1920', label: 'Desktop 1920 x 1080', width: 1920, height: 1080 },
+  { id: 'tablet-1024', label: 'Tablet 1024 x 768', width: 1024, height: 768 },
+  { id: 'mobile-375', label: 'Mobile 375 x 812', width: 375, height: 812 },
+];
+
 function extractComponentIdFromIssue(path: string, components: UIComponent[]): string | null {
   if (!path.startsWith('components.')) return null;
   const rest = path.slice('components.'.length);
@@ -162,6 +193,10 @@ function nextId(base: string, existing: Set<string>) {
 
 function toTestIdSuffix(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function clampValue(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function clampItem(item: UIGridItem, columns: number): UIGridItem {
@@ -339,21 +374,30 @@ export default function BuilderPage() {
   const [previewLocale, setPreviewLocale] = useState(previewContext.locale);
   const [activeBreakpoint, setActiveBreakpoint] = useState<LayoutBreakpoint>('lg');
   const [showGridOverlay, setShowGridOverlay] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [showRulers, setShowRulers] = useState(true);
+  const [showGuides, setShowGuides] = useState(true);
+  const [showMarginGuides, setShowMarginGuides] = useState(true);
+  const [lockAspectRatio, setLockAspectRatio] = useState(false);
+  const [zoomPercent, setZoomPercent] = useState(100);
+  const [artboardPreset, setArtboardPreset] = useState<ArtboardPresetId>('desktop-1440');
+  const [customArtboardWidth, setCustomArtboardWidth] = useState(1440);
+  const [customArtboardHeight, setCustomArtboardHeight] = useState(900);
   const [draft, setDraft] = useState({
     id: '',
     adapterHint: DEFAULT_ADAPTER_HINT,
   });
   const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
-  const [canvasMetrics, setCanvasMetrics] = useState<{
-    cellWidth: number;
-    rowHeight: number;
-    gap: number;
-    canvasRect: DOMRect | null;
-  }>({
+  const [canvasInteraction, setCanvasInteraction] = useState<CanvasInteraction | null>(null);
+  const [canvasMetrics, setCanvasMetrics] = useState<GridCanvasMetrics>({
     cellWidth: 96,
+    colStep: 108,
+    rowStep: 68,
     rowHeight: 56,
     gap: 12,
-    canvasRect: null,
+    surfaceRect: null,
+    viewportRect: null,
+    zoom: 1,
   });
 
   const sensors = useSensors(
@@ -361,7 +405,7 @@ export default function BuilderPage() {
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const [activeDrag, setActiveDrag] = useState<{ kind: 'palette' | 'component'; label: string } | null>(null);
+  const [activeDrag, setActiveDrag] = useState<{ kind: 'palette'; label: string } | null>(null);
 
   const components = useMemo(() => normalizeFocusOrder(schema.components as UIComponent[]), [schema.components]);
   const effectiveSchema = useMemo(
@@ -391,12 +435,27 @@ export default function BuilderPage() {
     () => getSchemaItemsForBreakpoint(effectiveSchema, activeBreakpoint),
     [activeBreakpoint, effectiveSchema],
   );
+  const artboardSize = useMemo(() => {
+    if (artboardPreset === 'custom') {
+      return {
+        width: clampValue(Math.trunc(customArtboardWidth || 1440), 320, 3200),
+        height: clampValue(Math.trunc(customArtboardHeight || 900), 320, 2400),
+      };
+    }
+    const preset = ARTBOARD_PRESETS.find((item) => item.id === artboardPreset) ?? ARTBOARD_PRESETS[0]!;
+    return { width: preset.width, height: preset.height };
+  }, [artboardPreset, customArtboardHeight, customArtboardWidth]);
+  const artboardRows = useMemo(
+    () => maxRowsFromArtboard(artboardSize.height, activeGridSpec.rowHeight, activeGridSpec.gap),
+    [activeGridSpec.gap, activeGridSpec.rowHeight, artboardSize.height],
+  );
   const localStorageKey = useMemo(
     () => `${BUILDER_LOCAL_STORAGE_KEY}:${versionId ?? 'scratch'}`,
     [versionId],
   );
 
   useEffect(() => {
+    registerPlatformAdapter();
     registerMaterialAdapters();
     registerAgGridAdapter();
     registerHighchartsAdapter();
@@ -597,6 +656,12 @@ export default function BuilderPage() {
   };
 
   const selectedComponent = selectedComponentId ? components.find((component) => component.id === selectedComponentId) ?? null : null;
+  const selectedItem = selectedComponentId
+    ? activeItems.find((item) => item.componentId === selectedComponentId) ?? null
+    : null;
+  const selectedItemIndex = selectedItem
+    ? activeItems.findIndex((item) => item.componentId === selectedItem.componentId)
+    : -1;
   const selectedDefinition =
     selectedComponent ? registry.find((def) => def.adapterHint === selectedComponent.adapterHint) ?? null : null;
 
@@ -631,18 +696,31 @@ export default function BuilderPage() {
   const updateGridItems = (
     breakpoint: LayoutBreakpoint,
     updater: (items: UIGridItem[]) => UIGridItem[],
-    anchorId?: string,
+    options?: {
+      anchorId?: string;
+      useCollision?: boolean;
+    },
   ) => {
     setSchema((current) => {
       const normalized = normalizeSchema(current);
       const spec = getSchemaGridSpec(normalized);
       const currentItems = getSchemaItemsForBreakpoint(normalized, breakpoint);
-      const nextItems = updater(currentItems);
+      const nextItems = updater(currentItems).map((item) => ({
+        ...item,
+        ...clampGridRect(
+          { x: item.x, y: item.y, w: item.w, h: item.h },
+          breakpoint === 'lg'
+            ? spec.columns
+            : spec.breakpoints?.[breakpoint]?.columns ?? spec.columns,
+          artboardRows,
+        ),
+      }));
+      const useCollision = options?.useCollision ?? true;
       const resolved =
-        anchorId
+        useCollision && options?.anchorId
           ? resolveCollisions(
               nextItems,
-              anchorId,
+              options.anchorId,
               breakpoint === 'lg'
                 ? spec.columns
                 : spec.breakpoints?.[breakpoint]?.columns ?? spec.columns,
@@ -667,25 +745,176 @@ export default function BuilderPage() {
           },
         },
       });
-    });
+      });
   };
 
-  const moveGridItem = (componentId: string, x: number, y: number) => {
+  const updateGridItemLayout = (
+    componentId: string,
+    nextRect: Partial<Pick<UIGridItem, 'x' | 'y' | 'w' | 'h' | 'layer'>>,
+    options?: { useCollision?: boolean },
+  ) => {
     updateGridItems(
       activeBreakpoint,
       (items) =>
-        items.map((item) => (item.componentId === componentId ? { ...item, x, y } : item)),
-      componentId,
+        items.map((item) => {
+          if (item.componentId !== componentId) return item;
+          const next = {
+            ...item,
+            ...nextRect,
+          };
+          const bounded = clampGridRect(
+            { x: next.x, y: next.y, w: next.w, h: next.h },
+            activeGridSpec.columns,
+            artboardRows,
+          );
+          return {
+            ...next,
+            ...bounded,
+            layer:
+              typeof next.layer === 'number'
+                ? Math.max(0, Math.trunc(next.layer))
+                : undefined,
+          };
+        }),
+      {
+        anchorId: componentId,
+        useCollision: options?.useCollision ?? true,
+      },
     );
   };
 
-  const resizeGridItem = (componentId: string, w: number, h: number) => {
+  const alignSelected = (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+    if (!selectedItem) return;
+    const current = selectedItem;
+    if (alignment === 'left') {
+      updateGridItemLayout(current.componentId, { x: 0 });
+      return;
+    }
+    if (alignment === 'center') {
+      const x = Math.max(0, Math.round((activeGridSpec.columns - current.w) / 2));
+      updateGridItemLayout(current.componentId, { x });
+      return;
+    }
+    if (alignment === 'right') {
+      const x = Math.max(0, activeGridSpec.columns - current.w);
+      updateGridItemLayout(current.componentId, { x });
+      return;
+    }
+    if (alignment === 'top') {
+      updateGridItemLayout(current.componentId, { y: 0 });
+      return;
+    }
+    if (alignment === 'middle') {
+      const y = Math.max(0, Math.round((artboardRows - current.h) / 2));
+      updateGridItemLayout(current.componentId, { y });
+      return;
+    }
+    const y = Math.max(0, artboardRows - current.h);
+    updateGridItemLayout(current.componentId, { y });
+  };
+
+  const distributeItems = (direction: 'horizontal' | 'vertical') => {
+    if (activeItems.length < 3) return;
     updateGridItems(
       activeBreakpoint,
-      (items) =>
-        items.map((item) => (item.componentId === componentId ? { ...item, w, h } : item)),
-      componentId,
+      (items) => {
+        const sorted = [...items].sort((a, b) =>
+          direction === 'horizontal'
+            ? a.x - b.x || a.componentId.localeCompare(b.componentId)
+            : a.y - b.y || a.componentId.localeCompare(b.componentId),
+        );
+        const first = sorted[0];
+        const last = sorted[sorted.length - 1];
+        if (!first || !last) return items;
+        if (direction === 'horizontal') {
+          const span = last.x - first.x;
+          if (span <= 0) return items;
+          return sorted.map((item, index) => {
+            if (index === 0 || index === sorted.length - 1) return item;
+            const nextX = Math.round(first.x + (span * index) / (sorted.length - 1));
+            return {
+              ...item,
+              x: clampNumber(nextX, 0, Math.max(0, activeGridSpec.columns - item.w)),
+            };
+          });
+        }
+        const span = last.y - first.y;
+        if (span <= 0) return items;
+        return sorted.map((item, index) => {
+          if (index === 0 || index === sorted.length - 1) return item;
+          const nextY = Math.round(first.y + (span * index) / (sorted.length - 1));
+          return {
+            ...item,
+            y: clampNumber(nextY, 0, Math.max(0, artboardRows - item.h)),
+          };
+        });
+      },
+      { useCollision: false },
     );
+  };
+
+  const changeSelectedLayer = (direction: 'forward' | 'backward') => {
+    if (!selectedItem) return;
+    const baseline = typeof selectedItem.layer === 'number' ? selectedItem.layer : Math.max(0, selectedItemIndex);
+    const nextLayer = direction === 'forward' ? baseline + 1 : Math.max(0, baseline - 1);
+    updateGridItemLayout(selectedItem.componentId, { layer: nextLayer }, { useCollision: false });
+  };
+
+  const resetSelectedSize = () => {
+    if (!selectedItem) return;
+    updateGridItemLayout(selectedItem.componentId, { w: 4, h: 3 });
+  };
+
+  const alignSelectedToGrid = () => {
+    if (!selectedItem) return;
+    updateGridItemLayout(
+      selectedItem.componentId,
+      {
+        x: Math.round(selectedItem.x),
+        y: Math.round(selectedItem.y),
+        w: Math.max(1, Math.round(selectedItem.w)),
+        h: Math.max(1, Math.round(selectedItem.h)),
+      },
+      { useCollision: true },
+    );
+  };
+
+  const fitSelectedToContent = () => {
+    if (!selectedItem || !selectedComponent) return;
+    const hint = selectedComponent.adapterHint.toLowerCase();
+    const isLarge =
+      hint.includes('table') ||
+      hint.includes('chart') ||
+      hint.includes('calendar') ||
+      hint.includes('drawer');
+    const nextW = isLarge ? Math.min(activeGridSpec.columns, 8) : Math.min(activeGridSpec.columns, 4);
+    const nextH = isLarge ? 6 : 3;
+    updateGridItemLayout(selectedItem.componentId, { w: nextW, h: nextH });
+  };
+
+  const zoomToFit = () => {
+    const viewport = canvasMetrics.viewportRect;
+    if (!viewport) return;
+    const availableWidth = Math.max(320, viewport.width - 120);
+    const availableHeight = Math.max(280, viewport.height - 120);
+    const widthRatio = availableWidth / artboardSize.width;
+    const heightRatio = availableHeight / artboardSize.height;
+    const nextZoom = clampValue(Math.round(Math.min(widthRatio, heightRatio) * 100), 50, 200);
+    setZoomPercent(nextZoom);
+  };
+
+  const zoomToSelection = () => {
+    if (!selectedItem) return;
+    const viewport = canvasMetrics.viewportRect;
+    if (!viewport) return;
+    const widthPx = selectedItem.w * canvasMetrics.colStep - canvasMetrics.gap;
+    const heightPx = selectedItem.h * canvasMetrics.rowStep - canvasMetrics.gap;
+    const availableWidth = Math.max(120, viewport.width - 160);
+    const availableHeight = Math.max(120, viewport.height - 160);
+    const widthRatio = availableWidth / Math.max(80, widthPx);
+    const heightRatio = availableHeight / Math.max(80, heightPx);
+    const nextZoom = clampValue(Math.round(Math.min(widthRatio, heightRatio) * 100), 50, 200);
+    setZoomPercent(nextZoom);
   };
 
   const removeComponent = (componentId: string) => {
@@ -695,17 +924,12 @@ export default function BuilderPage() {
 
   const onDragStart = (event: DragStartEvent) => {
     const activeId = String(event.active.id);
-    if (activeId.startsWith('palette:')) {
-      setActiveDrag({ kind: 'palette', label: String(event.active.data.current?.label ?? 'Palette item') });
-      return;
-    }
-    setActiveDrag({
-      kind: 'component',
-      label: activeId.startsWith('canvas:') ? activeId.slice('canvas:'.length) : activeId,
-    });
+    if (!activeId.startsWith('palette:')) return;
+    setActiveDrag({ kind: 'palette', label: String(event.active.data.current?.label ?? 'Palette item') });
   };
 
   const onDragMove = (event: DragMoveEvent) => {
+    if (!String(event.active.id).startsWith('palette:')) return;
     const translated = event.active.rect.current.translated;
     const initial = event.active.rect.current.initial;
     const rect = translated ?? initial;
@@ -724,8 +948,6 @@ export default function BuilderPage() {
       }
       return;
     }
-    const overId = String(over.id);
-
     if (activeId.startsWith('palette:')) {
       const adapterHint = activeId.slice('palette:'.length);
       const def = registry.find((item) => item.adapterHint === adapterHint);
@@ -745,55 +967,39 @@ export default function BuilderPage() {
       const nextComponent = buildComponentFromRegistry(def, id);
       setSchema((current) => withUpdatedComponents(current, (currentComponents) => [...currentComponents, nextComponent]));
 
-      const rect = canvasMetrics.canvasRect;
+      const rect = canvasMetrics.surfaceRect;
       const pointer = dragPointer;
       if (rect && pointer) {
-        const stepX = canvasMetrics.cellWidth + canvasMetrics.gap;
-        const stepY = canvasMetrics.rowHeight + canvasMetrics.gap;
-        const rawX = Math.floor((pointer.x - rect.left) / stepX);
-        const rawY = Math.floor((pointer.y - rect.top) / stepY);
-        updateGridItems(
-          activeBreakpoint,
-          (items) =>
-            items.map((item) =>
-              item.componentId === id
-                ? { ...item, x: Math.max(0, rawX), y: Math.max(0, rawY) }
-                : item,
-            ),
+        const logical = clientToLogicalPoint(pointer.x, pointer.y, rect, canvasMetrics.zoom);
+        const rawX = Math.floor(logical.x / canvasMetrics.colStep);
+        const rawY = Math.floor(logical.y / canvasMetrics.rowStep);
+        updateGridItemLayout(
           id,
+          {
+            x: clampNumber(rawX, 0, Math.max(0, activeGridSpec.columns - 1)),
+            y: clampNumber(rawY, 0, Math.max(0, artboardRows - 1)),
+            layer: Math.max(0, activeItems.length),
+          },
+          { useCollision: true },
         );
       }
       setSelectedComponentId(id);
       toast({ variant: 'success', title: 'Dropped component', description: id });
-      return;
-    }
-
-    if (activeId.startsWith('canvas:') && overId === 'canvas') {
-      const componentId = activeId.slice('canvas:'.length);
-      const payload = active.data.current as { x?: number; y?: number } | undefined;
-      const startX = Number(payload?.x ?? 0);
-      const startY = Number(payload?.y ?? 0);
-      const stepX = canvasMetrics.cellWidth + canvasMetrics.gap;
-      const stepY = canvasMetrics.rowHeight + canvasMetrics.gap;
-      const nextX = Math.max(0, startX + Math.round(event.delta.x / stepX));
-      const nextY = Math.max(0, startY + Math.round(event.delta.y / stepY));
-      moveGridItem(componentId, nextX, nextY);
     }
   };
 
   const dragGridCoordinates = useMemo(() => {
-    const rect = canvasMetrics.canvasRect;
+    const rect = canvasMetrics.surfaceRect;
     if (!dragPointer || !rect) return null;
-    const stepX = canvasMetrics.cellWidth + canvasMetrics.gap;
-    const stepY = canvasMetrics.rowHeight + canvasMetrics.gap;
-    const x = Math.max(0, Math.floor((dragPointer.x - rect.left) / stepX));
-    const y = Math.max(0, Math.floor((dragPointer.y - rect.top) / stepY));
+    const logical = clientToLogicalPoint(dragPointer.x, dragPointer.y, rect, canvasMetrics.zoom);
+    const x = Math.max(0, Math.floor(logical.x / canvasMetrics.colStep));
+    const y = Math.max(0, Math.floor(logical.y / canvasMetrics.rowStep));
     return { x, y };
   }, [canvasMetrics, dragPointer]);
 
   return (
     <div className={cn(styles.page, styles.builderRoot)}>
-      <Card>
+      <Card className={styles.headerCard}>
         <CardHeader>
           <div className={styles.headerRow}>
             <div>
@@ -941,7 +1147,13 @@ export default function BuilderPage() {
         </CardContent>
       </Card>
 
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd}>
+      <DndContext
+        id="builder-dnd-context"
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+      >
         {previewMode ? (
           <Card>
             <CardHeader>
@@ -974,46 +1186,61 @@ export default function BuilderPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className={styles.builderGrid}>
-            <Card className={styles.paletteColumn}>
-              <CardHeader>
-                <CardTitle>Component Palette</CardTitle>
-              </CardHeader>
-              <CardContent className={styles.paletteContent}>
-                {registryLoading ? <p className={styles.canvasHint}>Loading registry...</p> : null}
-                {registry.map((def) => (
-                  <PaletteItem
-                    key={def.adapterHint}
-                    def={def}
-                    selected={draft.adapterHint === def.adapterHint}
-                    disabled={loading || registryLoading || Boolean(def.palette?.disabled)}
-                    onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
-                  />
-                ))}
-
-                <div className={styles.addSection}>
-                  <p className={styles.addTitle}>Quick Add (optional)</p>
-                  <div className={styles.addStack}>
-                    <Input
-                      placeholder="Component id"
-                      value={draft.id}
-                      onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
-                      data-testid="builder-quick-add-id"
+          <BuilderShell
+            className={styles.builderShell}
+            storageKey={`ruleflow:builder:layout:${effectivePreviewContext.tenantId}`}
+            palette={
+              <Card className={styles.panelCard}>
+                <CardHeader className={styles.panelHeader}>
+                  <CardTitle>Component Palette</CardTitle>
+                </CardHeader>
+                <CardContent className={cn(styles.paletteContent, styles.panelContentScrollable)}>
+                  {registryLoading ? <p className={styles.canvasHint}>Loading registry...</p> : null}
+                  {registry.map((def) => (
+                    <PaletteItem
+                      key={def.adapterHint}
+                      def={def}
+                      selected={draft.adapterHint === def.adapterHint}
+                      disabled={loading || registryLoading || Boolean(def.palette?.disabled)}
+                      onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
                     />
-                    <Button size="sm" onClick={addComponent} disabled={loading} data-testid="builder-quick-add-button">
-                      Add
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  ))}
 
-            <Card className={styles.canvasColumn}>
-              <CardHeader>
+                  <div className={styles.addSection}>
+                    <p className={styles.addTitle}>Quick Add (optional)</p>
+                    <div className={styles.addStack}>
+                      <Input
+                        placeholder="Component id"
+                        value={draft.id}
+                        onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
+                        data-testid="builder-quick-add-id"
+                      />
+                      <Button size="sm" onClick={addComponent} disabled={loading} data-testid="builder-quick-add-button">
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            }
+            canvasToolbar={
+              <div className={styles.workspaceToolbar}>
                 <div className={styles.canvasHeaderRow}>
-                  <CardTitle>Canvas</CardTitle>
+                  <div>
+                    <h2 className={styles.workspaceTitle}>Canvas Workspace</h2>
+                    <p className={styles.canvasHint}>Drag from palette and place on the grid surface.</p>
+                  </div>
                   <div className={styles.actions}>
-                    {dragGridCoordinates ? (
+                    {canvasInteraction ? (
+                      <Badge variant="muted">
+                        {canvasInteraction.x},{canvasInteraction.y} {canvasInteraction.w}x{canvasInteraction.h} |
+                        {' '}
+                        {Math.round(canvasInteraction.px.left)}px,
+                        {Math.round(canvasInteraction.px.top)}px
+                        {' '}
+                        {Math.round(canvasInteraction.px.width)}x{Math.round(canvasInteraction.px.height)}px
+                      </Badge>
+                    ) : dragGridCoordinates ? (
                       <Badge variant="muted">
                         {dragGridCoordinates.x},{dragGridCoordinates.y}
                       </Badge>
@@ -1023,8 +1250,144 @@ export default function BuilderPage() {
                     </Badge>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className={styles.canvasContent}>
+                <div className={styles.canvasControlsRow}>
+                  <div className={styles.canvasControlGroup}>
+                    <label className="rfFieldLabel">Artboard</label>
+                    <Select
+                      value={artboardPreset}
+                      onChange={(event) => setArtboardPreset(event.target.value as ArtboardPresetId)}
+                      aria-label="Artboard preset"
+                      data-testid="builder-artboard-select"
+                    >
+                      {ARTBOARD_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                      <option value="custom">Custom</option>
+                    </Select>
+                    {artboardPreset === 'custom' ? (
+                      <div className={styles.artboardCustomGrid}>
+                        <Input
+                          type="number"
+                          value={customArtboardWidth}
+                          onChange={(event) => {
+                            const parsed = Number(event.target.value);
+                            setCustomArtboardWidth(Number.isFinite(parsed) ? Math.trunc(parsed) : 1440);
+                          }}
+                          aria-label="Custom artboard width"
+                          data-testid="builder-artboard-custom-width"
+                        />
+                        <Input
+                          type="number"
+                          value={customArtboardHeight}
+                          onChange={(event) => {
+                            const parsed = Number(event.target.value);
+                            setCustomArtboardHeight(Number.isFinite(parsed) ? Math.trunc(parsed) : 900);
+                          }}
+                          aria-label="Custom artboard height"
+                          data-testid="builder-artboard-custom-height"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className={styles.canvasControlGroup}>
+                    <label className="rfFieldLabel">Zoom</label>
+                    <div className={styles.zoomControls}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setZoomPercent((current) => clampValue(current - 10, 50, 200))}
+                        aria-label="Zoom out"
+                      >
+                        -
+                      </Button>
+                      <Input
+                        type="number"
+                        value={zoomPercent}
+                        onChange={(event) => {
+                          const parsed = Number(event.target.value);
+                          const next = Number.isFinite(parsed) ? Math.trunc(parsed) : 100;
+                          setZoomPercent(clampValue(next, 50, 200));
+                        }}
+                        aria-label="Canvas zoom percent"
+                        data-testid="builder-zoom-input"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setZoomPercent((current) => clampValue(current + 10, 50, 200))}
+                        aria-label="Zoom in"
+                      >
+                        +
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setZoomPercent(100)} data-testid="builder-zoom-reset">
+                        Reset
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={zoomToFit} data-testid="builder-zoom-fit">
+                        Fit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={zoomToSelection} disabled={!selectedItem} data-testid="builder-zoom-selection">
+                        Selection
+                      </Button>
+                    </div>
+                  </div>
+                  <div className={styles.canvasControlGroup}>
+                    <label className="rfFieldLabel">Canvas Helpers</label>
+                    <div className={styles.togglePills}>
+                      <button
+                        type="button"
+                        className={cn(styles.togglePill, showGridOverlay ? styles.togglePillActive : undefined)}
+                        onClick={() => setShowGridOverlay((value) => !value)}
+                        aria-pressed={showGridOverlay}
+                        data-testid="builder-toggle-grid"
+                      >
+                        Grid
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(styles.togglePill, snapToGrid ? styles.togglePillActive : undefined)}
+                        onClick={() => setSnapToGrid((value) => !value)}
+                        aria-pressed={snapToGrid}
+                        data-testid="builder-toggle-snap"
+                      >
+                        Snap
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(styles.togglePill, showRulers ? styles.togglePillActive : undefined)}
+                        onClick={() => setShowRulers((value) => !value)}
+                        aria-pressed={showRulers}
+                        data-testid="builder-toggle-rulers"
+                      >
+                        Rulers
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(styles.togglePill, showGuides ? styles.togglePillActive : undefined)}
+                        onClick={() => setShowGuides((value) => !value)}
+                        aria-pressed={showGuides}
+                        data-testid="builder-toggle-guides"
+                      >
+                        Guides
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(styles.togglePill, lockAspectRatio ? styles.togglePillActive : undefined)}
+                        onClick={() => setLockAspectRatio((value) => !value)}
+                        aria-pressed={lockAspectRatio}
+                        data-testid="builder-toggle-aspect"
+                      >
+                        Lock Aspect
+                      </button>
+                      <Badge variant="muted">{artboardSize.width}x{artboardSize.height}</Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+            canvas={
+              <div className={styles.canvasContent}>
                 <CanvasDropZone disabled={loading}>
                   {loading && components.length === 0 ? <p className={styles.canvasHint}>Loading schema...</p> : null}
                   {!loading && components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
@@ -1040,65 +1403,103 @@ export default function BuilderPage() {
                     i18n={i18n}
                     disabled={loading}
                     showGrid={showGridOverlay}
+                    showRulers={showRulers}
+                    showGuides={showGuides}
+                    showMarginGuides={showMarginGuides}
+                    lockAspectRatio={lockAspectRatio}
+                    artboardWidth={artboardSize.width}
+                    artboardHeight={artboardSize.height}
+                    zoom={zoomPercent}
+                    snap={snapToGrid}
                     onSelect={setSelectedComponentId}
                     onRemove={removeComponent}
-                    onMove={moveGridItem}
-                    onResize={resizeGridItem}
+                    onUpdateLayout={(componentId, next) => updateGridItemLayout(componentId, next)}
+                    onInteractionChange={setCanvasInteraction}
                     onMetricsChange={setCanvasMetrics}
                   />
                 </CanvasDropZone>
                 <p className={styles.canvasHint}>
-                  Drag from palette to place anywhere. Use item handles to move/resize, arrows to nudge, Shift+arrows to resize.
+                  Drag the handle to move, use resize handles for precise sizing, and Shift + arrows to resize by grid units. Canvas scroll is isolated to this center workspace.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            }
+            inspector={
+              <div className={styles.inspectorStack}>
+                {selectedComponent ? (
+                  <ComponentEditor
+                    component={selectedComponent}
+                    definition={selectedDefinition}
+                    registry={registry}
+                    issues={issuesByComponentId.get(selectedComponent.id)}
+                    previewData={previewData}
+                    previewContext={effectivePreviewContext}
+                    translate={i18n.t}
+                    layout={
+                      selectedItem
+                        ? {
+                            x: selectedItem.x,
+                            y: selectedItem.y,
+                            w: selectedItem.w,
+                            h: selectedItem.h,
+                            layer: selectedItem.layer ?? Math.max(0, selectedItemIndex),
+                            colStep: canvasMetrics.colStep,
+                            rowStep: canvasMetrics.rowStep,
+                            gap: activeGridSpec.gap,
+                            columns: activeGridSpec.columns,
+                            maxRows: artboardRows,
+                          }
+                        : undefined
+                    }
+                    onLayoutChange={(patch) => {
+                      if (!selectedItem) return;
+                      updateGridItemLayout(selectedItem.componentId, patch);
+                    }}
+                    onAlign={alignSelected}
+                    onDistribute={distributeItems}
+                    onBringForward={() => changeSelectedLayer('forward')}
+                    onSendBackward={() => changeSelectedLayer('backward')}
+                    onResetLayoutSize={resetSelectedSize}
+                    onAlignToGrid={alignSelectedToGrid}
+                    onFitToContent={fitSelectedToContent}
+                    onToggleMarginGuides={() => setShowMarginGuides((value) => !value)}
+                    marginGuidesEnabled={showMarginGuides}
+                    onChange={(next) =>
+                      setSchema((current) =>
+                        withUpdatedComponents(current, (currentComponents) =>
+                          currentComponents.map((item) => (item.id === next.id ? next : item)),
+                        ),
+                      )
+                    }
+                    onRemove={() => removeComponent(selectedComponent.id)}
+                  />
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Properties</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className={styles.emptyText}>Select a component on the canvas to edit its properties.</p>
+                    </CardContent>
+                  </Card>
+                )}
 
-            <div className={cn(styles.canvasContent, styles.sideColumn)}>
-              {selectedComponent ? (
-                <ComponentEditor
-                  component={selectedComponent}
-                  definition={selectedDefinition}
-                  registry={registry}
-                  issues={issuesByComponentId.get(selectedComponent.id)}
-                  previewData={previewData}
-                  previewContext={effectivePreviewContext}
-                  translate={i18n.t}
-                  onChange={(next) =>
-                    setSchema((current) =>
-                      withUpdatedComponents(current, (currentComponents) =>
-                        currentComponents.map((item) => (item.id === next.id ? next : item)),
-                      ),
-                    )
-                  }
-                  onRemove={() => removeComponent(selectedComponent.id)}
+                <SchemaPreview
+                  schema={effectiveSchema}
+                  issues={validation.issues}
+                  resolveComponentId={(path) => extractComponentIdFromIssue(path, components)}
+                  onFocusComponentId={focusComponent}
+                  onSchemaChange={(nextSchema) => setSchema(normalizeSchema(nextSchema))}
                 />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Properties</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className={styles.emptyText}>Select a component on the canvas to edit its properties.</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              <SchemaPreview
-                schema={effectiveSchema}
-                issues={validation.issues}
-                resolveComponentId={(path) => extractComponentIdFromIssue(path, components)}
-                onFocusComponentId={focusComponent}
-                onSchemaChange={(nextSchema) => setSchema(normalizeSchema(nextSchema))}
-              />
-            </div>
-          </div>
+              </div>
+            }
+          />
         )}
 
         <DragOverlay>
           {activeDrag ? (
             <div className={styles.dragOverlay}>
               <div className={styles.dragOverlayTitle}>{activeDrag.label}</div>
-              <div className={styles.dragOverlaySub}>{activeDrag.kind === 'palette' ? 'Palette item' : 'Canvas item'}</div>
+              <div className={styles.dragOverlaySub}>Palette item</div>
             </div>
           ) : null}
         </DragOverlay>

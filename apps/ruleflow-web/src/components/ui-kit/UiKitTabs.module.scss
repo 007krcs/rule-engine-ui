@@ -1,0 +1,33 @@
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 72%, transparent);
+  color: var(--pf-surface-text-muted);
+  min-height: var(--pf-control-height-sm);
+  padding: 0 14px;
+  font-size: var(--pf-font-size-sm);
+  font-weight: var(--pf-font-weight-semibold);
+  letter-spacing: 0.01em;
+  transition:
+    border-color var(--pf-motion-fast) var(--pf-motion-easing-standard),
+    background-color var(--pf-motion-fast) var(--pf-motion-easing-standard),
+    color var(--pf-motion-fast) var(--pf-motion-easing-standard);
+}
+
+.tab:hover {
+  border-color: color-mix(in srgb, var(--pf-color-primary-400) 38%, var(--pf-surface-border));
+  color: var(--pf-surface-text);
+}
+
+.tabActive {
+  border-color: color-mix(in srgb, var(--pf-color-primary-500) 48%, var(--pf-surface-border));
+  background: color-mix(in srgb, var(--pf-color-primary-500) 16%, var(--pf-surface-layer));
+  color: var(--pf-color-primary-700);
+}

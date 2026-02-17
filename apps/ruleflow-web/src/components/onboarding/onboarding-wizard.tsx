@@ -11,7 +11,7 @@ import { apiPost } from '@/lib/demo/api-client';
 import { useToast } from '@/components/ui/toast';
 import { SamplesGallery } from '@/components/onboarding/samples-gallery';
 import { useOnboarding } from '@/components/onboarding/onboarding-provider';
-import styles from './onboarding-wizard.module.css';
+import styles from './onboarding-wizard.module.scss';
 
 function stepBadge(done: boolean) {
   return <Badge variant={done ? 'success' : 'warning'}>{done ? 'PASS' : 'FAIL'}</Badge>;
@@ -116,13 +116,13 @@ export function OnboardingWizard() {
           {versionId ? <span className={styles.metaCode}>{versionId}</span> : <span className={styles.metaCode}>none</span>}
         </p>
         <div className={styles.footerRight}>
-          <Link href="/samples" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+          <Link href="/samples" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
             Browse samples
           </Link>
-          <span className="rfHelperText" style={{ margin: 0 }}>
+          <span className={`${styles.helperTextMuted} rfHelperText`}>
             |
           </span>
-          <Link href="/docs/getting-started" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+          <Link href="/docs/getting-started" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
             Getting started
           </Link>
         </div>
@@ -141,8 +141,8 @@ export function OnboardingWizard() {
           </div>
 
           <div className={styles.stepActions}>
-            <div style={{ display: 'grid', gap: 10, width: 'min(520px, 100%)' }}>
-              <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+            <div className={styles.createFormWrap}>
+              <div className={styles.createFormGrid}>
                 <div>
                   <label className="rfFieldLabel">Tenant Id</label>
                   <Input value={tenantId} onChange={(e) => setTenantId(e.target.value)} disabled={creating} />
@@ -156,18 +156,18 @@ export function OnboardingWizard() {
                 <label className="rfFieldLabel">Name</label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} disabled={creating} />
               </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className={styles.createActions}>
                 <Button size="sm" onClick={() => void createDraft()} disabled={creating || name.trim().length === 0}>
                   {creating ? 'Creating...' : 'Create draft'}
                 </Button>
-                <Link href="/docs/tutorial-console" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+                <Link href="/docs/tutorial-console" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
                   Learn configId/version
                 </Link>
               </div>
             </div>
           </div>
 
-          <div style={{ height: 16 }} />
+          <div className={styles.sectionSpacer} />
           <SamplesGallery
             onCloned={() => {
               onboarding.close();
@@ -189,7 +189,7 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={openBuilder} disabled={!versionId}>
               Open Builder
             </Button>
-            <Link href="/docs/tutorial-builder" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            <Link href="/docs/tutorial-builder" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
               Builder tutorial
             </Link>
           </div>
@@ -210,7 +210,7 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={openRules} disabled={!versionId}>
               Open Rules Builder
             </Button>
-            <Link href="/docs/tutorial-rules" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            <Link href="/docs/tutorial-rules" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
               Rules tutorial
             </Link>
           </div>
@@ -228,7 +228,7 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={openPreview} disabled={!versionId}>
               Open Preview Mode
             </Button>
-            <Link href="/docs/tutorial-builder" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            <Link href="/docs/tutorial-builder" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
               Responsive checklist
             </Link>
           </div>
@@ -248,7 +248,7 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={openBuilder} disabled={!versionId}>
               Back to Builder
             </Button>
-            <Link href="/docs/wcag" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            <Link href="/docs/wcag" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
               Validation gates
             </Link>
           </div>
@@ -286,13 +286,13 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={() => openPlayground({ autorun: 'submit', focusTrace: true, explain: true })} disabled={!versionId}>
               Open Trace + Explain
             </Button>
-            <Link href="/docs/tutorial-playground" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            <Link href="/docs/tutorial-playground" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
               Trace tutorial
             </Link>
           </div>
         </section>
 
-        <section className={styles.stepCard}>
+        <section className={styles.stepCard} data-testid="onboarding-step-gitops">
           <div className={styles.stepHeader}>
             <div>
               <p className={styles.stepTitle}>8) Console export/import</p>
@@ -304,7 +304,7 @@ export function OnboardingWizard() {
             <Button size="sm" onClick={openGitOps}>
               Open Console (Versions)
             </Button>
-            <Link href="/docs/deployment" onClick={onboarding.close} className="rfHelperText" style={{ margin: 0 }}>
+            <Link href="/docs/deployment" onClick={onboarding.close} className={`${styles.helperLink} rfHelperText`}>
               GitOps docs
             </Link>
           </div>

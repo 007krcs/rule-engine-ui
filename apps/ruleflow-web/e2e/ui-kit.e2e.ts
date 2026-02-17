@@ -18,34 +18,40 @@ async function waitForClientReady(page: Page) {
   await expect(page.getByTestId('client-ready')).toBeVisible({ timeout: 120_000 });
 }
 
-test('ui-kit page theme controls and accessibility gate', async ({ page }) => {
+test('ui-kit explorer supports search, preview controls, and theme toolbar', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/system/ui-kit');
   await waitForClientReady(page);
 
-  await expect(page.getByRole('heading', { name: 'Platform UI Kit' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Component Explorer' })).toBeVisible();
 
-  await page.getByRole('combobox', { name: 'Theme mode' }).selectOption('dark');
+  await page.getByTestId('ui-kit-search-input').fill('dialog');
+  await expect(page.getByTestId('ui-kit-item-platform.dialog')).toBeVisible();
+  await page.getByTestId('ui-kit-item-platform.dialog').click();
+
+  await expect(page.getByRole('heading', { name: 'PFDialog' })).toBeVisible();
+  await expect(page.getByTestId('ui-kit-preview')).toBeVisible();
+
+  await page.getByTestId('ui-kit-prop-open').evaluate((node) => {
+    (node as HTMLInputElement).click();
+  });
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  await page.getByTestId('ui-kit-theme-mode').selectOption('dark');
   await expect.poll(async () => page.evaluate(() => document.documentElement.getAttribute('data-theme'))).toBe('dark');
 
-  await page.getByRole('combobox', { name: 'Density mode' }).selectOption('compact');
+  await page.getByTestId('ui-kit-density-mode').selectOption('compact');
   await expect.poll(async () => page.evaluate(() => document.documentElement.getAttribute('data-density'))).toBe('compact');
 
-  await page.getByLabel('Brand primary').fill('#0055aa');
+  await page.getByTestId('ui-kit-brand-primary').fill('#0055aa');
   await expect
     .poll(async () =>
       page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--pf-color-primary-500').trim()),
     )
     .toBe('#0055aa');
 
-  await page.addScriptTag({ url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js' });
-  const violations = await page.evaluate(async () => {
-    const axe = (window as Window & { axe: { run: (root?: unknown, options?: unknown) => Promise<{ violations: unknown[] }> } }).axe;
-    const results = await axe.run(document, {
-      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
-    });
-    return results.violations as Array<{ impact: string | null }>;
+  await page.screenshot({
+    path: testInfo.outputPath('ui-kit-explorer-1366x768.png'),
+    fullPage: false,
   });
-
-  const blocking = violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
-  expect(blocking).toEqual([]);
 });

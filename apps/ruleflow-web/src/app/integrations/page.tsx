@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import type { ExecutionContext, JSONValue, UISchema } from '@platform/schema';
 import { RenderPage } from '@platform/react-renderer';
+import { registerPlatformAdapter } from '@platform/react-platform-adapter';
 import { registerMaterialAdapters } from '@platform/react-material-adapter';
 import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
 import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
@@ -52,7 +53,7 @@ const snippets: Array<{
   },
   {
     title: 'React (Demo Adapters)',
-    code: `import { RenderPage } from '@platform/react-renderer';\nimport { registerMaterialAdapters } from '@platform/react-material-adapter';\nimport { registerAgGridAdapter } from '@platform/react-aggrid-adapter';\nimport { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';\n\nregisterMaterialAdapters();\nregisterAgGridAdapter();\nregisterHighchartsAdapter();\n\n<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />`,
+    code: `import { RenderPage } from '@platform/react-renderer';\nimport { registerPlatformAdapter } from '@platform/react-platform-adapter';\nimport { registerMaterialAdapters } from '@platform/react-material-adapter';\nimport { registerAgGridAdapter } from '@platform/react-aggrid-adapter';\nimport { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';\n\nregisterPlatformAdapter();\nregisterMaterialAdapters();\nregisterAgGridAdapter();\nregisterHighchartsAdapter();\n\n<RenderPage uiSchema={uiSchema} data={data} context={context} i18n={i18n} />`,
     description: 'Demo adapters render HTML/SVG so you can ship without external UI dependencies.',
     preview: 'react',
   },
@@ -78,6 +79,7 @@ const snippets: Array<{
 
 export default function IntegrationsPage() {
   useEffect(() => {
+    registerPlatformAdapter();
     registerMaterialAdapters();
     registerAgGridAdapter();
     registerHighchartsAdapter();

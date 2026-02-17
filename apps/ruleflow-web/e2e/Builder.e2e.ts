@@ -109,7 +109,8 @@ test('supports grid DnD + breakpoint persistence + i18n + visibleWhen rules', as
 
   const breakpointSelect = page.getByTestId('builder-breakpoint-select');
   await breakpointSelect.selectOption('md');
-  await addedItem.click();
+  await addedItem.scrollIntoViewIfNeeded();
+  await addedItem.click({ force: true });
   await addedItem.focus();
   await addedItem.press('ArrowRight');
   await addedItem.press('ArrowRight');
@@ -137,7 +138,9 @@ test('supports grid DnD + breakpoint persistence + i18n + visibleWhen rules', as
   await expect(page.getByText('Nom du client')).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole('button', { name: 'Back to editing' }).click();
-  await page.getByTestId('builder-grid-item-customerNameInput').click();
+  const customerNameItem = page.getByTestId('builder-grid-item-customerNameInput');
+  await customerNameItem.scrollIntoViewIfNeeded();
+  await customerNameItem.click({ force: true });
   await page.getByTestId('rule-type-select').selectOption('visibleWhen');
   await page.getByLabel('Rule left path').fill('context.locale');
   await page.getByLabel('Rule operator').selectOption('eq');

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule, UISchema } from '@platform/schema';
 import { executeStep } from '@platform/core-runtime';
 import { RenderPage } from '@platform/react-renderer';
+import { registerPlatformAdapter } from '@platform/react-platform-adapter';
 import { registerMaterialAdapters } from '@platform/react-material-adapter';
 import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
 import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
@@ -263,6 +264,7 @@ export default function HealthPage() {
 
     // Adapters
     try {
+      registerPlatformAdapter();
       registerMaterialAdapters();
       registerAgGridAdapter();
       registerHighchartsAdapter();
