@@ -13,15 +13,23 @@ import {
   type ColorScale,
 } from './tokens';
 
+export type PlatformThemeMode = 'light' | 'dark';
+export type PlatformThemeDensity = 'comfortable' | 'cozy' | 'compact';
+export type PlatformVisualStyle = 'flat' | 'layered' | '3d';
+
 export type PlatformTheme = {
-  mode: 'light' | 'dark';
-  density: 'comfortable' | 'compact';
+  mode: PlatformThemeMode;
+  density: PlatformThemeDensity;
+  visual: PlatformVisualStyle;
   brand?: {
     logoUrl?: string;
+    faviconUrl?: string;
     primary?: string;
     secondary?: string;
     fontFamily?: string;
     radiusScale?: number;
+    elevationIntensity?: number;
+    noise?: number;
   };
 };
 
@@ -38,10 +46,60 @@ export interface PlatformThemeContextValue {
   setTheme: (theme: Partial<PlatformTheme>) => void;
   setMode: (mode: PlatformTheme['mode']) => void;
   setDensity: (density: PlatformTheme['density']) => void;
-  setBrand: (brand: PlatformTheme['brand']) => void;
+  setVisual: (visual: PlatformTheme['visual']) => void;
+  setBrand: (brand: Partial<NonNullable<PlatformTheme['brand']>>) => void;
 }
 
+type VisualPreset = {
+  elevationIntensity: number;
+  noiseOpacity: number;
+  lightX: string;
+  lightY: string;
+  highlightAlpha: number;
+  shadowAlpha: number;
+};
+
 const DEFAULT_STORAGE_KEY = 'pf:theme:v1';
+
+const VISUAL_PRESETS: Record<PlatformVisualStyle, VisualPreset> = {
+  flat: {
+    elevationIntensity: 0.75,
+    noiseOpacity: 0,
+    lightX: '18%',
+    lightY: '12%',
+    highlightAlpha: 0,
+    shadowAlpha: 0,
+  },
+  layered: {
+    elevationIntensity: 1,
+    noiseOpacity: 0.03,
+    lightX: '18%',
+    lightY: '12%',
+    highlightAlpha: 0.36,
+    shadowAlpha: 0.16,
+  },
+  '3d': {
+    elevationIntensity: 1.28,
+    noiseOpacity: 0.045,
+    lightX: '14%',
+    lightY: '8%',
+    highlightAlpha: 0.42,
+    shadowAlpha: 0.22,
+  },
+};
+
+const DEFAULT_BACKGROUNDS: Record<PlatformThemeMode, { bg0: string; bg1: string; bg2: string }> = {
+  light: {
+    bg0: '#edf2fa',
+    bg1: '#f7f9fd',
+    bg2: '#e8edf7',
+  },
+  dark: {
+    bg0: '#09101a',
+    bg1: '#111b2a',
+    bg2: '#182436',
+  },
+};
 
 const ThemeContext = createContext<PlatformThemeContextValue | null>(null);
 
@@ -60,7 +118,7 @@ export function PlatformThemeProvider({
     if (typeof window === 'undefined') return;
     const stored = readStoredTheme(storageKey);
     if (!stored) return;
-    setThemeState((current) => ({ ...current, ...stored, brand: { ...current.brand, ...stored.brand } }));
+    setThemeState((current) => mergeTheme(current, stored));
   }, [storageKey]);
 
   useEffect(() => {
@@ -68,14 +126,7 @@ export function PlatformThemeProvider({
     let cancelled = false;
     tenantThemeLoader().then((tenantTheme) => {
       if (!tenantTheme || cancelled) return;
-      setThemeState((current) => ({
-        ...current,
-        ...tenantTheme,
-        brand: {
-          ...current.brand,
-          ...(tenantTheme.brand ?? {}),
-        },
-      }));
+      setThemeState((current) => mergeTheme(current, tenantTheme));
     });
     return () => {
       cancelled = true;
@@ -87,9 +138,18 @@ export function PlatformThemeProvider({
   useEffect(() => {
     const element = resolveTarget(target);
     if (!element) return;
+    const densityAttribute = normalizeDensityAttribute(theme.density);
     element.setAttribute('data-theme', theme.mode);
-    element.setAttribute('data-density', theme.density);
+    element.setAttribute('data-density', densityAttribute);
+    element.setAttribute('data-visual', theme.visual);
     applyThemeVars(element, vars);
+
+    if (typeof document !== 'undefined' && element === document.documentElement) {
+      document.body?.setAttribute('data-theme', theme.mode);
+      document.body?.setAttribute('data-density', densityAttribute);
+      document.body?.setAttribute('data-visual', theme.visual);
+    }
+
     writeStoredTheme(storageKey, theme);
   }, [theme, vars, target, storageKey]);
 
@@ -97,18 +157,12 @@ export function PlatformThemeProvider({
     () => ({
       theme,
       setTheme: (next) => {
-        setThemeState((current) => ({
-          ...current,
-          ...next,
-          brand: {
-            ...current.brand,
-            ...(next.brand ?? {}),
-          },
-        }));
+        setThemeState((current) => mergeTheme(current, next));
       },
-      setMode: (mode) => setThemeState((current) => ({ ...current, mode })),
-      setDensity: (density) => setThemeState((current) => ({ ...current, density })),
-      setBrand: (brand) => setThemeState((current) => ({ ...current, brand })),
+      setMode: (mode) => setThemeState((current) => mergeTheme(current, { mode })),
+      setDensity: (density) => setThemeState((current) => mergeTheme(current, { density })),
+      setVisual: (visual) => setThemeState((current) => mergeTheme(current, { visual })),
+      setBrand: (brand) => setThemeState((current) => mergeTheme(current, { brand })),
     }),
     [theme],
   );
@@ -125,12 +179,25 @@ export function usePlatformTheme(): PlatformThemeContextValue {
 }
 
 export function createThemeVars(theme: PlatformTheme): Record<string, string> {
-  const tokens = getDesignTokensForMode(theme.mode);
-  const vars = tokensToCssVars(tokens, theme.density);
+  const mode = normalizeMode(theme.mode);
+  const density = normalizeDensity(theme.density);
+  const visual = normalizeVisual(theme.visual);
+
+  const tokens = getDesignTokensForMode(mode);
+  const vars = tokensToCssVars(tokens, density);
+
+  vars['--pf-density'] = normalizeDensityAttribute(theme.density);
+  vars['--pf-visual-style'] = visual;
 
   if (theme.brand?.primary) {
     const primaryScale = deriveColorScale(theme.brand.primary);
     applyScale(vars, 'primary', primaryScale);
+    applyBackgroundScale(vars, primaryScale, mode);
+  } else {
+    const fallback = DEFAULT_BACKGROUNDS[mode];
+    vars['--pf-bg-0'] = fallback.bg0;
+    vars['--pf-bg-1'] = fallback.bg1;
+    vars['--pf-bg-2'] = fallback.bg2;
   }
 
   if (theme.brand?.secondary) {
@@ -152,9 +219,23 @@ export function createThemeVars(theme: PlatformTheme): Record<string, string> {
     vars['--pf-radius-2xl'] = scalePx(vars['--pf-radius-2xl'], multiplier);
   }
 
-  if (theme.brand?.logoUrl) {
-    vars['--pf-brand-logo-url'] = `url("${theme.brand.logoUrl}")`;
-  }
+  vars['--pf-brand-logo-url'] = theme.brand?.logoUrl ? `url("${theme.brand.logoUrl}")` : '';
+  vars['--pf-brand-favicon-url'] = theme.brand?.faviconUrl ? `url("${theme.brand.faviconUrl}")` : '';
+
+  const preset = VISUAL_PRESETS[visual];
+  vars['--pf-light-x'] = preset.lightX;
+  vars['--pf-light-y'] = preset.lightY;
+  vars['--pf-elevation-intensity'] = formatNumber(
+    clamp(theme.brand?.elevationIntensity ?? preset.elevationIntensity, 0.6, 1.8),
+  );
+  vars['--pf-noise-opacity'] = formatNumber(clamp(theme.brand?.noise ?? preset.noiseOpacity, 0, 0.08), 3);
+
+  const primaryScale = theme.brand?.primary ? deriveColorScale(theme.brand.primary) : null;
+  const highlightHex = mode === 'dark' ? (primaryScale?.[200] ?? '#8eafff') : '#ffffff';
+  const shadowHex = mode === 'dark' ? '#000000' : (primaryScale?.[900] ?? '#1c2537');
+
+  vars['--pf-bg-highlight'] = rgbToCssAlpha(hexToRgb(highlightHex), preset.highlightAlpha);
+  vars['--pf-bg-shadow'] = rgbToCssAlpha(hexToRgb(shadowHex), preset.shadowAlpha);
 
   return vars;
 }
@@ -182,7 +263,10 @@ export function deriveColorScale(hex: string): ColorScale {
 
   const scale: Partial<ColorScale> = {};
   for (const [step, amount] of steps) {
-    const mixed = amount >= 0 ? mixRgb(rgb, { r: 255, g: 255, b: 255 }, amount) : mixRgb(rgb, { r: 0, g: 0, b: 0 }, Math.abs(amount));
+    const mixed =
+      amount >= 0
+        ? mixRgb(rgb, { r: 255, g: 255, b: 255 }, amount)
+        : mixRgb(rgb, { r: 0, g: 0, b: 0 }, Math.abs(amount));
     scale[step] = rgbToHex(mixed.r, mixed.g, mixed.b);
   }
 
@@ -193,11 +277,13 @@ export { platformThemeInitScript };
 
 function resolveInitialTheme(initialTheme?: Partial<PlatformTheme>): PlatformTheme {
   const preferredMode = resolvePreferredMode();
-  return {
-    mode: initialTheme?.mode ?? preferredMode,
-    density: initialTheme?.density ?? 'comfortable',
-    brand: initialTheme?.brand,
+  const base: PlatformTheme = {
+    mode: preferredMode,
+    density: 'comfortable',
+    visual: 'layered',
+    brand: {},
   };
+  return mergeTheme(base, initialTheme);
 }
 
 function resolvePreferredMode(): PlatformTheme['mode'] {
@@ -210,7 +296,8 @@ function readStoredTheme(storageKey: string): Partial<PlatformTheme> | null {
   try {
     const raw = window.localStorage.getItem(storageKey);
     if (!raw) return null;
-    return JSON.parse(raw) as Partial<PlatformTheme>;
+    const parsed = JSON.parse(raw) as Partial<PlatformTheme>;
+    return sanitizeThemePatch(parsed);
   } catch {
     return null;
   }
@@ -233,11 +320,124 @@ function applyScale(vars: Record<string, string>, name: string, scale: ColorScal
   }
 }
 
+function applyBackgroundScale(
+  vars: Record<string, string>,
+  scale: ColorScale,
+  mode: PlatformThemeMode,
+): void {
+  if (mode === 'dark') {
+    vars['--pf-bg-0'] = mixHex(scale[900], '#09101a', 0.78);
+    vars['--pf-bg-1'] = mixHex(scale[800], '#111b2a', 0.8);
+    vars['--pf-bg-2'] = mixHex(scale[700], '#182436', 0.82);
+    return;
+  }
+
+  vars['--pf-bg-0'] = mixHex(scale[50], '#edf2fa', 0.72);
+  vars['--pf-bg-1'] = mixHex(scale[100], '#f7f9fd', 0.82);
+  vars['--pf-bg-2'] = mixHex(scale[200], '#e8edf7', 0.84);
+}
+
+function mergeTheme(base: PlatformTheme, patch?: Partial<PlatformTheme>): PlatformTheme {
+  const safePatch = sanitizeThemePatch(patch);
+  const merged: PlatformTheme = {
+    ...base,
+    ...safePatch,
+    mode: normalizeMode(safePatch.mode ?? base.mode),
+    density: normalizeDensityInput(safePatch.density ?? base.density),
+    visual: normalizeVisual(safePatch.visual ?? base.visual),
+    brand: {
+      ...(base.brand ?? {}),
+      ...(safePatch.brand ?? {}),
+    },
+  };
+  return merged;
+}
+
+function sanitizeThemePatch(patch?: Partial<PlatformTheme>): Partial<PlatformTheme> {
+  if (!patch) return {};
+  const next: Partial<PlatformTheme> = {};
+
+  if (patch.mode) {
+    next.mode = normalizeMode(patch.mode);
+  }
+  if (patch.density) {
+    next.density = normalizeDensityInput(patch.density);
+  }
+  if (patch.visual) {
+    next.visual = normalizeVisual(patch.visual);
+  }
+
+  if (patch.brand) {
+    next.brand = {
+      logoUrl: patch.brand.logoUrl,
+      faviconUrl: patch.brand.faviconUrl,
+      primary: patch.brand.primary,
+      secondary: patch.brand.secondary,
+      fontFamily: patch.brand.fontFamily,
+      radiusScale:
+        typeof patch.brand.radiusScale === 'number' && Number.isFinite(patch.brand.radiusScale)
+          ? clamp(patch.brand.radiusScale, 0.5, 2)
+          : undefined,
+      elevationIntensity:
+        typeof patch.brand.elevationIntensity === 'number' && Number.isFinite(patch.brand.elevationIntensity)
+          ? clamp(patch.brand.elevationIntensity, 0.6, 1.8)
+          : undefined,
+      noise:
+        typeof patch.brand.noise === 'number' && Number.isFinite(patch.brand.noise)
+          ? clamp(patch.brand.noise, 0, 0.08)
+          : undefined,
+    };
+  }
+
+  return next;
+}
+
+function normalizeMode(mode: string | undefined): PlatformThemeMode {
+  return mode === 'dark' ? 'dark' : 'light';
+}
+
+function normalizeVisual(visual: string | undefined): PlatformVisualStyle {
+  if (visual === 'flat' || visual === 'layered' || visual === '3d') return visual;
+  return 'layered';
+}
+
+function normalizeDensityInput(density: string | undefined): PlatformThemeDensity {
+  if (density === 'compact') return 'compact';
+  if (density === 'cozy') return 'cozy';
+  return 'comfortable';
+}
+
+function normalizeDensity(density: PlatformThemeDensity): 'comfortable' | 'compact' {
+  return density === 'compact' ? 'compact' : 'comfortable';
+}
+
+function normalizeDensityAttribute(density: PlatformThemeDensity): 'comfortable' | 'compact' | 'cozy' {
+  if (density === 'compact') return 'compact';
+  if (density === 'cozy') return 'cozy';
+  return 'comfortable';
+}
+
 function scalePx(raw: string | undefined, multiplier: number): string {
   if (!raw) return '0px';
   const value = Number.parseFloat(raw);
   if (Number.isNaN(value)) return raw;
   return `${Math.round(value * multiplier)}px`;
+}
+
+function mixHex(a: string, b: string, ratioToB: number): string {
+  const rgbA = hexToRgb(a);
+  const rgbB = hexToRgb(b);
+  const mixed = mixRgb(rgbA, rgbB, ratioToB);
+  return rgbToHex(mixed.r, mixed.g, mixed.b);
+}
+
+function rgbToCssAlpha(rgb: { r: number; g: number; b: number }, alpha: number): string {
+  const clamped = clamp(alpha, 0, 1);
+  return `rgb(${rgb.r} ${rgb.g} ${rgb.b} / ${Math.round(clamped * 100)}%)`;
+}
+
+function formatNumber(value: number, digits = 2): string {
+  return Number(value.toFixed(digits)).toString();
 }
 
 function clamp(value: number, min: number, max: number): number {

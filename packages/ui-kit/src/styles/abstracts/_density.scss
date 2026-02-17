@@ -1,0 +1,24 @@
+@layer tokens {
+  [data-density='cozy'],
+  [data-density='comfortable'] {
+    --pf-density: cozy;
+    --pf-density-scale: 1;
+    --pf-control-height-sm: 32px;
+    --pf-control-height-md: 40px;
+    --pf-control-height-lg: 48px;
+    --pf-control-padding-x-sm: 8px;
+    --pf-control-padding-x-md: 12px;
+    --pf-control-padding-x-lg: 16px;
+  }
+
+  [data-density='compact'] {
+    --pf-density: compact;
+    --pf-density-scale: 0.87;
+    --pf-control-height-sm: 28px;
+    --pf-control-height-md: 34px;
+    --pf-control-height-lg: 40px;
+    --pf-control-padding-x-sm: 6px;
+    --pf-control-padding-x-md: 8px;
+    --pf-control-padding-x-lg: 12px;
+  }
+}

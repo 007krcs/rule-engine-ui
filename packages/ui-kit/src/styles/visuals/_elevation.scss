@@ -1,0 +1,17 @@
+@layer base {
+  :root {
+    --pf-elevation-intensity: 1;
+  }
+
+  [data-visual='flat'] {
+    --pf-elevation-intensity: 0.7;
+  }
+
+  [data-visual='layered'] {
+    --pf-elevation-intensity: 1;
+  }
+
+  [data-visual='3d'] {
+    --pf-elevation-intensity: 1.25;
+  }
+}

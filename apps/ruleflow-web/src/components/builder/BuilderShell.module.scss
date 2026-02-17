@@ -31,7 +31,7 @@
   position: relative;
   z-index: 3;
   padding: var(--rf-space-3);
-  background: color-mix(in srgb, var(--rf-surface) 95%, transparent);
+  background: transparent;
 }
 
 .splitter {
@@ -67,14 +67,11 @@
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   position: relative;
-  background:
-    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--rf-accent) 10%, transparent), transparent 52%),
-    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--rf-primary) 10%, transparent), transparent 48%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rf-surface) 96%, transparent), color-mix(in srgb, var(--rf-surface-2) 92%, transparent));
+  background: transparent;
 }
 
 .workspace::before {
-  content: '';
+  content: none;
   position: absolute;
   inset: 0;
   pointer-events: none;

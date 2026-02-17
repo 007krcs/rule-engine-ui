@@ -61,6 +61,12 @@ export const docs: DocEntry[] = [
     body: 'Component manifest JSON, validation, tenant vs global scope, palette updates.',
   },
   {
+    slug: 'tutorial-template-library',
+    title: 'Tutorial: Template Library',
+    description: 'Create reusable BA-first templates as schema JSON and publish them in-app.',
+    body: 'Template metadata, required data contracts, schema JSON placement, and apply-flow integration in Builder.',
+  },
+  {
     slug: 'tutorial-company-adapter',
     title: 'Tutorial: Add Your Company Component In 10 Minutes',
     description: 'Implement and register custom components using adapter hints.',

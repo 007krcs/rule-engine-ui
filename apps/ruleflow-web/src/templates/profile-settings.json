@@ -1,0 +1,345 @@
+{
+  "version": "1.0.0",
+  "pageId": "profile-settings-screen",
+  "layoutType": "grid",
+  "layout": {
+    "id": "root",
+    "type": "grid",
+    "columns": 12,
+    "componentIds": [
+      "profilePageShell",
+      "profileSection",
+      "profileTabs",
+      "profileStatusAlert",
+      "profileInfoCards",
+      "profileFirstName",
+      "profileLastName",
+      "profileEmail",
+      "profileRole",
+      "profileBio",
+      "profileCancel",
+      "profileSave"
+    ]
+  },
+  "grid": {
+    "columns": 12,
+    "rowHeight": 56,
+    "gap": 12,
+    "collisionStrategy": "push",
+    "breakpoints": {
+      "md": {
+        "columns": 8,
+        "rowHeight": 52,
+        "gap": 10
+      },
+      "sm": {
+        "columns": 4,
+        "rowHeight": 48,
+        "gap": 8
+      }
+    }
+  },
+  "items": [
+    { "id": "profilePageShell", "componentId": "profilePageShell", "x": 0, "y": 0, "w": 12, "h": 2 },
+    { "id": "profileSection", "componentId": "profileSection", "x": 0, "y": 2, "w": 12, "h": 2 },
+    { "id": "profileTabs", "componentId": "profileTabs", "x": 0, "y": 4, "w": 12, "h": 2 },
+    { "id": "profileStatusAlert", "componentId": "profileStatusAlert", "x": 0, "y": 6, "w": 12, "h": 2 },
+    { "id": "profileInfoCards", "componentId": "profileInfoCards", "x": 0, "y": 8, "w": 12, "h": 4 },
+    { "id": "profileFirstName", "componentId": "profileFirstName", "x": 0, "y": 12, "w": 3, "h": 2 },
+    { "id": "profileLastName", "componentId": "profileLastName", "x": 3, "y": 12, "w": 3, "h": 2 },
+    { "id": "profileEmail", "componentId": "profileEmail", "x": 6, "y": 12, "w": 3, "h": 2 },
+    { "id": "profileRole", "componentId": "profileRole", "x": 9, "y": 12, "w": 3, "h": 2 },
+    { "id": "profileBio", "componentId": "profileBio", "x": 0, "y": 14, "w": 12, "h": 3 },
+    { "id": "profileCancel", "componentId": "profileCancel", "x": 8, "y": 17, "w": 2, "h": 2 },
+    { "id": "profileSave", "componentId": "profileSave", "x": 10, "y": 17, "w": 2, "h": 2 },
+
+    { "id": "profileFirstName:md", "componentId": "profileFirstName", "x": 0, "y": 12, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "profileLastName:md", "componentId": "profileLastName", "x": 4, "y": 12, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "profileEmail:md", "componentId": "profileEmail", "x": 0, "y": 14, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "profileRole:md", "componentId": "profileRole", "x": 4, "y": 14, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "profileBio:md", "componentId": "profileBio", "x": 0, "y": 16, "w": 8, "h": 3, "breakpoint": "md" },
+    { "id": "profileCancel:md", "componentId": "profileCancel", "x": 4, "y": 19, "w": 2, "h": 2, "breakpoint": "md" },
+    { "id": "profileSave:md", "componentId": "profileSave", "x": 6, "y": 19, "w": 2, "h": 2, "breakpoint": "md" },
+
+    { "id": "profileFirstName:sm", "componentId": "profileFirstName", "x": 0, "y": 12, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "profileLastName:sm", "componentId": "profileLastName", "x": 0, "y": 14, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "profileEmail:sm", "componentId": "profileEmail", "x": 0, "y": 16, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "profileRole:sm", "componentId": "profileRole", "x": 0, "y": 18, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "profileBio:sm", "componentId": "profileBio", "x": 0, "y": 20, "w": 4, "h": 4, "breakpoint": "sm" },
+    { "id": "profileCancel:sm", "componentId": "profileCancel", "x": 0, "y": 24, "w": 2, "h": 2, "breakpoint": "sm" },
+    { "id": "profileSave:sm", "componentId": "profileSave", "x": 2, "y": 24, "w": 2, "h": 2, "breakpoint": "sm" }
+  ],
+  "components": [
+    {
+      "id": "profilePageShell",
+      "type": "layout",
+      "adapterHint": "platform.pageShell",
+      "props": {
+        "sidebarWidth": 260,
+        "collapsedSidebarWidth": 88,
+        "hasRightPanel": false,
+        "headerHeight": 64,
+        "stickyHeader": true,
+        "contentTitleKey": "runtime.templates.profile.content.title",
+        "contentDescriptionKey": "runtime.templates.profile.content.description"
+      },
+      "bindings": {
+        "data": {
+          "sidebarItems": "data.navigation.profileSidebar"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.shell.label",
+        "helperTextKey": "runtime.templates.profile.shell.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.shell.aria",
+        "keyboardNav": true,
+        "focusOrder": 1
+      }
+    },
+    {
+      "id": "profileSection",
+      "type": "layout",
+      "adapterHint": "platform.section",
+      "props": {
+        "titleKey": "runtime.templates.profile.section.title",
+        "descriptionKey": "runtime.templates.profile.section.description",
+        "intent": "neutral"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.section.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.section.aria",
+        "keyboardNav": true,
+        "focusOrder": 2
+      }
+    },
+    {
+      "id": "profileTabs",
+      "type": "navigation",
+      "adapterHint": "platform.tabs",
+      "props": {
+        "value": "settings",
+        "tabs": [
+          { "id": "settings", "labelKey": "runtime.templates.profile.tabs.settings", "contentKey": "runtime.templates.profile.tabs.settings.content" },
+          { "id": "team", "labelKey": "runtime.templates.profile.tabs.team", "contentKey": "runtime.templates.profile.tabs.team.content" },
+          { "id": "plan", "labelKey": "runtime.templates.profile.tabs.plan", "contentKey": "runtime.templates.profile.tabs.plan.content" },
+          { "id": "billing", "labelKey": "runtime.templates.profile.tabs.billing", "contentKey": "runtime.templates.profile.tabs.billing.content" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "value": "data.userProfile.activeTab"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.tabs.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.tabs.aria",
+        "keyboardNav": true,
+        "focusOrder": 3
+      }
+    },
+    {
+      "id": "profileStatusAlert",
+      "type": "feedback",
+      "adapterHint": "platform.alert",
+      "props": {
+        "intent": "success",
+        "descriptionKey": "runtime.templates.profile.alert.description"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.alert.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.alert.aria",
+        "keyboardNav": true,
+        "focusOrder": 4
+      }
+    },
+    {
+      "id": "profileInfoCards",
+      "type": "display",
+      "adapterHint": "platform.cardGrid",
+      "props": {
+        "columns": { "sm": 1, "md": 2, "lg": 3, "xl": 3 },
+        "gap": 16
+      },
+      "bindings": {
+        "data": {
+          "items": "data.userProfile.sections"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.cards.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.cards.aria",
+        "keyboardNav": true,
+        "focusOrder": 5
+      }
+    },
+    {
+      "id": "profileFirstName",
+      "type": "input",
+      "adapterHint": "platform.textField",
+      "bindings": {
+        "data": {
+          "value": "data.userProfile.firstName"
+        }
+      },
+      "validations": {
+        "required": true
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.form.firstName.label",
+        "helperTextKey": "runtime.templates.profile.form.firstName.helper",
+        "placeholderKey": "runtime.templates.profile.form.firstName.placeholder"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.form.firstName.aria",
+        "keyboardNav": true,
+        "focusOrder": 6
+      }
+    },
+    {
+      "id": "profileLastName",
+      "type": "input",
+      "adapterHint": "platform.textField",
+      "bindings": {
+        "data": {
+          "value": "data.userProfile.lastName"
+        }
+      },
+      "validations": {
+        "required": true
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.form.lastName.label",
+        "helperTextKey": "runtime.templates.profile.form.lastName.helper",
+        "placeholderKey": "runtime.templates.profile.form.lastName.placeholder"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.form.lastName.aria",
+        "keyboardNav": true,
+        "focusOrder": 7
+      }
+    },
+    {
+      "id": "profileEmail",
+      "type": "input",
+      "adapterHint": "platform.textField",
+      "bindings": {
+        "data": {
+          "value": "data.userProfile.email"
+        }
+      },
+      "validations": {
+        "required": true
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.form.email.label",
+        "helperTextKey": "runtime.templates.profile.form.email.helper",
+        "placeholderKey": "runtime.templates.profile.form.email.placeholder"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.form.email.aria",
+        "keyboardNav": true,
+        "focusOrder": 8
+      }
+    },
+    {
+      "id": "profileRole",
+      "type": "input",
+      "adapterHint": "platform.select",
+      "props": {
+        "options": [
+          { "value": "author", "labelKey": "runtime.templates.profile.form.role.author" },
+          { "value": "approver", "labelKey": "runtime.templates.profile.form.role.approver" },
+          { "value": "viewer", "labelKey": "runtime.templates.profile.form.role.viewer" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "value": "data.userProfile.role"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.form.role.label",
+        "helperTextKey": "runtime.templates.profile.form.role.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.form.role.aria",
+        "keyboardNav": true,
+        "focusOrder": 9
+      }
+    },
+    {
+      "id": "profileBio",
+      "type": "input",
+      "adapterHint": "platform.textField",
+      "bindings": {
+        "data": {
+          "value": "data.userProfile.bio"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.form.bio.label",
+        "helperTextKey": "runtime.templates.profile.form.bio.helper",
+        "placeholderKey": "runtime.templates.profile.form.bio.placeholder"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.form.bio.aria",
+        "keyboardNav": true,
+        "focusOrder": 10
+      }
+    },
+    {
+      "id": "profileCancel",
+      "type": "action",
+      "adapterHint": "platform.button",
+      "props": {
+        "variant": "outline",
+        "intent": "neutral",
+        "labelKey": "runtime.templates.profile.actions.cancel"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.actions.cancel"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.actions.cancel.aria",
+        "keyboardNav": true,
+        "focusOrder": 11
+      }
+    },
+    {
+      "id": "profileSave",
+      "type": "action",
+      "adapterHint": "platform.button",
+      "props": {
+        "variant": "solid",
+        "intent": "primary",
+        "labelKey": "runtime.templates.profile.actions.save"
+      },
+      "rules": {
+        "disabledWhen": {
+          "op": "eq",
+          "left": { "path": "context.role" },
+          "right": { "value": "viewer" }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.profile.actions.save",
+        "helperTextKey": "runtime.templates.profile.actions.save.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.profile.actions.save.aria",
+        "keyboardNav": true,
+        "focusOrder": 12
+      }
+    }
+  ]
+}

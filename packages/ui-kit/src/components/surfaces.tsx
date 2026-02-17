@@ -248,7 +248,7 @@ export function PFPopover({
     <div className="pf-popover-layer">
       <div
         ref={popoverRef}
-        className={cn('pf-popover', `pf-popover--${placement}`, className)}
+        className={cn('pf-popover', 'pf-surface-panel', `pf-popover--${placement}`, className)}
         role="dialog"
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
         {...rest}

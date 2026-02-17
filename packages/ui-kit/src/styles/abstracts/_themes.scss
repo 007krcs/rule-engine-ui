@@ -1,0 +1,453 @@
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    --pf-font-sans: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --pf-font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+    --pf-font-size-xs: 12px;
+    --pf-font-size-sm: 14px;
+    --pf-font-size-md: 16px;
+    --pf-font-size-lg: 18px;
+    --pf-font-size-xl: 20px;
+    --pf-font-size-2xl: 24px;
+    --pf-font-size-3xl: 30px;
+    --pf-font-weight-regular: 400;
+    --pf-font-weight-medium: 500;
+    --pf-font-weight-semibold: 600;
+    --pf-font-weight-bold: 700;
+    --pf-line-height-tight: 1.2;
+    --pf-line-height-normal: 1.45;
+    --pf-line-height-relaxed: 1.65;
+
+    --pf-space-0: 0px;
+    --pf-space-1: 2px;
+    --pf-space-2: 4px;
+    --pf-space-3: 6px;
+    --pf-space-4: 8px;
+    --pf-space-5: 12px;
+    --pf-space-6: 16px;
+    --pf-space-7: 20px;
+    --pf-space-8: 24px;
+    --pf-space-9: 32px;
+    --pf-space-10: 40px;
+    --pf-space-11: 48px;
+    --pf-space-12: 64px;
+
+    --pf-radius-none: 0;
+    --pf-radius-xs: 4px;
+    --pf-radius-sm: 6px;
+    --pf-radius-md: 10px;
+    --pf-radius-lg: 14px;
+    --pf-radius-xl: 18px;
+    --pf-radius-2xl: 24px;
+    --pf-radius-full: 9999px;
+
+    --pf-shadow-sm: 0 1px 2px rgb(15 25 38 / calc(0.08 * var(--pf-elevation-intensity)));
+    --pf-shadow-md: 0 10px 30px rgb(18 29 49 / calc(0.12 * var(--pf-elevation-intensity)));
+    --pf-shadow-lg: 0 14px 42px rgb(18 29 49 / calc(0.18 * var(--pf-elevation-intensity)));
+    --pf-shadow-xl: 0 24px 70px rgb(18 29 49 / calc(0.22 * var(--pf-elevation-intensity)));
+    --pf-shadow-xs: var(--pf-shadow-sm);
+
+    --pf-z-base: 1;
+    --pf-z-dropdown: 1000;
+    --pf-z-sticky: 1020;
+    --pf-z-drawer: 1080;
+    --pf-z-modal: 1140;
+    --pf-z-popover: 1200;
+    --pf-z-toast: 1210;
+    --pf-z-tooltip: 1260;
+
+    --pf-motion-fast: 120ms;
+    --pf-motion-normal: 200ms;
+    --pf-motion-slow: 320ms;
+    --pf-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+    --pf-transition-standard: all var(--pf-motion-normal) var(--pf-motion-easing-standard);
+    --pf-visual-style: layered;
+    --pf-elevation-intensity: 1;
+    --pf-noise-opacity: 0.035;
+    --pf-surface-glass-opacity: 0.72;
+    --pf-surface-glass-blur: 10px;
+    --pf-light-x: 18%;
+    --pf-light-y: 12%;
+    --pf-bg-0: #edf2fa;
+    --pf-bg-1: #f7f9fd;
+    --pf-bg-2: #e8edf7;
+    --pf-bg-highlight: rgb(255 255 255 / 36%);
+    --pf-bg-shadow: rgb(28 37 55 / 16%);
+
+    --pf-density: comfortable;
+    --pf-density-scale: 1;
+    --pf-control-height-sm: 32px;
+    --pf-control-height-md: 40px;
+    --pf-control-height-lg: 48px;
+    --pf-control-padding-x-sm: 8px;
+    --pf-control-padding-x-md: 12px;
+    --pf-control-padding-x-lg: 16px;
+
+    --pf-color-primary-50: #ebf3ff;
+    --pf-color-primary-100: #dce9ff;
+    --pf-color-primary-200: #b8d2ff;
+    --pf-color-primary-300: #84afff;
+    --pf-color-primary-400: #4f8cff;
+    --pf-color-primary-500: #2f6af5;
+    --pf-color-primary-600: #1e53d1;
+    --pf-color-primary-700: #183fa0;
+    --pf-color-primary-800: #163682;
+    --pf-color-primary-900: #152e69;
+
+    --pf-color-secondary-50: #f6f1ff;
+    --pf-color-secondary-100: #ece3ff;
+    --pf-color-secondary-200: #dac7ff;
+    --pf-color-secondary-300: #c0a0ff;
+    --pf-color-secondary-400: #a377ff;
+    --pf-color-secondary-500: #8b52f3;
+    --pf-color-secondary-600: #7337ce;
+    --pf-color-secondary-700: #5a2ba1;
+    --pf-color-secondary-800: #4b2682;
+    --pf-color-secondary-900: #3d2069;
+
+    --pf-color-neutral-50: #f6f8fb;
+    --pf-color-neutral-100: #eef2f7;
+    --pf-color-neutral-200: #d9e1eb;
+    --pf-color-neutral-300: #b5c1cf;
+    --pf-color-neutral-400: #8898ac;
+    --pf-color-neutral-500: #66768e;
+    --pf-color-neutral-600: #4d5d73;
+    --pf-color-neutral-700: #3b4658;
+    --pf-color-neutral-800: #2b3442;
+    --pf-color-neutral-900: #1b2230;
+
+    --pf-color-success-50: #edfbf5;
+    --pf-color-success-100: #d5f5e7;
+    --pf-color-success-200: #afebd1;
+    --pf-color-success-300: #76dcb2;
+    --pf-color-success-400: #3fc18e;
+    --pf-color-success-500: #26a774;
+    --pf-color-success-600: #1a865d;
+    --pf-color-success-700: #166b4b;
+    --pf-color-success-800: #14563e;
+    --pf-color-success-900: #104634;
+
+    --pf-color-warn-50: #fff8eb;
+    --pf-color-warn-100: #feefcc;
+    --pf-color-warn-200: #fddf97;
+    --pf-color-warn-300: #fbc45e;
+    --pf-color-warn-400: #f7a934;
+    --pf-color-warn-500: #eb8b17;
+    --pf-color-warn-600: #ca6e0f;
+    --pf-color-warn-700: #a6550f;
+    --pf-color-warn-800: #874514;
+    --pf-color-warn-900: #703b14;
+    --pf-color-warning-50: var(--pf-color-warn-50);
+    --pf-color-warning-100: var(--pf-color-warn-100);
+    --pf-color-warning-200: var(--pf-color-warn-200);
+    --pf-color-warning-300: var(--pf-color-warn-300);
+    --pf-color-warning-400: var(--pf-color-warn-400);
+    --pf-color-warning-500: var(--pf-color-warn-500);
+    --pf-color-warning-600: var(--pf-color-warn-600);
+    --pf-color-warning-700: var(--pf-color-warn-700);
+    --pf-color-warning-800: var(--pf-color-warn-800);
+    --pf-color-warning-900: var(--pf-color-warn-900);
+
+    --pf-color-error-50: #fff1f2;
+    --pf-color-error-100: #ffe2e6;
+    --pf-color-error-200: #ffc9d2;
+    --pf-color-error-300: #ff9bac;
+    --pf-color-error-400: #fe6985;
+    --pf-color-error-500: #f24062;
+    --pf-color-error-600: #d3264d;
+    --pf-color-error-700: #b11f43;
+    --pf-color-error-800: #951f3f;
+    --pf-color-error-900: #7f1f3b;
+
+    --pf-surface-canvas: #f5f7fb;
+    --pf-surface-layer: #fff;
+    --pf-surface-layer-alt: #eef2f7;
+    --pf-surface-overlay: rgb(13 22 39 / 56%);
+    --pf-surface-border: #d9e1eb;
+    --pf-surface-text: #152033;
+    --pf-surface-text-muted: #4d5d73;
+    --pf-surface-focus: rgb(47 106 245 / 34%);
+    --pf-surface-inverse-text: #f8fbff;
+
+    --pf-border-width-strong: 1px;
+    --pf-ring-width: 3px;
+
+    --pf-control-radius: var(--pf-radius-md);
+    --pf-control-border-width: var(--pf-border-width-strong);
+    --pf-control-border-color: var(--pf-surface-border);
+    --pf-control-bg: var(--pf-surface-layer);
+    --pf-control-bg-filled: color-mix(in srgb, var(--pf-surface-layer-alt) 90%, transparent);
+    --pf-control-text: var(--pf-surface-text);
+    --pf-control-placeholder: var(--pf-surface-text-muted);
+    --pf-control-adornment: var(--pf-surface-text-muted);
+    --pf-control-shadow: inset 0 0 0 0 transparent;
+    --pf-control-hover-border: color-mix(in srgb, var(--pf-color-primary-300) 45%, var(--pf-surface-border));
+    --pf-control-focus-border: var(--pf-color-primary-500);
+    --pf-control-focus-shadow: 0 0 0 var(--pf-ring-width) var(--pf-surface-focus);
+    --pf-control-invalid-border: var(--pf-color-error-500);
+    --pf-control-invalid-shadow: 0 0 0 var(--pf-ring-width) rgb(242 64 98 / 20%);
+    --pf-control-disabled-opacity: 0.62;
+
+    --pf-button-radius: var(--pf-radius-md);
+    --pf-button-border-width: var(--pf-border-width-strong);
+    --pf-button-gap: var(--pf-space-2);
+    --pf-button-font-weight: var(--pf-font-weight-semibold);
+    --pf-button-letter-spacing: 0.01em;
+    --pf-button-shadow: 0 1px 2px rgb(18 29 49 / 12%);
+    --pf-button-shadow-hover: 0 8px 20px rgb(18 29 49 / 18%);
+    --pf-button-shadow-active: 0 2px 8px rgb(18 29 49 / 14%);
+    --pf-button-disabled-opacity: 0.58;
+    --pf-button-solid-text: #fff;
+
+    --pf-card-bg: var(--pf-surface-layer);
+    --pf-card-border: var(--pf-surface-border);
+    --pf-card-radius: var(--pf-radius-lg);
+    --pf-card-padding: var(--pf-space-4);
+    --pf-card-gap: var(--pf-space-3);
+    --pf-card-shadow: 0 0 0 transparent;
+    --pf-card-shadow-elevated: var(--pf-shadow-md);
+    --pf-card-shadow-elevated-hover: var(--pf-shadow-lg);
+
+    --pf-dialog-bg: var(--pf-surface-layer);
+    --pf-dialog-border: var(--pf-surface-border);
+    --pf-dialog-radius: var(--pf-radius-lg);
+    --pf-dialog-shadow: var(--pf-shadow-xl);
+    --pf-dialog-header-bg: color-mix(in srgb, var(--pf-surface-layer) 92%, transparent);
+
+    --pf-snackbar-bg: var(--pf-surface-layer);
+    --pf-snackbar-border: var(--pf-surface-border);
+    --pf-snackbar-radius: var(--pf-radius-md);
+    --pf-snackbar-shadow: var(--pf-shadow-lg);
+
+    --pf-popover-bg: var(--pf-surface-layer);
+    --pf-popover-border: var(--pf-surface-border);
+    --pf-popover-radius: var(--pf-radius-md);
+    --pf-popover-shadow: var(--pf-shadow-lg);
+
+    --pf-accordion-bg: var(--pf-surface-layer);
+    --pf-accordion-border: var(--pf-surface-border);
+    --pf-accordion-summary-bg: color-mix(in srgb, var(--pf-surface-layer-alt) 35%, transparent);
+    --pf-accordion-summary-hover-bg: color-mix(in srgb, var(--pf-color-primary-100) 22%, transparent);
+    --pf-accordion-icon: var(--pf-surface-text-muted);
+    --pf-accordion-content-bg: color-mix(in srgb, var(--pf-surface-layer) 96%, transparent);
+
+    --pf-table-bg: var(--pf-surface-layer);
+    --pf-table-border: var(--pf-surface-border);
+    --pf-table-header-bg: color-mix(in srgb, var(--pf-surface-layer-alt) 85%, transparent);
+    --pf-table-row-hover-bg: color-mix(in srgb, var(--pf-color-primary-100) 14%, transparent);
+
+    --pf-screen-content-max: 100%;
+    --pf-screen-card-density-multiplier: 1;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    --pf-color-primary-50: #dbe8ff;
+    --pf-color-primary-100: #bfd4ff;
+    --pf-color-primary-200: #95b6ff;
+    --pf-color-primary-300: #6d98ff;
+    --pf-color-primary-400: #4f8cff;
+    --pf-color-primary-500: #3d7aff;
+    --pf-color-primary-600: #2c65ed;
+    --pf-color-primary-700: #2653c1;
+    --pf-color-primary-800: #22489d;
+    --pf-color-primary-900: #1f3f84;
+
+    --pf-color-secondary-50: #efe8ff;
+    --pf-color-secondary-100: #dfd0ff;
+    --pf-color-secondary-200: #c7adff;
+    --pf-color-secondary-300: #ad86ff;
+    --pf-color-secondary-400: #9668ff;
+    --pf-color-secondary-500: #8759fb;
+    --pf-color-secondary-600: #7343dd;
+    --pf-color-secondary-700: #5f35b8;
+    --pf-color-secondary-800: #4e2d95;
+    --pf-color-secondary-900: #412677;
+
+    --pf-color-neutral-50: #f2f4f7;
+    --pf-color-neutral-100: #e0e5ec;
+    --pf-color-neutral-200: #c1cad7;
+    --pf-color-neutral-300: #9caac0;
+    --pf-color-neutral-400: #7b8ba6;
+    --pf-color-neutral-500: #62728e;
+    --pf-color-neutral-600: #4e5c73;
+    --pf-color-neutral-700: #3c475a;
+    --pf-color-neutral-800: #293242;
+    --pf-color-neutral-900: #161c28;
+
+    --pf-color-success-50: #e9fbf3;
+    --pf-color-success-100: #c5f3df;
+    --pf-color-success-200: #9ae8c7;
+    --pf-color-success-300: #68d8aa;
+    --pf-color-success-400: #3ac38c;
+    --pf-color-success-500: #23ad77;
+    --pf-color-success-600: #1b8e61;
+    --pf-color-success-700: #176f4d;
+    --pf-color-success-800: #145a3f;
+    --pf-color-success-900: #114c36;
+
+    --pf-color-warn-50: #fff7e8;
+    --pf-color-warn-100: #feebc5;
+    --pf-color-warn-200: #fddb91;
+    --pf-color-warn-300: #fbc35c;
+    --pf-color-warn-400: #f5a734;
+    --pf-color-warn-500: #e88c19;
+    --pf-color-warn-600: #c86f11;
+    --pf-color-warn-700: #a45810;
+    --pf-color-warn-800: #854614;
+    --pf-color-warn-900: #6f3a14;
+    --pf-color-warning-50: var(--pf-color-warn-50);
+    --pf-color-warning-100: var(--pf-color-warn-100);
+    --pf-color-warning-200: var(--pf-color-warn-200);
+    --pf-color-warning-300: var(--pf-color-warn-300);
+    --pf-color-warning-400: var(--pf-color-warn-400);
+    --pf-color-warning-500: var(--pf-color-warn-500);
+    --pf-color-warning-600: var(--pf-color-warn-600);
+    --pf-color-warning-700: var(--pf-color-warn-700);
+    --pf-color-warning-800: var(--pf-color-warn-800);
+    --pf-color-warning-900: var(--pf-color-warn-900);
+
+    --pf-color-error-50: #ffeff2;
+    --pf-color-error-100: #ffdde3;
+    --pf-color-error-200: #ffc1cd;
+    --pf-color-error-300: #ff91a7;
+    --pf-color-error-400: #ff647f;
+    --pf-color-error-500: #fa3d60;
+    --pf-color-error-600: #dc254c;
+    --pf-color-error-700: #b82042;
+    --pf-color-error-800: #9a203d;
+    --pf-color-error-900: #841f3a;
+
+    --pf-surface-canvas: #0e1521;
+    --pf-surface-layer: #172131;
+    --pf-surface-layer-alt: #1f2c41;
+    --pf-surface-overlay: rgb(7 11 18 / 72%);
+    --pf-surface-border: #2d3a4f;
+    --pf-surface-text: #e7eef9;
+    --pf-surface-text-muted: #a6b4cb;
+    --pf-surface-focus: rgb(79 140 255 / 40%);
+    --pf-surface-inverse-text: #0f1728;
+
+    --pf-control-bg-filled: color-mix(in srgb, var(--pf-surface-layer-alt) 86%, transparent);
+    --pf-control-hover-border: color-mix(in srgb, var(--pf-color-primary-300) 54%, var(--pf-surface-border));
+    --pf-control-focus-shadow: 0 0 0 var(--pf-ring-width) rgb(79 140 255 / 26%);
+    --pf-control-invalid-shadow: 0 0 0 var(--pf-ring-width) rgb(250 61 96 / 22%);
+
+    --pf-button-shadow: 0 1px 2px rgb(0 0 0 / calc(0.32 * var(--pf-elevation-intensity)));
+    --pf-button-shadow-hover: 0 10px 24px rgb(0 0 0 / calc(0.35 * var(--pf-elevation-intensity)));
+    --pf-button-shadow-active: 0 4px 12px rgb(0 0 0 / calc(0.35 * var(--pf-elevation-intensity)));
+    --pf-button-solid-text: #eff5ff;
+
+    --pf-card-shadow-elevated: 0 14px 32px rgb(0 0 0 / calc(0.34 * var(--pf-elevation-intensity)));
+    --pf-card-shadow-elevated-hover: 0 20px 44px rgb(0 0 0 / calc(0.42 * var(--pf-elevation-intensity)));
+    --pf-dialog-shadow: 0 24px 58px rgb(0 0 0 / calc(0.38 * var(--pf-elevation-intensity)));
+    --pf-dialog-header-bg: color-mix(in srgb, var(--pf-surface-layer-alt) 88%, transparent);
+    --pf-snackbar-shadow: 0 12px 28px rgb(0 0 0 / calc(0.36 * var(--pf-elevation-intensity)));
+    --pf-table-row-hover-bg: color-mix(in srgb, var(--pf-color-primary-200) 18%, transparent);
+    --pf-bg-0: #09101a;
+    --pf-bg-1: #111b2a;
+    --pf-bg-2: #182436;
+    --pf-bg-highlight: rgb(142 175 255 / 18%);
+    --pf-bg-shadow: rgb(0 0 0 / 36%);
+  }
+
+  [data-density="compact"] {
+    --pf-density: compact;
+    --pf-density-scale: 0.87;
+    --pf-control-height-sm: 28px;
+    --pf-control-height-md: 34px;
+    --pf-control-height-lg: 40px;
+    --pf-control-padding-x-sm: 6px;
+    --pf-control-padding-x-md: 8px;
+    --pf-control-padding-x-lg: 12px;
+    --pf-card-padding: var(--pf-space-3);
+    --pf-card-gap: var(--pf-space-2);
+  }
+
+  [data-pf-screen="default"] {
+    --pf-screen-content-max: 100%;
+    --pf-control-height-sm: 32px;
+    --pf-control-height-md: 40px;
+    --pf-control-height-lg: 48px;
+    --pf-button-radius: var(--pf-radius-md);
+    --pf-control-radius: var(--pf-radius-md);
+    --pf-card-bg: var(--pf-surface-layer);
+    --pf-card-shadow-elevated: var(--pf-shadow-md);
+    --pf-card-shadow-elevated-hover: var(--pf-shadow-lg);
+    --pf-dialog-shadow: var(--pf-shadow-xl);
+    --pf-table-row-hover-bg: color-mix(in srgb, var(--pf-color-primary-100) 14%, transparent);
+  }
+
+  [data-pf-screen="console"] {
+    --pf-screen-content-max: 1480px;
+    --pf-card-bg: color-mix(in srgb, var(--pf-surface-layer) 96%, var(--pf-color-primary-50));
+    --pf-card-shadow-elevated: 0 12px 28px rgb(18 29 49 / 14%);
+    --pf-card-shadow-elevated-hover: 0 18px 36px rgb(18 29 49 / 18%);
+    --pf-button-radius: var(--pf-radius-sm);
+  }
+
+  [data-pf-screen="builder"] {
+    --pf-screen-content-max: 1680px;
+    --pf-control-height-sm: 30px;
+    --pf-control-height-md: 36px;
+    --pf-control-height-lg: 42px;
+    --pf-card-bg: color-mix(in srgb, var(--pf-surface-layer) 90%, var(--pf-color-secondary-50));
+    --pf-table-row-hover-bg: color-mix(in srgb, var(--pf-color-secondary-100) 24%, transparent);
+    --pf-button-shadow-hover: 0 10px 26px rgb(36 48 82 / 20%);
+  }
+
+  [data-pf-screen="playground"] {
+    --pf-screen-content-max: 1280px;
+    --pf-card-bg: color-mix(in srgb, var(--pf-surface-layer) 88%, var(--pf-color-primary-50));
+    --pf-card-shadow-elevated: 0 16px 30px rgb(21 32 51 / 16%);
+    --pf-card-shadow-elevated-hover: 0 24px 46px rgb(21 32 51 / 24%);
+    --pf-dialog-shadow: 0 28px 62px rgb(18 29 49 / 24%);
+  }
+
+  [data-pf-screen="docs"] {
+    --pf-screen-content-max: 1200px;
+    --pf-card-bg: var(--pf-surface-layer);
+    --pf-card-shadow-elevated: var(--pf-shadow-sm);
+    --pf-control-radius: var(--pf-radius-sm);
+  }
+
+  [data-pf-screen="system"] {
+    --pf-screen-content-max: 1560px;
+    --pf-card-bg: color-mix(in srgb, var(--pf-surface-layer) 92%, var(--pf-color-neutral-50));
+    --pf-button-radius: var(--pf-radius-sm);
+    --pf-control-radius: var(--pf-radius-sm);
+  }
+
+  [data-visual='flat'] {
+    --pf-visual-style: flat;
+    --pf-elevation-intensity: 0.75;
+    --pf-noise-opacity: 0;
+    --pf-surface-glass-opacity: 1;
+    --pf-surface-glass-blur: 0px;
+    --pf-bg-highlight: rgb(255 255 255 / 0%);
+    --pf-bg-shadow: rgb(0 0 0 / 0%);
+  }
+
+  [data-visual='layered'] {
+    --pf-visual-style: layered;
+    --pf-elevation-intensity: 1;
+    --pf-noise-opacity: 0.03;
+    --pf-surface-glass-opacity: 0.74;
+    --pf-surface-glass-blur: 8px;
+  }
+
+  [data-visual='3d'] {
+    --pf-visual-style: 3d;
+    --pf-elevation-intensity: 1.28;
+    --pf-noise-opacity: 0.045;
+    --pf-surface-glass-opacity: 0.68;
+    --pf-surface-glass-blur: 12px;
+    --pf-light-x: 14%;
+    --pf-light-y: 8%;
+    --pf-bg-highlight: rgb(255 255 255 / 42%);
+    --pf-bg-shadow: rgb(0 0 0 / 22%);
+  }
+}
+

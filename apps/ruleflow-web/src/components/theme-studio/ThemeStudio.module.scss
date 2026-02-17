@@ -1,0 +1,241 @@
+.root {
+  --theme-studio-offset: 190px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--pf-space-4);
+  min-height: calc(100dvh - var(--theme-studio-offset));
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pf-space-4);
+  padding: var(--pf-space-4);
+  border-radius: var(--pf-radius-lg);
+  border: 1px solid var(--pf-surface-border);
+}
+
+.heroActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-2);
+}
+
+.shell {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: var(--pf-space-4);
+}
+
+.controlsPane {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-lg);
+  padding: var(--pf-space-4);
+  display: grid;
+  align-content: start;
+  gap: var(--pf-space-4);
+}
+
+.section {
+  border: 1px solid color-mix(in srgb, var(--pf-surface-border) 80%, transparent);
+  border-radius: var(--pf-radius-md);
+  padding: var(--pf-space-3);
+  display: grid;
+  gap: var(--pf-space-3);
+  background: color-mix(in srgb, var(--pf-surface-layer) 95%, transparent);
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pf-space-2);
+}
+
+.colorField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--pf-space-2);
+  align-items: end;
+}
+
+.colorPicker {
+  inline-size: 48px;
+  block-size: var(--pf-control-height-md);
+  border-radius: var(--pf-radius-sm);
+  border: 1px solid var(--pf-surface-border);
+  background: transparent;
+  padding: 2px;
+}
+
+.sliderLabel {
+  margin: 0;
+  font-size: var(--pf-font-size-sm);
+  color: var(--pf-surface-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pf-space-2);
+}
+
+.slider {
+  inline-size: 100%;
+  accent-color: var(--pf-color-primary-500);
+}
+
+.uploadGrid {
+  display: grid;
+  gap: var(--pf-space-2);
+}
+
+.uploadField {
+  border: 1px dashed color-mix(in srgb, var(--pf-surface-border) 86%, transparent);
+  border-radius: var(--pf-radius-md);
+  padding: var(--pf-space-3);
+  display: grid;
+  gap: var(--pf-space-2);
+  font-size: var(--pf-font-size-sm);
+}
+
+.uploadField input {
+  inline-size: 100%;
+}
+
+.logoPreview {
+  inline-size: 100%;
+  max-inline-size: 220px;
+  max-block-size: 64px;
+  object-fit: contain;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-sm);
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 74%, transparent);
+  padding: var(--pf-space-2);
+}
+
+.importActions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pf-space-2);
+  flex-wrap: wrap;
+}
+
+.previewPane {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-lg);
+  padding: var(--pf-space-4);
+  display: grid;
+  align-content: start;
+  gap: var(--pf-space-4);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pf-space-3);
+}
+
+.previewBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-3);
+  min-width: 0;
+}
+
+.previewLogo,
+.previewMark {
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--pf-radius-md);
+  border: 1px solid var(--pf-surface-border);
+}
+
+.previewLogo {
+  object-fit: contain;
+  background: color-mix(in srgb, var(--pf-surface-layer) 92%, transparent);
+}
+
+.previewMark {
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: var(--pf-font-weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--pf-button-solid-text);
+  background: linear-gradient(135deg, var(--pf-color-primary-500), var(--pf-color-secondary-500));
+}
+
+.previewCanvas {
+  display: grid;
+  gap: var(--pf-space-4);
+}
+
+.previewAppBar {
+  border-radius: var(--pf-radius-lg);
+  overflow: hidden;
+}
+
+.previewToolbar {
+  padding: var(--pf-space-3);
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pf-space-4);
+}
+
+.formStack {
+  display: grid;
+  gap: var(--pf-space-3);
+}
+
+@media (max-width: 1400px) {
+  .shell {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .root {
+    --theme-studio-offset: 170px;
+  }
+
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .controlsPane,
+  .previewPane {
+    max-block-size: 50dvh;
+  }
+
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .fieldRow {
+    grid-template-columns: 1fr;
+  }
+
+  .previewHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .colorField {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .colorPicker {
+    inline-size: 100%;
+  }
+}

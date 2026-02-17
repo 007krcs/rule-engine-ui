@@ -13,6 +13,7 @@ const docComponents: Record<string, ComponentType> = {
   'tutorial-rules': dynamic(() => import('@/content/docs/tutorial-rules.mdx')),
   'tutorial-playground': dynamic(() => import('@/content/docs/tutorial-playground.mdx')),
   'tutorial-component-registry': dynamic(() => import('@/content/docs/tutorial-component-registry.mdx')),
+  'tutorial-template-library': dynamic(() => import('@/content/docs/tutorial-template-library.mdx')),
   'tutorial-company-adapter': dynamic(() => import('@/content/docs/tutorial-company-adapter.mdx')),
   'tutorial-integrations': dynamic(() => import('@/content/docs/tutorial-integrations.mdx')),
   'tutorial-theming': dynamic(() => import('@/content/docs/tutorial-theming.mdx')),

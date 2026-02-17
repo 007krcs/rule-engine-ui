@@ -1,0 +1,26 @@
+@layer base {
+  .pf-root {
+    font-family: var(--pf-font-sans);
+    font-size: var(--pf-font-size-md);
+    line-height: var(--pf-line-height-normal);
+    color: var(--pf-surface-text);
+    background: var(--pf-surface-canvas);
+  }
+
+  .pf-root,
+  .pf-box {
+    color: var(--pf-surface-text);
+  }
+
+  .pf-root code,
+  .pf-root pre,
+  .pf-typography--code {
+    font-family: var(--pf-font-mono);
+  }
+
+  .pf-root :where(button, [role="button"], input, select, textarea, a, [tabindex]):focus-visible {
+    outline: var(--pf-ring-width) solid var(--pf-surface-focus);
+    outline-offset: 2px;
+  }
+}
+

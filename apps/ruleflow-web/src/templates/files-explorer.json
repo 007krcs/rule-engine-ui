@@ -1,0 +1,300 @@
+{
+  "version": "1.0.0",
+  "pageId": "files-explorer-screen",
+  "layoutType": "grid",
+  "layout": {
+    "id": "root",
+    "type": "grid",
+    "columns": 12,
+    "componentIds": [
+      "filesPageShell",
+      "filesSection",
+      "filesToolbar",
+      "filesTagsFilter",
+      "filesSplit",
+      "filesFoldersTable",
+      "filesTiles",
+      "filesDetailsTabs",
+      "filesInspectorSection",
+      "filesEmptyState"
+    ]
+  },
+  "grid": {
+    "columns": 12,
+    "rowHeight": 56,
+    "gap": 12,
+    "collisionStrategy": "push",
+    "breakpoints": {
+      "md": {
+        "columns": 8,
+        "rowHeight": 52,
+        "gap": 10
+      },
+      "sm": {
+        "columns": 4,
+        "rowHeight": 48,
+        "gap": 8
+      }
+    }
+  },
+  "items": [
+    { "id": "filesPageShell", "componentId": "filesPageShell", "x": 0, "y": 0, "w": 12, "h": 2 },
+    { "id": "filesSection", "componentId": "filesSection", "x": 0, "y": 2, "w": 12, "h": 2 },
+    { "id": "filesToolbar", "componentId": "filesToolbar", "x": 0, "y": 4, "w": 9, "h": 2 },
+    { "id": "filesTagsFilter", "componentId": "filesTagsFilter", "x": 9, "y": 4, "w": 3, "h": 2 },
+    { "id": "filesSplit", "componentId": "filesSplit", "x": 0, "y": 6, "w": 12, "h": 3 },
+    { "id": "filesFoldersTable", "componentId": "filesFoldersTable", "x": 0, "y": 9, "w": 8, "h": 7 },
+    { "id": "filesTiles", "componentId": "filesTiles", "x": 0, "y": 16, "w": 8, "h": 5 },
+    { "id": "filesDetailsTabs", "componentId": "filesDetailsTabs", "x": 8, "y": 9, "w": 4, "h": 6 },
+    { "id": "filesInspectorSection", "componentId": "filesInspectorSection", "x": 8, "y": 15, "w": 4, "h": 3 },
+    { "id": "filesEmptyState", "componentId": "filesEmptyState", "x": 0, "y": 21, "w": 12, "h": 3 },
+
+    { "id": "filesToolbar:md", "componentId": "filesToolbar", "x": 0, "y": 4, "w": 8, "h": 2, "breakpoint": "md" },
+    { "id": "filesTagsFilter:md", "componentId": "filesTagsFilter", "x": 0, "y": 6, "w": 8, "h": 2, "breakpoint": "md" },
+    { "id": "filesSplit:md", "componentId": "filesSplit", "x": 0, "y": 8, "w": 8, "h": 3, "breakpoint": "md" },
+    { "id": "filesFoldersTable:md", "componentId": "filesFoldersTable", "x": 0, "y": 11, "w": 8, "h": 7, "breakpoint": "md" },
+    { "id": "filesTiles:md", "componentId": "filesTiles", "x": 0, "y": 18, "w": 8, "h": 5, "breakpoint": "md" },
+    { "id": "filesDetailsTabs:md", "componentId": "filesDetailsTabs", "x": 0, "y": 23, "w": 8, "h": 4, "breakpoint": "md" },
+    { "id": "filesInspectorSection:md", "componentId": "filesInspectorSection", "x": 0, "y": 27, "w": 8, "h": 3, "breakpoint": "md" },
+
+    { "id": "filesToolbar:sm", "componentId": "filesToolbar", "x": 0, "y": 4, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "filesTagsFilter:sm", "componentId": "filesTagsFilter", "x": 0, "y": 6, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "filesSplit:sm", "componentId": "filesSplit", "x": 0, "y": 8, "w": 4, "h": 3, "breakpoint": "sm" },
+    { "id": "filesFoldersTable:sm", "componentId": "filesFoldersTable", "x": 0, "y": 11, "w": 4, "h": 7, "breakpoint": "sm" },
+    { "id": "filesTiles:sm", "componentId": "filesTiles", "x": 0, "y": 18, "w": 4, "h": 6, "breakpoint": "sm" },
+    { "id": "filesDetailsTabs:sm", "componentId": "filesDetailsTabs", "x": 0, "y": 24, "w": 4, "h": 4, "breakpoint": "sm" },
+    { "id": "filesInspectorSection:sm", "componentId": "filesInspectorSection", "x": 0, "y": 28, "w": 4, "h": 3, "breakpoint": "sm" }
+  ],
+  "components": [
+    {
+      "id": "filesPageShell",
+      "type": "layout",
+      "adapterHint": "platform.pageShell",
+      "props": {
+        "sidebarWidth": 280,
+        "collapsedSidebarWidth": 88,
+        "hasRightPanel": true,
+        "headerHeight": 64,
+        "stickyHeader": true,
+        "contentTitleKey": "runtime.templates.files.content.title",
+        "contentDescriptionKey": "runtime.templates.files.content.description"
+      },
+      "bindings": {
+        "data": {
+          "sidebarItems": "data.navigation.filesSidebar",
+          "rightPanelItems": "data.files.rightPanelItems"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.shell.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.shell.aria",
+        "keyboardNav": true,
+        "focusOrder": 1
+      }
+    },
+    {
+      "id": "filesSection",
+      "type": "layout",
+      "adapterHint": "platform.section",
+      "props": {
+        "titleKey": "runtime.templates.files.section.title",
+        "descriptionKey": "runtime.templates.files.section.description",
+        "intent": "neutral"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.section.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.section.aria",
+        "keyboardNav": true,
+        "focusOrder": 2
+      }
+    },
+    {
+      "id": "filesToolbar",
+      "type": "layout",
+      "adapterHint": "platform.toolbar",
+      "props": {
+        "align": "space-between",
+        "wrap": true,
+        "searchPlaceholderKey": "runtime.templates.files.toolbar.searchPlaceholder",
+        "actionLabelKey": "runtime.templates.files.toolbar.action"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.toolbar.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.toolbar.aria",
+        "keyboardNav": true,
+        "focusOrder": 3
+      }
+    },
+    {
+      "id": "filesTagsFilter",
+      "type": "input",
+      "adapterHint": "platform.select",
+      "props": {
+        "options": [
+          { "value": "all", "labelKey": "runtime.templates.files.tags.all" },
+          { "value": "finance", "labelKey": "runtime.templates.files.tags.finance" },
+          { "value": "contracts", "labelKey": "runtime.templates.files.tags.contracts" },
+          { "value": "archive", "labelKey": "runtime.templates.files.tags.archive" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "value": "data.files.filters.tag"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.tags.label",
+        "helperTextKey": "runtime.templates.files.tags.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.tags.aria",
+        "keyboardNav": true,
+        "focusOrder": 4
+      }
+    },
+    {
+      "id": "filesSplit",
+      "type": "layout",
+      "adapterHint": "platform.splitLayout",
+      "props": {
+        "leftWidthPercent": 65,
+        "gap": 16,
+        "stackOnMobile": true,
+        "leftTitleKey": "runtime.templates.files.split.leftTitle",
+        "leftDescriptionKey": "runtime.templates.files.split.leftDescription",
+        "rightTitleKey": "runtime.templates.files.split.rightTitle",
+        "rightDescriptionKey": "runtime.templates.files.split.rightDescription"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.split.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.split.aria",
+        "keyboardNav": true,
+        "focusOrder": 5
+      }
+    },
+    {
+      "id": "filesFoldersTable",
+      "type": "data",
+      "adapterHint": "platform.table",
+      "props": {
+        "columns": [
+          { "field": "name", "headerKey": "runtime.templates.files.table.name" },
+          { "field": "modifiedAt", "headerKey": "runtime.templates.files.table.modified" },
+          { "field": "size", "headerKey": "runtime.templates.files.table.size" },
+          { "field": "owner", "headerKey": "runtime.templates.files.table.owner" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "rows": "data.files.folders"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.table.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.table.aria",
+        "keyboardNav": true,
+        "focusOrder": 6
+      }
+    },
+    {
+      "id": "filesTiles",
+      "type": "display",
+      "adapterHint": "platform.cardGrid",
+      "props": {
+        "columns": { "sm": 1, "md": 2, "lg": 3, "xl": 4 },
+        "gap": 14
+      },
+      "bindings": {
+        "data": {
+          "items": "data.files.tiles"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.tiles.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.tiles.aria",
+        "keyboardNav": true,
+        "focusOrder": 7
+      }
+    },
+    {
+      "id": "filesDetailsTabs",
+      "type": "navigation",
+      "adapterHint": "platform.tabs",
+      "props": {
+        "value": "details",
+        "tabs": [
+          { "id": "details", "labelKey": "runtime.templates.files.tabs.details", "contentKey": "runtime.templates.files.tabs.details.content" },
+          { "id": "activity", "labelKey": "runtime.templates.files.tabs.activity", "contentKey": "runtime.templates.files.tabs.activity.content" }
+        ]
+      },
+      "rules": {
+        "visibleWhen": {
+          "op": "exists",
+          "left": { "path": "data.files.selectedFileName" }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.tabs.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.tabs.aria",
+        "keyboardNav": true,
+        "focusOrder": 8
+      }
+    },
+    {
+      "id": "filesInspectorSection",
+      "type": "layout",
+      "adapterHint": "platform.section",
+      "props": {
+        "titleKey": "runtime.templates.files.inspector.title",
+        "descriptionKey": "runtime.templates.files.inspector.description",
+        "intent": "info"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.inspector.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.inspector.aria",
+        "keyboardNav": true,
+        "focusOrder": 9
+      }
+    },
+    {
+      "id": "filesEmptyState",
+      "type": "feedback",
+      "adapterHint": "platform.emptyState",
+      "props": {
+        "descriptionKey": "runtime.templates.files.empty.description",
+        "actionLabelKey": "runtime.templates.files.empty.action"
+      },
+      "rules": {
+        "visibleWhen": {
+          "op": "eq",
+          "left": { "path": "data.files.count" },
+          "right": { "value": 0 }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.files.empty.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.files.empty.aria",
+        "keyboardNav": true,
+        "focusOrder": 10
+      }
+    }
+  ]
+}

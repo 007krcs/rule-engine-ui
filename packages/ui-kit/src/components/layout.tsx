@@ -102,7 +102,7 @@ export interface PFAppBarProps extends HTMLAttributes<HTMLElement> {
 }
 
 export function PFAppBar({ className, position = 'sticky', ...rest }: PFAppBarProps) {
-  return <header className={cn('pf-app-bar', `pf-app-bar--${position}`, className)} {...rest} />;
+  return <header className={cn('pf-app-bar', 'pf-surface-panel', `pf-app-bar--${position}`, className)} {...rest} />;
 }
 
 export interface PFToolbarProps extends HTMLAttributes<HTMLDivElement> {
@@ -122,6 +122,7 @@ export function PFToolbar({
     <div
       className={cn(
         'pf-toolbar',
+        'pf-surface-toolbar',
         `pf-toolbar--${align}`,
         wrap && 'pf-toolbar--wrap',
         density ? `pf-toolbar--${density}` : undefined,
@@ -132,7 +133,7 @@ export function PFToolbar({
   );
 }
 
-export interface PFPageShellProps extends HTMLAttributes<HTMLDivElement> {
+export interface PFPageShellProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
   header?: ReactNode;
   sidebar?: ReactNode;
   content?: ReactNode;
@@ -272,7 +273,7 @@ export function PFPageShell({
   );
 }
 
-export interface PFSectionProps extends HTMLAttributes<HTMLElement> {
+export interface PFSectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   title?: ReactNode;
   description?: ReactNode;
   titleKey?: string;
@@ -397,7 +398,7 @@ export function PFCardGrid({
   return <div className={cn('pf-card-grid', className)} style={mergedStyle} {...rest} />;
 }
 
-export interface PFEmptyStateProps extends HTMLAttributes<HTMLDivElement> {
+export interface PFEmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   icon?: ReactNode;
   title?: ReactNode;
   description?: ReactNode;

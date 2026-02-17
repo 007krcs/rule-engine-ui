@@ -58,8 +58,18 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
       const rightPanelItems = toStringArray(
         resolveBindingValue(component, ctx, 'rightPanelItems') ?? component.props?.rightPanelItems,
       );
-      const shellContentTitle = component.props?.contentTitle;
-      const shellContentDescription = component.props?.contentDescription;
+      const shellContentTitle = resolveText(
+        ctx,
+        component.props?.contentTitleKey,
+        component.props?.contentTitle,
+        label,
+      );
+      const shellContentDescription = resolveText(
+        ctx,
+        component.props?.contentDescriptionKey,
+        component.props?.contentDescription,
+        helperText || 'Use this surface to compose complete screens.',
+      );
 
       return (
         <PFPageShell
@@ -84,7 +94,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
                   {sidebarItems.length > 0 ? (
                     <ul>
                       {sidebarItems.map((item) => (
-                        <li key={item}>{item}</li>
+                        <li key={item}>{resolveStringOrKey(ctx, item)}</li>
                       ))}
                     </ul>
                   ) : (
@@ -103,7 +113,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
                 {rightPanelItems.length > 0 ? (
                   <ul>
                     {rightPanelItems.map((item) => (
-                      <li key={item}>{item}</li>
+                      <li key={item}>{resolveStringOrKey(ctx, item)}</li>
                     ))}
                   </ul>
                 ) : (
@@ -116,8 +126,8 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           )}
         >
           <PFSection
-            title={asString(shellContentTitle, label)}
-            description={asString(shellContentDescription, helperText || 'Use this surface to compose complete screens.')}
+            title={shellContentTitle}
+            description={shellContentDescription}
           >
             <PFTypography variant="body2" muted>
               PageShell coordinates header, sidebar, content, and optional right panel across breakpoints.
@@ -129,13 +139,25 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
     case 'platform.section':
       return (
         <PFSection
-          title={label}
-          description={helperText || asString(component.props?.description, '')}
+          title={resolveText(ctx, component.props?.titleKey, component.props?.title, label)}
+          description={resolveText(
+            ctx,
+            component.props?.descriptionKey,
+            component.props?.description,
+            helperText || '',
+          )}
           intent={toSectionIntent(component.props?.intent)}
-          actions={asString(component.props?.actionLabel, '') ? <PFButton size="sm">{asString(component.props?.actionLabel, '')}</PFButton> : undefined}
+          actions={resolveText(ctx, component.props?.actionLabelKey, component.props?.actionLabel, '') ? (
+            <PFButton size="sm">{resolveText(ctx, component.props?.actionLabelKey, component.props?.actionLabel, '')}</PFButton>
+          ) : undefined}
         >
           <PFTypography variant="body2">
-            {asString(component.props?.body, 'Section content. Place forms, tables, or summaries here.')}
+            {resolveText(
+              ctx,
+              component.props?.bodyKey,
+              component.props?.body,
+              'Section content. Place forms, tables, or summaries here.',
+            )}
           </PFTypography>
         </PFSection>
       );
@@ -175,8 +197,12 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           density={asBoolean(component.props?.density === 'compact', false) ? 'compact' : 'comfortable'}
         >
           <PFTypography variant="label">{label}</PFTypography>
-          <PFTextField id={`${component.id}-search`} label="" placeholder={asString(component.props?.searchPlaceholder, 'Search')} />
-          <PFButton size="sm">{asString(component.props?.actionLabel, 'Apply')}</PFButton>
+          <PFTextField
+            id={`${component.id}-search`}
+            label=""
+            placeholder={resolveText(ctx, component.props?.searchPlaceholderKey, component.props?.searchPlaceholder, 'Search')}
+          />
+          <PFButton size="sm">{resolveText(ctx, component.props?.actionLabelKey, component.props?.actionLabel, 'Apply')}</PFButton>
         </PFToolbar>
       );
     case 'platform.cardGrid': {
@@ -213,10 +239,28 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
       return (
         <PFEmptyState
           title={label}
-          description={helperText || asString(component.props?.description, 'There is nothing to display yet.')}
-          action={<PFButton size="sm">{asString(component.props?.actionLabel, 'Create')}</PFButton>}
+          description={resolveText(
+            ctx,
+            component.props?.descriptionKey,
+            component.props?.description,
+            helperText || 'There is nothing to display yet.',
+          )}
+          action={<PFButton size="sm">{resolveText(ctx, component.props?.actionLabelKey, component.props?.actionLabel, 'Create')}</PFButton>}
           icon={<span aria-hidden="true">+</span>}
         />
+      );
+
+    case 'platform.button':
+      return (
+        <PFButton
+          size={toButtonSize(component.props?.size)}
+          variant={toButtonVariant(component.props?.variant)}
+          intent={toButtonIntent(component.props?.intent)}
+          disabled={Boolean(component.props?.disabled)}
+          onClick={() => ctx.events.onClick?.({ componentId: component.id })}
+        >
+          {resolveText(ctx, component.props?.labelKey, component.props?.label, label)}
+        </PFButton>
       );
 
     case 'platform.textField': {
@@ -236,7 +280,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
       );
     }
     case 'platform.select': {
-      const options = toSelectOptions(component.props?.options);
+      const options = toSelectOptions(component.props?.options, ctx);
       const value = asString(resolveBindingValue(component, ctx, 'value') ?? resolveBoundDataValue(component, ctx), '');
       return (
         <PFSelect
@@ -252,12 +296,12 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
       const rows = toObjectArray(
         resolveBindingValue(component, ctx, 'rows') ?? component.props?.rows,
       );
-      const columns = toTableColumns(component.props?.columns);
+      const columns = toTableColumns(component.props?.columns, ctx);
       return (
         <PFTable
           columns={columns}
           rows={rows}
-          emptyState={asString(component.props?.emptyState, 'No rows available.')}
+          emptyState={resolveText(ctx, component.props?.emptyStateKey, component.props?.emptyState, 'No rows available.')}
           rowKey={(row, index) => asString(row.id, String(index))}
         />
       );
@@ -271,7 +315,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
         />
       );
     case 'platform.tabs': {
-      const tabs = toTabs(component.props?.tabs);
+      const tabs = toTabs(component.props?.tabs, ctx);
       const value = asString(resolveBindingValue(component, ctx, 'value') ?? component.props?.value, tabs[0]?.id ?? 'tab-1');
       return (
         <PFTabs value={value} onChange={(next) => ctx.events.onChange?.(next, valueBindingPath)}>
@@ -286,7 +330,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
     case 'platform.alert':
       return (
         <PFAlert title={label} intent={toAlertIntent(component.props?.intent)}>
-          {helperText || asString(component.props?.description, '')}
+          {resolveText(ctx, component.props?.descriptionKey, component.props?.description, helperText || '')}
         </PFAlert>
       );
     case 'platform.avatar':
@@ -298,7 +342,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
       );
     case 'platform.badge':
       return (
-        <PFBadge badgeContent={asNumber(component.props?.badgeContent, 0)}>
+        <PFBadge badgeContent={asNumber(resolveBindingValue(component, ctx, 'badgeContent') ?? component.props?.badgeContent, 0)}>
           <PFChip intent="neutral">{label}</PFChip>
         </PFBadge>
       );
@@ -438,7 +482,10 @@ function toStringArray(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
 }
 
-function toSelectOptions(value: unknown): Array<{ value: string; label: string; disabled?: boolean }> {
+function toSelectOptions(
+  value: unknown,
+  ctx?: AdapterContext,
+): Array<{ value: string; label: string; disabled?: boolean }> {
   if (!Array.isArray(value)) {
     return [
       { value: 'all', label: 'All' },
@@ -457,7 +504,7 @@ function toSelectOptions(value: unknown): Array<{ value: string; label: string; 
     if (!optionValue) continue;
     options.push({
       value: optionValue,
-      label: asString(entry.label, optionValue),
+      label: resolveText(ctx, entry.labelKey, entry.label, optionValue),
       disabled: asBoolean(entry.disabled, false),
     });
   }
@@ -466,6 +513,7 @@ function toSelectOptions(value: unknown): Array<{ value: string; label: string; 
 
 function toTableColumns(
   value: unknown,
+  ctx?: AdapterContext,
 ): Array<{ id: string; header: React.ReactNode; align?: 'left' | 'right' | 'center' }> {
   if (!Array.isArray(value)) {
     return [
@@ -482,14 +530,14 @@ function toTableColumns(
     const align = toAlign(entry.align);
     columns.push({
       id,
-      header: asString(entry.header ?? entry.label ?? entry.headerKey, id),
+      header: resolveText(ctx, entry.headerKey, entry.header ?? entry.label, id),
       align,
     });
   }
   return columns.length > 0 ? columns : [{ id: 'value', header: 'Value' }];
 }
 
-function toTabs(value: unknown): Array<{ id: string; label: string; content: string }> {
+function toTabs(value: unknown, ctx?: AdapterContext): Array<{ id: string; label: string; content: string }> {
   if (!Array.isArray(value)) {
     return [
       { id: 'overview', label: 'Overview', content: 'Overview content.' },
@@ -503,8 +551,8 @@ function toTabs(value: unknown): Array<{ id: string; label: string; content: str
     if (!id) continue;
     tabs.push({
       id,
-      label: asString(entry.label, id),
-      content: asString(entry.content, 'Tab content.'),
+      label: resolveText(ctx, entry.labelKey, entry.label, id),
+      content: resolveText(ctx, entry.contentKey, entry.content, 'Tab content.'),
     });
   }
   return tabs.length > 0 ? tabs : [{ id: 'overview', label: 'Overview', content: 'Overview content.' }];
@@ -554,6 +602,23 @@ function toChipIntent(value: unknown): 'neutral' | 'primary' | 'secondary' | 'su
   return 'neutral';
 }
 
+function toButtonVariant(value: unknown): 'solid' | 'outline' | 'ghost' {
+  if (value === 'solid' || value === 'outline' || value === 'ghost') return value;
+  return 'solid';
+}
+
+function toButtonIntent(value: unknown): 'primary' | 'secondary' | 'neutral' | 'success' | 'warn' | 'error' {
+  if (value === 'primary' || value === 'secondary' || value === 'neutral' || value === 'success' || value === 'warn' || value === 'error') {
+    return value;
+  }
+  return 'primary';
+}
+
+function toButtonSize(value: unknown): 'sm' | 'md' | 'lg' {
+  if (value === 'sm' || value === 'md' || value === 'lg') return value;
+  return 'md';
+}
+
 function asString(value: unknown, fallback: string): string {
   return typeof value === 'string' ? value : fallback;
 }
@@ -572,4 +637,30 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
 
 function isRecord(value: unknown): value is Record<string, JSONValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function resolveText(
+  ctx: AdapterContext | undefined,
+  keyValue: unknown,
+  fallbackValue: unknown,
+  defaultText: string,
+): string {
+  const fallbackText = asString(fallbackValue, defaultText);
+  const key = asOptionalString(keyValue);
+  if (!key) {
+    if (!ctx) return fallbackText;
+    if (fallbackText.includes('.') || fallbackText.includes(':')) {
+      return ctx.i18n.t(fallbackText, undefined, { defaultText: fallbackText });
+    }
+    return fallbackText;
+  }
+  if (!ctx) return fallbackText || key;
+  return ctx.i18n.t(key, undefined, { defaultText: fallbackText || key });
+}
+
+function resolveStringOrKey(ctx: AdapterContext, value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return value;
+  if (!trimmed.includes('.') && !trimmed.includes(':')) return value;
+  return ctx.i18n.t(trimmed, undefined, { defaultText: value });
 }

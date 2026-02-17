@@ -3,7 +3,21 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { Activity, BookOpen, Boxes, HeartPulse, LayoutDashboard, ListTodo, Menu, PackageOpen, Plug, ShieldCheck, Sparkles, X } from 'lucide-react';
+import {
+  Activity,
+  BookOpen,
+  Boxes,
+  HeartPulse,
+  LayoutDashboard,
+  LayoutTemplate,
+  ListTodo,
+  Menu,
+  PackageOpen,
+  Plug,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import {
   PFButton,
   PFDialog,
@@ -11,7 +25,7 @@ import {
   PFTextArea,
   PFTextField,
 } from '@platform/ui-kit';
-import styles from './app-shell.module.css';
+import styles from './app-shell.module.scss';
 import { cn } from '@/lib/utils';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { DensityToggle } from '@/components/layout/density-toggle';
@@ -36,6 +50,8 @@ const systemItems = [
   { href: '/console?tab=governance', label: 'Governance', icon: ShieldCheck },
   { href: '/console?tab=observability', label: 'Observability', icon: Activity },
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
+  { href: '/system/templates', label: 'Template Library', icon: LayoutTemplate },
+  { href: '/system/theme-studio', label: 'Theme Studio', icon: Sparkles },
   { href: '/system/ui-kit', label: 'UI Kit', icon: Sparkles },
   { href: '/system/translations', label: 'Translations', icon: BookOpen },
   { href: '/system/layout-check', label: 'Layout Check', icon: Boxes },
@@ -50,6 +66,8 @@ function helpHrefForPathname(pathname: string): string {
   if (pathname.startsWith('/console')) return '/docs/tutorial-console';
   if (pathname.startsWith('/component-registry')) return '/docs/tutorial-component-registry';
   if (pathname.startsWith('/integrations')) return '/docs/tutorial-integrations';
+  if (pathname.startsWith('/system/templates')) return '/docs/tutorial-template-library';
+  if (pathname.startsWith('/system/theme-studio')) return '/docs';
   if (pathname.startsWith('/system/ui-kit')) return '/docs';
   if (pathname.startsWith('/samples')) return '/docs/quickstart';
   if (pathname.startsWith('/docs')) return '/docs';
@@ -74,6 +92,8 @@ function getPageTitle(pathname: string, tab?: string | null) {
   }
 
   if (pathname.startsWith('/system/health')) return 'Health';
+  if (pathname.startsWith('/system/templates')) return 'Template Library';
+  if (pathname.startsWith('/system/theme-studio')) return 'Theme Studio';
   if (pathname.startsWith('/system/ui-kit')) return 'UI Kit';
   if (pathname.startsWith('/system/translations')) return 'Translations';
   if (pathname.startsWith('/system/layout-check')) return 'Layout Check';
@@ -130,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const nav = (
     <div className={styles.navStack}>
-      <nav className={styles.navCard}>
+      <nav className={cn(styles.navCard, 'pf-surface-panel')}>
         <p className={styles.navTitle}>Platform</p>
         <div className={styles.navList}>
           <button
@@ -162,7 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <nav className={styles.navCard}>
+      <nav className={cn(styles.navCard, 'pf-surface-panel')}>
         <p className={styles.navTitle}>System</p>
         <div className={styles.navList}>
           {systemItems.map((item) => {
@@ -187,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <div className={styles.rbacCard}>
+      <div className={cn(styles.rbacCard, 'pf-surface-panel')}>
         <p className={styles.rbacTitle}>RBAC: Author / Approver / Publisher / Viewer</p>
         <p className={styles.rbacText}>Tenant isolation active. Signed releases required for publishing.</p>
       </div>
@@ -253,6 +273,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       { id: 'open-console', label: 'Open Console', onRun: () => router.push('/console') },
       { id: 'open-samples', label: 'Open Samples Gallery', onRun: () => router.push('/samples') },
       { id: 'open-component-registry', label: 'Open Component Registry', onRun: () => router.push('/component-registry') },
+      { id: 'open-templates', label: 'Open Template Library', onRun: () => router.push('/system/templates') },
       { id: 'open-docs', label: 'Open Docs', onRun: () => router.push('/docs') },
       { id: 'help', label: 'Help (this page)', onRun: () => router.push(helpHref) },
       { id: 'export-gitops', label: 'Export GitOps Bundle', onRun: () => void exportGitOps() },
@@ -266,9 +287,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [commandActions, commandQuery]);
 
   return (
-    <div className={styles.shell} data-pf-screen={screenPreset}>
+    <div className={cn(styles.shell, 'rf-app-shell')} data-pf-screen={screenPreset}>
       {clientReady ? <span data-testid="client-ready" className={styles.clientReady} aria-hidden="true" /> : null}
-      <header className={styles.header}>
+      <header className={cn(styles.header, 'pf-surface-panel')}>
         <div className={styles.headerInner}>
           <div className={styles.headerLeft}>
             <PFIconButton
@@ -320,7 +341,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Close navigation"
             onClick={() => setMobileNavOpen(false)}
           />
-          <div className={cn(styles.drawer, 'rfScrollbar')}>
+          <div className={cn(styles.drawer, 'rfScrollbar', 'pf-surface-panel')}>
             <div className={styles.drawerHeader}>
               <p className={styles.drawerTitle}>Navigation</p>
               <PFIconButton

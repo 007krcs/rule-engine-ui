@@ -1,0 +1,54 @@
+@layer utilities {
+  .pf-u-sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .pf-u-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pf-u-focus-ring:focus-visible {
+    outline: var(--pf-ring-width) solid var(--pf-surface-focus);
+    outline-offset: 2px;
+  }
+
+  .pf-u-flex {
+    display: flex;
+  }
+
+  .pf-u-grid {
+    display: grid;
+  }
+
+  .pf-u-gap-2 {
+    gap: var(--pf-space-2);
+  }
+
+  .pf-u-gap-4 {
+    gap: var(--pf-space-4);
+  }
+
+  .pf-u-p-4 {
+    padding: var(--pf-space-4);
+  }
+
+  .pf-u-rounded-md {
+    border-radius: var(--pf-radius-md);
+  }
+
+  .pf-u-border {
+    border: 1px solid var(--pf-surface-border);
+  }
+}
+
+@layer overrides {}

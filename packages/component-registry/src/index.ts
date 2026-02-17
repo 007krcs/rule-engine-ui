@@ -162,6 +162,22 @@ const CATALOG_SEEDS: SeedComponent[] = [
     bindings: { data: ['value'] },
     tokensUsed: ['--pf-control-bg', '--pf-control-border-color', '--pf-font-size-md'],
   }),
+  seed('platform.button', 'Button', 'Inputs', 'Primary action button with intent, variant, and size controls.', 'stable', {
+    propsSchema: objectSchema('Button', {
+      labelKey: stringSchema('Label Key', 'Translation key for button text.'),
+      variant: stringEnumSchema('Variant', ['solid', 'outline', 'ghost']),
+      intent: stringEnumSchema('Intent', ['primary', 'secondary', 'neutral', 'success', 'warn', 'error']),
+      size: stringEnumSchema('Size', ['sm', 'md', 'lg']),
+      disabled: booleanSchema('Disabled'),
+    }),
+    defaultProps: {
+      variant: 'solid',
+      intent: 'primary',
+      size: 'md',
+    },
+    bindings: { data: ['value'] },
+    tokensUsed: ['--pf-color-primary-500', '--pf-space-3', '--pf-radius-md'],
+  }),
   seed('platform.numberField', 'NumberField', 'Inputs', 'Numeric text field with min/max support.', 'stable', {
     propsSchema: objectSchema('Numeric input', {
       label: stringSchema('Label'),

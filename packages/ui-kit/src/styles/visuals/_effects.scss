@@ -1,0 +1,31 @@
+@layer base {
+  .pf-glow-ring:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--pf-color-primary-500) 60%, transparent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--pf-color-primary-500) 18%, transparent);
+  }
+
+  .pf-noise-overlay {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .pf-noise-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--pf-noise-opacity, 0.03);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgb(255 255 255 / 52%) 1px, transparent 0),
+      radial-gradient(circle at 2px 2px, rgb(0 0 0 / 28%) 1px, transparent 0);
+    background-size: 10px 10px, 14px 14px;
+    mix-blend-mode: soft-light;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pf-noise-overlay::after {
+      animation: none;
+    }
+  }
+}

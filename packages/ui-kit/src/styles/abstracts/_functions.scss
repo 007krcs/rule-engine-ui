@@ -1,0 +1,18 @@
+@use 'sass:map';
+@use './tokens' as tokens;
+
+@function token($group, $key, $fallback: null) {
+  @return tokens.token-value($group, $key, $fallback);
+}
+
+@function color($palette, $step: 500) {
+  @return var(--pf-color-#{$palette}-#{$step});
+}
+
+@function elevation($level: md) {
+  @return var(--pf-shadow-#{$level});
+}
+
+@function mix($a, $b, $weight: 50%) {
+  @return color-mix(in srgb, #{$a} #{$weight}, #{$b});
+}

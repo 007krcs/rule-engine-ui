@@ -34,6 +34,7 @@
     "@platform/react-renderer": "workspace:*",
     "@platform/rules-engine": "workspace:*",
     "@platform/schema": "workspace:*",
+    "@platform/theme-config": "workspace:*",
     "@platform/ui-kit": "workspace:*",
     "@platform/validator": "workspace:*",
     "@platform/vue-renderer": "workspace:*",

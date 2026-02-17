@@ -2,36 +2,36 @@
   color-scheme: light;
 
   /* Typography */
-  --rf-font-sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  --rf-font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --rf-font-sans: var(--pf-font-sans, var(--font-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif);
+  --rf-font-mono: var(--pf-font-mono, var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace);
 
   /* Spacing */
-  --rf-space-1: 4px;
-  --rf-space-2: 8px;
-  --rf-space-3: 12px;
-  --rf-space-4: 16px;
-  --rf-space-5: 20px;
-  --rf-space-6: 24px;
-  --rf-space-8: 32px;
-  --rf-space-10: 40px;
+  --rf-space-1: var(--pf-space-2, 4px);
+  --rf-space-2: var(--pf-space-4, 8px);
+  --rf-space-3: var(--pf-space-5, 12px);
+  --rf-space-4: var(--pf-space-6, 16px);
+  --rf-space-5: var(--pf-space-7, 20px);
+  --rf-space-6: var(--pf-space-8, 24px);
+  --rf-space-8: var(--pf-space-9, 32px);
+  --rf-space-10: var(--pf-space-10, 40px);
 
   /* Radii */
-  --rf-radius-sm: 10px;
-  --rf-radius-md: 14px;
-  --rf-radius-lg: 18px;
-  --rf-radius-pill: 999px;
+  --rf-radius-sm: var(--pf-radius-sm, 6px);
+  --rf-radius-md: var(--pf-radius-md, 10px);
+  --rf-radius-lg: var(--pf-radius-lg, 14px);
+  --rf-radius-pill: var(--pf-radius-full, 999px);
 
   /* Colors */
-  --rf-bg: var(--pf-surface-canvas, #f7fafc);
+  --rf-bg: var(--pf-bg-0, var(--pf-surface-canvas, #f7fafc));
   --rf-fg: var(--pf-surface-text, #0f172a);
   --rf-muted: var(--pf-surface-text-muted, #475569);
   --rf-surface: var(--pf-surface-layer, #ffffff);
   --rf-surface-2: var(--pf-surface-layer-alt, #f1f5f9);
   --rf-border: var(--pf-surface-border, #e2e8f0);
-  --rf-shadow: rgba(15, 23, 42, 0.08);
+  --rf-shadow: rgb(15 23 42 / 8%);
 
   --rf-primary: var(--pf-color-primary-600, #1e53d1);
-  --rf-primary-fg: #ffffff;
+  --rf-primary-fg: var(--pf-button-solid-text, #ffffff);
   --rf-accent: var(--pf-color-secondary-500, #7c3aed);
   --rf-accent-fg: var(--pf-surface-inverse-text, #ffffff);
   --rf-success: var(--pf-color-success-700, #166b4b);
@@ -41,31 +41,13 @@
   --rf-focus: var(--pf-surface-focus, rgba(37, 99, 235, 0.35));
 
   /* Shadows */
-  --rf-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 18px 40px rgba(15, 23, 42, 0.08);
-  --rf-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.08), 0 10px 22px rgba(15, 23, 42, 0.10);
+  --rf-shadow-card: var(--pf-shadow-lg, 0 14px 42px rgb(18 29 49 / 18%));
+  --rf-shadow-soft: var(--pf-shadow-md, 0 10px 30px rgb(18 29 49 / 12%));
 }
 
 :root[data-theme='dark'],
 .dark {
   color-scheme: dark;
-
-  --rf-bg: #0b1220;
-  --rf-fg: #e5e7eb;
-  --rf-muted: #94a3b8;
-  --rf-surface: #0f1a2b;
-  --rf-surface-2: #101f35;
-  --rf-border: #1f2d43;
-  --rf-shadow: rgba(0, 0, 0, 0.35);
-
-  --rf-primary: #4f8cff;
-  --rf-primary-fg: #06142e;
-  --rf-accent: #a78bfa;
-  --rf-accent-fg: #140628;
-  --rf-success: #34d399;
-  --rf-warning: #fbbf24;
-  --rf-danger: #fb7185;
-
-  --rf-focus: rgba(79, 140, 255, 0.35);
 }
 
 *,

@@ -313,7 +313,7 @@ export function PFMenu({
       </button>
       {isOpen ? (
         <ul
-          className={cn('pf-menu__list', align === 'end' && 'pf-menu__list--end')}
+          className={cn('pf-menu__list', 'pf-surface-panel', align === 'end' && 'pf-menu__list--end')}
           role="menu"
           id={menuId}
           ref={listRef}

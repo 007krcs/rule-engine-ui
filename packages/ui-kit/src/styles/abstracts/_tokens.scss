@@ -1,0 +1,160 @@
+@use 'sass:map';
+
+$colors: (
+  primary: (
+    50: #ebf3ff,
+    100: #dce9ff,
+    200: #b8d2ff,
+    300: #84afff,
+    400: #4f8cff,
+    500: #2f6af5,
+    600: #1e53d1,
+    700: #183fa0,
+    800: #163682,
+    900: #152e69,
+  ),
+  secondary: (
+    50: #f6f1ff,
+    100: #ece3ff,
+    200: #dac7ff,
+    300: #c0a0ff,
+    400: #a377ff,
+    500: #8b52f3,
+    600: #7337ce,
+    700: #5a2ba1,
+    800: #4b2682,
+    900: #3d2069,
+  ),
+  neutral: (
+    50: #f6f8fb,
+    100: #eef2f7,
+    200: #d9e1eb,
+    300: #b5c1cf,
+    400: #8898ac,
+    500: #66768e,
+    600: #4d5d73,
+    700: #3b4658,
+    800: #2b3442,
+    900: #1b2230,
+  ),
+  success: (
+    500: #26a774,
+    700: #166b4b,
+  ),
+  warning: (
+    500: #eb8b17,
+    700: #a6550f,
+  ),
+  error: (
+    500: #f24062,
+    700: #b11f43,
+  ),
+);
+
+$typography: (
+  sans: '"Plus Jakarta Sans", "Avenir Next", "Segoe UI", Arial, sans-serif',
+  mono: '"IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace',
+  sizes: (
+    xs: 12px,
+    sm: 14px,
+    md: 16px,
+    lg: 18px,
+    xl: 20px,
+    2xl: 24px,
+  ),
+);
+
+$spacing: (
+  0: 0px,
+  1: 2px,
+  2: 4px,
+  3: 6px,
+  4: 8px,
+  5: 12px,
+  6: 16px,
+  7: 20px,
+  8: 24px,
+  9: 32px,
+  10: 40px,
+  11: 48px,
+  12: 64px,
+);
+
+$radii: (
+  xs: 4px,
+  sm: 6px,
+  md: 10px,
+  lg: 14px,
+  xl: 18px,
+  2xl: 24px,
+  full: 9999px,
+);
+
+$shadows: (
+  sm: 0 1px 2px rgb(15 25 38 / 8%),
+  md: 0 10px 30px rgb(18 29 49 / 12%),
+  lg: 0 14px 42px rgb(18 29 49 / 18%),
+  xl: 0 24px 70px rgb(18 29 49 / 22%),
+);
+
+$z-index: (
+  dropdown: 1000,
+  modal: 1140,
+  toast: 1210,
+  tooltip: 1260,
+);
+
+$transitions: (
+  fast: 120ms,
+  normal: 200ms,
+  slow: 320ms,
+);
+
+$density: (
+  cozy: (
+    control-height-sm: 32px,
+    control-height-md: 40px,
+    control-height-lg: 48px,
+  ),
+  compact: (
+    control-height-sm: 28px,
+    control-height-md: 34px,
+    control-height-lg: 40px,
+  ),
+);
+
+@function token-map($name) {
+  @if $name == colors {
+    @return $colors;
+  }
+  @if $name == typography {
+    @return $typography;
+  }
+  @if $name == spacing {
+    @return $spacing;
+  }
+  @if $name == radii {
+    @return $radii;
+  }
+  @if $name == shadows {
+    @return $shadows;
+  }
+  @if $name == z-index {
+    @return $z-index;
+  }
+  @if $name == transitions {
+    @return $transitions;
+  }
+  @if $name == density {
+    @return $density;
+  }
+  @error 'Unknown token map: #{$name}';
+}
+
+@function token-value($map-name, $key, $fallback: null) {
+  $map: token-map($map-name);
+  @if map.has-key($map, $key) {
+    @return map.get($map, $key);
+  }
+  @return $fallback;
+}

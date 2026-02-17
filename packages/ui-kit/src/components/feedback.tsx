@@ -169,7 +169,7 @@ export function PFDialog({
         }}
       />
       <section
-        className={cn('pf-dialog', `pf-dialog--${size}`, className)}
+        className={cn('pf-dialog', 'pf-surface-dialog', `pf-dialog--${size}`, className)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
@@ -349,7 +349,7 @@ export function PFSnackbar({
   if (!visible) return null;
 
   return (
-    <div className={cn('pf-snackbar', intentClass('pf-snackbar', intent), className)} role="status" {...rest}>
+    <div className={cn('pf-snackbar', 'pf-surface-panel', intentClass('pf-snackbar', intent), className)} role="status" {...rest}>
       <div className="pf-snackbar__message">
         {title ? <strong className="pf-snackbar__title">{title}</strong> : null}
         <span>{message}</span>

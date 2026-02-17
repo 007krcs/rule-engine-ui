@@ -6,7 +6,7 @@ export interface PFCardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export function PFCard({ className, elevated = false, ...rest }: PFCardProps) {
-  return <article className={cn('pf-card', elevated && 'pf-card--elevated', className)} {...rest} />;
+  return <article className={cn('pf-card', 'pf-surface-card', elevated && 'pf-card--elevated', className)} {...rest} />;
 }
 
 export type PFCardHeaderProps = HTMLAttributes<HTMLDivElement>;
@@ -132,7 +132,7 @@ export function PFTable<RowType extends Record<string, unknown>>({
   ...rest
 }: PFTableProps<RowType>) {
   return (
-    <div className="pf-table-wrap">
+    <div className={cn('pf-table-wrap', 'pf-surface-table')}>
       <table className={cn('pf-table', className)} {...rest}>
         <thead>
           <tr>

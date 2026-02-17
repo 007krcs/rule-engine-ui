@@ -1,0 +1,70 @@
+# Template Library
+
+The Template Library lets business analysts start from production-style screens without touching JSON.
+
+## Where templates live
+
+Template schemas are stored as JSON files under:
+
+`apps/ruleflow-web/src/templates/*.json`
+
+Each file is a full `UISchema` using grid layout (`layoutType: "grid"`, `grid`, `items`, `components`).
+
+## Register template metadata
+
+Add or update entry metadata in:
+
+`apps/ruleflow-web/src/templates/catalog.ts`
+
+Required metadata:
+
+- `id`
+- `name`
+- `category`
+- `purpose`
+- `requiredData`
+- `components`
+- `customizable`
+- `setupChecklist`
+- `screenshotTone`
+
+## API exposure
+
+Templates are served from:
+
+- `GET /api/templates`
+- `GET /api/templates/:templateId`
+
+Implementation source:
+
+- `apps/ruleflow-web/src/templates/server.ts`
+
+## BA apply flow
+
+The BA opens `/system/templates`, picks a template, and clicks **Apply template**.
+
+The app navigates to `/builder?template=<id>&checklist=1`, then Builder:
+
+1. Loads schema JSON from the template API
+2. Confirms before overwrite if the current canvas has content
+3. Applies the new schema
+4. Opens the setup checklist panel
+
+## Rules and i18n requirements
+
+All BA-facing labels should use i18n keys (`i18n.labelKey`, `i18n.helperTextKey`, `i18n.placeholderKey`, `accessibility.ariaLabelKey`).
+
+Template rules can be included directly in each component, for example:
+
+- `visibleWhen`
+- `disabledWhen`
+- `requiredWhen`
+
+## New template checklist
+
+1. Copy an existing template JSON and rename IDs consistently.
+2. Ensure bindings point to real data paths.
+3. Include breakpoint overrides for desktop/tablet/mobile.
+4. Add at least one rule placeholder relevant to business behavior.
+5. Register metadata in `catalog.ts`.
+6. Verify in `/system/templates` and `/builder` apply flow.

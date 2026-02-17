@@ -1,0 +1,322 @@
+{
+  "version": "1.0.0",
+  "pageId": "messaging-screen",
+  "layoutType": "grid",
+  "layout": {
+    "id": "root",
+    "type": "grid",
+    "columns": 12,
+    "componentIds": [
+      "messagingPageShell",
+      "messagingSection",
+      "messagingToolbar",
+      "messagingUnreadBadge",
+      "messagingSplit",
+      "messagingConversations",
+      "messagingThread",
+      "messagingInfoTabs",
+      "messagingComposer",
+      "messagingSend",
+      "messagingEmpty"
+    ]
+  },
+  "grid": {
+    "columns": 12,
+    "rowHeight": 56,
+    "gap": 12,
+    "collisionStrategy": "push",
+    "breakpoints": {
+      "md": {
+        "columns": 8,
+        "rowHeight": 52,
+        "gap": 10
+      },
+      "sm": {
+        "columns": 4,
+        "rowHeight": 48,
+        "gap": 8
+      }
+    }
+  },
+  "items": [
+    { "id": "messagingPageShell", "componentId": "messagingPageShell", "x": 0, "y": 0, "w": 12, "h": 2 },
+    { "id": "messagingSection", "componentId": "messagingSection", "x": 0, "y": 2, "w": 12, "h": 2 },
+    { "id": "messagingToolbar", "componentId": "messagingToolbar", "x": 0, "y": 4, "w": 9, "h": 2 },
+    { "id": "messagingUnreadBadge", "componentId": "messagingUnreadBadge", "x": 9, "y": 4, "w": 3, "h": 2 },
+    { "id": "messagingSplit", "componentId": "messagingSplit", "x": 0, "y": 6, "w": 12, "h": 3 },
+    { "id": "messagingConversations", "componentId": "messagingConversations", "x": 0, "y": 9, "w": 3, "h": 10 },
+    { "id": "messagingThread", "componentId": "messagingThread", "x": 3, "y": 9, "w": 6, "h": 10 },
+    { "id": "messagingInfoTabs", "componentId": "messagingInfoTabs", "x": 9, "y": 9, "w": 3, "h": 8 },
+    { "id": "messagingComposer", "componentId": "messagingComposer", "x": 3, "y": 19, "w": 5, "h": 2 },
+    { "id": "messagingSend", "componentId": "messagingSend", "x": 8, "y": 19, "w": 1, "h": 2 },
+    { "id": "messagingEmpty", "componentId": "messagingEmpty", "x": 0, "y": 21, "w": 12, "h": 3 },
+
+    { "id": "messagingToolbar:md", "componentId": "messagingToolbar", "x": 0, "y": 4, "w": 8, "h": 2, "breakpoint": "md" },
+    { "id": "messagingUnreadBadge:md", "componentId": "messagingUnreadBadge", "x": 0, "y": 6, "w": 8, "h": 2, "breakpoint": "md" },
+    { "id": "messagingSplit:md", "componentId": "messagingSplit", "x": 0, "y": 8, "w": 8, "h": 3, "breakpoint": "md" },
+    { "id": "messagingConversations:md", "componentId": "messagingConversations", "x": 0, "y": 11, "w": 3, "h": 8, "breakpoint": "md" },
+    { "id": "messagingThread:md", "componentId": "messagingThread", "x": 3, "y": 11, "w": 5, "h": 8, "breakpoint": "md" },
+    { "id": "messagingInfoTabs:md", "componentId": "messagingInfoTabs", "x": 0, "y": 19, "w": 8, "h": 4, "breakpoint": "md" },
+    { "id": "messagingComposer:md", "componentId": "messagingComposer", "x": 0, "y": 23, "w": 6, "h": 2, "breakpoint": "md" },
+    { "id": "messagingSend:md", "componentId": "messagingSend", "x": 6, "y": 23, "w": 2, "h": 2, "breakpoint": "md" },
+
+    { "id": "messagingToolbar:sm", "componentId": "messagingToolbar", "x": 0, "y": 4, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "messagingUnreadBadge:sm", "componentId": "messagingUnreadBadge", "x": 0, "y": 6, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "messagingSplit:sm", "componentId": "messagingSplit", "x": 0, "y": 8, "w": 4, "h": 3, "breakpoint": "sm" },
+    { "id": "messagingConversations:sm", "componentId": "messagingConversations", "x": 0, "y": 11, "w": 4, "h": 8, "breakpoint": "sm" },
+    { "id": "messagingThread:sm", "componentId": "messagingThread", "x": 0, "y": 19, "w": 4, "h": 8, "breakpoint": "sm" },
+    { "id": "messagingInfoTabs:sm", "componentId": "messagingInfoTabs", "x": 0, "y": 27, "w": 4, "h": 4, "breakpoint": "sm" },
+    { "id": "messagingComposer:sm", "componentId": "messagingComposer", "x": 0, "y": 31, "w": 3, "h": 2, "breakpoint": "sm" },
+    { "id": "messagingSend:sm", "componentId": "messagingSend", "x": 3, "y": 31, "w": 1, "h": 2, "breakpoint": "sm" }
+  ],
+  "components": [
+    {
+      "id": "messagingPageShell",
+      "type": "layout",
+      "adapterHint": "platform.pageShell",
+      "props": {
+        "sidebarWidth": 272,
+        "collapsedSidebarWidth": 88,
+        "hasRightPanel": true,
+        "headerHeight": 64,
+        "stickyHeader": true,
+        "contentTitleKey": "runtime.templates.messaging.content.title",
+        "contentDescriptionKey": "runtime.templates.messaging.content.description"
+      },
+      "bindings": {
+        "data": {
+          "sidebarItems": "data.navigation.messagingSidebar",
+          "rightPanelItems": "data.messages.rightPanelItems"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.shell.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.shell.aria",
+        "keyboardNav": true,
+        "focusOrder": 1
+      }
+    },
+    {
+      "id": "messagingSection",
+      "type": "layout",
+      "adapterHint": "platform.section",
+      "props": {
+        "titleKey": "runtime.templates.messaging.section.title",
+        "descriptionKey": "runtime.templates.messaging.section.description",
+        "intent": "neutral"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.section.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.section.aria",
+        "keyboardNav": true,
+        "focusOrder": 2
+      }
+    },
+    {
+      "id": "messagingToolbar",
+      "type": "layout",
+      "adapterHint": "platform.toolbar",
+      "props": {
+        "align": "space-between",
+        "wrap": true,
+        "searchPlaceholderKey": "runtime.templates.messaging.toolbar.searchPlaceholder",
+        "actionLabelKey": "runtime.templates.messaging.toolbar.action"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.toolbar.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.toolbar.aria",
+        "keyboardNav": true,
+        "focusOrder": 3
+      }
+    },
+    {
+      "id": "messagingUnreadBadge",
+      "type": "display",
+      "adapterHint": "platform.badge",
+      "bindings": {
+        "data": {
+          "badgeContent": "data.messages.unreadCount"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.unread.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.unread.aria",
+        "keyboardNav": true,
+        "focusOrder": 4
+      }
+    },
+    {
+      "id": "messagingSplit",
+      "type": "layout",
+      "adapterHint": "platform.splitLayout",
+      "props": {
+        "leftWidthPercent": 30,
+        "gap": 16,
+        "stackOnMobile": true,
+        "leftTitleKey": "runtime.templates.messaging.split.leftTitle",
+        "leftDescriptionKey": "runtime.templates.messaging.split.leftDescription",
+        "rightTitleKey": "runtime.templates.messaging.split.rightTitle",
+        "rightDescriptionKey": "runtime.templates.messaging.split.rightDescription"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.split.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.split.aria",
+        "keyboardNav": true,
+        "focusOrder": 5
+      }
+    },
+    {
+      "id": "messagingConversations",
+      "type": "data",
+      "adapterHint": "platform.table",
+      "props": {
+        "columns": [
+          { "field": "contact", "headerKey": "runtime.templates.messaging.table.contact" },
+          { "field": "lastMessage", "headerKey": "runtime.templates.messaging.table.lastMessage" },
+          { "field": "time", "headerKey": "runtime.templates.messaging.table.time" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "rows": "data.messages.conversations"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.table.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.table.aria",
+        "keyboardNav": true,
+        "focusOrder": 6
+      }
+    },
+    {
+      "id": "messagingThread",
+      "type": "display",
+      "adapterHint": "platform.cardGrid",
+      "props": {
+        "columns": { "sm": 1, "md": 1, "lg": 1, "xl": 1 },
+        "gap": 12
+      },
+      "bindings": {
+        "data": {
+          "items": "data.messages.thread"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.thread.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.thread.aria",
+        "keyboardNav": true,
+        "focusOrder": 7
+      }
+    },
+    {
+      "id": "messagingInfoTabs",
+      "type": "navigation",
+      "adapterHint": "platform.tabs",
+      "props": {
+        "value": "details",
+        "tabs": [
+          { "id": "details", "labelKey": "runtime.templates.messaging.tabs.details", "contentKey": "runtime.templates.messaging.tabs.details.content" },
+          { "id": "activity", "labelKey": "runtime.templates.messaging.tabs.activity", "contentKey": "runtime.templates.messaging.tabs.activity.content" }
+        ]
+      },
+      "rules": {
+        "visibleWhen": {
+          "op": "neq",
+          "left": { "path": "context.role" },
+          "right": { "value": "viewer" }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.tabs.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.tabs.aria",
+        "keyboardNav": true,
+        "focusOrder": 8
+      }
+    },
+    {
+      "id": "messagingComposer",
+      "type": "input",
+      "adapterHint": "platform.textField",
+      "bindings": {
+        "data": {
+          "value": "data.messages.composer"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.composer.label",
+        "helperTextKey": "runtime.templates.messaging.composer.helper",
+        "placeholderKey": "runtime.templates.messaging.composer.placeholder"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.composer.aria",
+        "keyboardNav": true,
+        "focusOrder": 9
+      }
+    },
+    {
+      "id": "messagingSend",
+      "type": "action",
+      "adapterHint": "platform.button",
+      "props": {
+        "variant": "solid",
+        "intent": "primary",
+        "labelKey": "runtime.templates.messaging.send.label"
+      },
+      "rules": {
+        "disabledWhen": {
+          "op": "eq",
+          "left": { "path": "data.messages.composer" },
+          "right": { "value": "" }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.send.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.send.aria",
+        "keyboardNav": true,
+        "focusOrder": 10
+      }
+    },
+    {
+      "id": "messagingEmpty",
+      "type": "feedback",
+      "adapterHint": "platform.emptyState",
+      "props": {
+        "descriptionKey": "runtime.templates.messaging.empty.description",
+        "actionLabelKey": "runtime.templates.messaging.empty.action"
+      },
+      "rules": {
+        "visibleWhen": {
+          "op": "eq",
+          "left": { "path": "data.messages.count" },
+          "right": { "value": 0 }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.messaging.empty.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.messaging.empty.aria",
+        "keyboardNav": true,
+        "focusOrder": 11
+      }
+    }
+  ]
+}

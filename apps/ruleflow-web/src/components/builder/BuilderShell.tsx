@@ -195,7 +195,7 @@ export function BuilderShell({
   if (isMobile) {
     return (
       <section className={cn(styles.shell, styles.mobileShell, className)} data-testid="builder-shell">
-        <section className={styles.workspace} data-testid="builder-canvas-workspace">
+        <section className={cn(styles.workspace, 'rf-builder-workspace')} data-testid="builder-canvas-workspace">
           <div className={styles.toolbar}>
             <div className={styles.mobileControls}>
               <button
@@ -237,7 +237,7 @@ export function BuilderShell({
           {panelsOpen ? (
             <div
               id="builder-mobile-panels"
-              className={styles.mobilePanel}
+              className={cn(styles.mobilePanel, 'pf-surface-panel')}
               data-testid={activePanel === 'palette' ? 'builder-palette-panel' : 'builder-inspector-panel'}
             >
               {activePanel === 'palette' ? palette : inspector}
@@ -255,7 +255,7 @@ export function BuilderShell({
   return (
     <section className={cn(styles.shell, className)} style={shellStyle} data-testid="builder-shell">
       {showPalette ? (
-        <aside className={styles.sidePane} data-testid="builder-palette-panel">
+        <aside className={cn(styles.sidePane, 'pf-surface-panel')} data-testid="builder-palette-panel">
           {palette}
         </aside>
       ) : null}
@@ -273,7 +273,7 @@ export function BuilderShell({
         />
       ) : null}
 
-      <section className={styles.workspace} data-testid="builder-canvas-workspace">
+      <section className={cn(styles.workspace, 'rf-builder-workspace')} data-testid="builder-canvas-workspace">
         <div className={styles.toolbar}>
           <div className={styles.panelActions}>
             <button
@@ -336,7 +336,7 @@ export function BuilderShell({
       ) : null}
 
       {showInspector ? (
-        <aside className={styles.sidePane} data-testid="builder-inspector-panel">
+        <aside className={cn(styles.sidePane, 'pf-surface-panel')} data-testid="builder-inspector-panel">
           {inspector}
         </aside>
       ) : null}

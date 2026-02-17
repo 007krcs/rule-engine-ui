@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ExecutionContext,
   JSONValue,
@@ -20,7 +20,7 @@ import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import type { ComponentDefinition } from '@platform/component-registry';
 import { builtinComponentDefinitions } from '@platform/component-registry';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { ConfigVersion } from '@/lib/demo/types';
 import { apiGet, apiPatch, apiPost } from '@/lib/demo/api-client';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +120,22 @@ type GetRegistryResponse =
   | { ok: true; tenantId: string; effective: ComponentDefinition[] }
   | { ok: false; error: string };
 
+type TemplateSummary = {
+  id: string;
+  name: string;
+  category: string;
+  purpose: string;
+  requiredData: string[];
+  components: string[];
+  customizable: string[];
+  setupChecklist: string[];
+  screenshotTone: 'orders' | 'profile' | 'files' | 'messages';
+};
+
+type GetTemplateResponse =
+  | { ok: true; template: { summary: TemplateSummary; schema: UISchema } }
+  | { ok: false; error: string };
+
 const previewContext: ExecutionContext = {
   tenantId: 'tenant-1',
   userId: 'builder',
@@ -137,7 +153,96 @@ const previewData: Record<string, JSONValue> = {
   orderTotal: 1200,
   loanAmount: 250000,
   riskLevel: 'Medium',
-  orders: [],
+  orders: {
+    count: 3,
+    filters: {
+      search: 'ACME',
+      status: 'processing',
+      category: 'standard',
+      customer: 'enterprise',
+    },
+    pagination: { page: 1, count: 12 },
+    rightPanelItems: ['SLA: 99.9%', 'Owner: Ops Team', 'Updated: 2m ago'],
+    items: [
+      {
+        id: 'ord-1',
+        invoice: 'INV-2301',
+        date: '2026-01-02',
+        status: 'Processing',
+        customerName: 'ACME Corp',
+        customerEmail: 'ops@acme.com',
+        total: '$1,240.00',
+      },
+      {
+        id: 'ord-2',
+        invoice: 'INV-2302',
+        date: '2026-01-04',
+        status: 'Completed',
+        customerName: 'Northwind',
+        customerEmail: 'finance@northwind.com',
+        total: '$980.00',
+      },
+      {
+        id: 'ord-3',
+        invoice: 'INV-2303',
+        date: '2026-01-06',
+        status: 'New',
+        customerName: 'Globex',
+        customerEmail: 'orders@globex.com',
+        total: '$2,420.00',
+      },
+    ],
+  },
+  userProfile: {
+    activeTab: 'settings',
+    firstName: 'Priya',
+    lastName: 'Sharma',
+    email: 'priya.sharma@example.com',
+    role: 'author',
+    bio: 'Product operations analyst focused on onboarding and policy updates.',
+    sections: [
+      { title: 'Team', description: 'Risk Operations' },
+      { title: 'Plan', description: 'Enterprise Pro' },
+      { title: 'Billing', description: 'Quarterly invoice' },
+    ],
+  },
+  files: {
+    count: 2,
+    filters: { tag: 'all' },
+    selectedFileName: 'Q1-financial-summary.pdf',
+    rightPanelItems: ['Storage: 76%', 'Retention: 180 days', 'Policy: Standard'],
+    folders: [
+      { id: 'folder-1', name: 'Contracts', modifiedAt: '2026-01-12', size: '128 MB', owner: 'Legal Team' },
+      { id: 'folder-2', name: 'Financials', modifiedAt: '2026-01-14', size: '96 MB', owner: 'Finance Team' },
+    ],
+    tiles: [
+      { title: 'Q1-financial-summary.pdf', description: 'Finance / 2.4 MB / Updated today' },
+      { title: 'renewal-checklist.docx', description: 'Legal / 840 KB / Updated yesterday' },
+      { title: 'customer-onboarding.pptx', description: 'Ops / 1.9 MB / Updated 3 days ago' },
+    ],
+  },
+  messages: {
+    count: 4,
+    unreadCount: 6,
+    composer: '',
+    rightPanelItems: ['Channel: Customer Ops', 'SLA: 1h', 'Region: US-East'],
+    conversations: [
+      { id: 'conv-1', contact: 'Alex Morgan', lastMessage: 'Need status update', time: '09:12' },
+      { id: 'conv-2', contact: 'Support Queue', lastMessage: '5 pending escalations', time: '08:45' },
+      { id: 'conv-3', contact: 'Finance Team', lastMessage: 'Invoice approved', time: 'Yesterday' },
+    ],
+    thread: [
+      { title: 'Alex Morgan', description: 'Can we confirm delivery ETA for INV-2303?' },
+      { title: 'You', description: 'Yes, it is scheduled for tomorrow morning.' },
+      { title: 'Alex Morgan', description: 'Great, thank you for confirming.' },
+    ],
+  },
+  navigation: {
+    ordersSidebar: ['Orders', 'Returns', 'Invoices', 'Customers'],
+    profileSidebar: ['Profile', 'Security', 'Notifications', 'Preferences'],
+    filesSidebar: ['Browse', 'Shared', 'Tags', 'Archive'],
+    messagingSidebar: ['Inbox', 'Assigned', 'Archived', 'Announcements'],
+  },
   revenueSeries: [2, 7, 4, 9],
 };
 
@@ -354,10 +459,18 @@ function PaletteItem({
   );
 }
 
+function initialChecklistState(summary: TemplateSummary | null): Record<string, boolean> {
+  if (!summary) return {};
+  return Object.fromEntries(summary.setupChecklist.map((_, index) => [`step-${index}`, false]));
+}
+
 export default function BuilderPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const versionId = searchParams.get('versionId');
   const previewFromUrl = searchParams.get('preview');
+  const templateId = searchParams.get('template');
+  const checklistFromUrl = searchParams.get('checklist') === '1';
   const { toast } = useToast();
   const { completeStep, setActiveVersionId } = useOnboarding();
 
@@ -365,6 +478,12 @@ export default function BuilderPage() {
   const [registryLoading, setRegistryLoading] = useState(false);
   const [registry, setRegistry] = useState<ComponentDefinition[]>(() => BUILTIN_COMPONENT_DEFS);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
+  const [templateSummary, setTemplateSummary] = useState<TemplateSummary | null>(null);
+  const [setupChecklistOpen, setSetupChecklistOpen] = useState(checklistFromUrl);
+  const [setupChecklistState, setSetupChecklistState] = useState<Record<string, boolean>>({});
+  const [templateApplying, setTemplateApplying] = useState(false);
+  const appliedTemplateRef = useRef<string | null>(null);
+  const [dragReady, setDragReady] = useState(false);
   const [schema, setSchema] = useState<UISchema>(() =>
     versionId ? createSchemaFromComponents([]) : createSchemaFromComponents(scratchComponents),
   );
@@ -464,8 +583,17 @@ export default function BuilderPage() {
   }, []);
 
   useEffect(() => {
+    setDragReady(true);
+  }, []);
+
+  useEffect(() => {
     if (previewFromUrl === '1') setPreviewMode(true);
   }, [previewFromUrl]);
+
+  useEffect(() => {
+    if (!checklistFromUrl) return;
+    setSetupChecklistOpen(true);
+  }, [checklistFromUrl]);
 
   useEffect(() => {
     if (!previewMode) return;
@@ -573,6 +701,75 @@ export default function BuilderPage() {
   useEffect(() => {
     void loadFromStore();
   }, [versionId]);
+
+  useEffect(() => {
+    if (!templateId) return;
+    if (appliedTemplateRef.current === templateId) return;
+    if (templateApplying) return;
+    if (versionId && loading) return;
+
+    let cancelled = false;
+    const applyTemplate = async () => {
+      setTemplateApplying(true);
+      try {
+        const response = await apiGet<GetTemplateResponse>(`/api/templates/${encodeURIComponent(templateId)}`);
+        if (!response.ok) throw new Error(response.error);
+        if (cancelled) return;
+
+        const scratchIds = scratchComponents.map((component) => component.id);
+        const hasDefaultScratch =
+          !versionId &&
+          components.length === scratchIds.length &&
+          components.every((component) => scratchIds.includes(component.id));
+
+        if (!hasDefaultScratch && components.length > 0) {
+          const confirmed = window.confirm(
+            `Load "${response.template.summary.name}" and replace the current canvas?`,
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+
+        const normalized = normalizeSchema(response.template.schema as UISchema);
+        const normalizedComponents = normalized.components as UIComponent[];
+
+        setSchema(normalized);
+        setSelectedComponentId(normalizedComponents[0]?.id ?? null);
+        setTemplateSummary(response.template.summary);
+        setSetupChecklistState(initialChecklistState(response.template.summary));
+        setSetupChecklistOpen(true);
+        setPreviewMode(false);
+        appliedTemplateRef.current = templateId;
+        toast({
+          variant: 'success',
+          title: 'Template applied',
+          description: response.template.summary.name,
+        });
+      } catch (error) {
+        if (cancelled) return;
+        toast({
+          variant: 'error',
+          title: 'Template load failed',
+          description: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams.toString());
+          next.delete('template');
+          next.delete('checklist');
+          const query = next.toString();
+          router.replace(query ? `/builder?${query}` : '/builder');
+          setTemplateApplying(false);
+        }
+      }
+    };
+
+    void applyTemplate();
+    return () => {
+      cancelled = true;
+    };
+  }, [components, loading, router, searchParams, templateApplying, templateId, toast, versionId]);
 
   const addComponent = () => {
     const trimmedId = draft.id.trim();
@@ -1013,6 +1210,12 @@ export default function BuilderPage() {
                 ) : (
                   'Scratch schema (stored in localStorage). Use New Config to persist a package.'
                 )}
+                {templateSummary ? (
+                  <>
+                    <br />
+                    Template: <span className="rfCodeInline">{templateSummary.name}</span> ({templateSummary.category})
+                  </>
+                ) : null}
               </p>
             </div>
             <div className={styles.actions}>
@@ -1022,6 +1225,17 @@ export default function BuilderPage() {
               <Button variant="outline" size="sm" onClick={() => setPreviewMode((v) => !v)} disabled={loading}>
                 {previewMode ? 'Exit preview' : 'Preview'}
               </Button>
+              {templateSummary ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSetupChecklistOpen((open) => !open)}
+                  disabled={loading || templateApplying}
+                  data-testid="builder-template-checklist-toggle"
+                >
+                  {setupChecklistOpen ? 'Hide setup checklist' : 'Show setup checklist'}
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -1147,13 +1361,14 @@ export default function BuilderPage() {
         </CardContent>
       </Card>
 
-      <DndContext
-        id="builder-dnd-context"
-        sensors={sensors}
-        onDragStart={onDragStart}
-        onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
-      >
+      {dragReady ? (
+        <DndContext
+          id="builder-dnd-context"
+          sensors={sensors}
+          onDragStart={onDragStart}
+          onDragMove={onDragMove}
+          onDragEnd={onDragEnd}
+        >
         {previewMode ? (
           <Card>
             <CardHeader>
@@ -1425,6 +1640,43 @@ export default function BuilderPage() {
             }
             inspector={
               <div className={styles.inspectorStack}>
+                {setupChecklistOpen && templateSummary ? (
+                  <Card className={styles.setupChecklistCard} data-testid="builder-template-checklist">
+                    <CardHeader>
+                      <CardTitle>{templateSummary.name} setup checklist</CardTitle>
+                    </CardHeader>
+                    <CardContent className={styles.setupChecklistBody}>
+                      <p className={styles.canvasHint}>
+                        Follow these guided steps: connect data, configure labels, configure rules, preview, then publish.
+                      </p>
+                      <div className={styles.setupChecklistSteps}>
+                        {templateSummary.setupChecklist.map((step, index) => {
+                          const key = `step-${index}`;
+                          const done = setupChecklistState[key] ?? false;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              className={cn(styles.setupChecklistStep, done ? styles.setupChecklistStepDone : undefined)}
+                              onClick={() =>
+                                setSetupChecklistState((current) => ({
+                                  ...current,
+                                  [key]: !done,
+                                }))
+                              }
+                            >
+                              <span className={styles.setupChecklistBullet} aria-hidden="true">
+                                {done ? 'x' : index + 1}
+                              </span>
+                              <span>{step}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 {selectedComponent ? (
                   <ComponentEditor
                     component={selectedComponent}
@@ -1495,15 +1747,22 @@ export default function BuilderPage() {
           />
         )}
 
-        <DragOverlay>
-          {activeDrag ? (
-            <div className={styles.dragOverlay}>
-              <div className={styles.dragOverlayTitle}>{activeDrag.label}</div>
-              <div className={styles.dragOverlaySub}>Palette item</div>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeDrag ? (
+              <div className={styles.dragOverlay}>
+                <div className={styles.dragOverlayTitle}>{activeDrag.label}</div>
+                <div className={styles.dragOverlaySub}>Palette item</div>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        <Card>
+          <CardContent>
+            <p className={styles.canvasHint}>Preparing drag and drop workspace...</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

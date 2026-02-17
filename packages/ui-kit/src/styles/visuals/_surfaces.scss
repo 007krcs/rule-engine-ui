@@ -1,0 +1,53 @@
+@layer components {
+  .pf-surface-card,
+  .pf-surface-panel,
+  .pf-surface-dialog,
+  .pf-surface-toolbar,
+  .pf-surface-table {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .pf-surface-card,
+  .pf-surface-panel,
+  .pf-surface-dialog {
+    border: 1px solid var(--pf-surface-border);
+    border-radius: var(--pf-radius-lg);
+    background: var(--pf-surface-layer);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--pf-surface-layer) 96%, transparent), color-mix(in srgb, var(--pf-surface-layer-alt) 92%, transparent)),
+      var(--pf-surface-layer);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 28%),
+      var(--pf-shadow-md);
+  }
+
+  .pf-surface-toolbar,
+  .pf-surface-table {
+    border: 1px solid var(--pf-surface-border);
+    border-radius: var(--pf-radius-md);
+    background: color-mix(in srgb, var(--pf-surface-layer) 96%, transparent);
+    box-shadow: var(--pf-shadow-sm);
+  }
+
+  [data-visual='flat'] .pf-surface-card,
+  [data-visual='flat'] .pf-surface-panel,
+  [data-visual='flat'] .pf-surface-dialog {
+    background: var(--pf-surface-layer);
+    box-shadow: 0 1px 2px rgb(15 25 38 / 8%);
+  }
+
+  [data-visual='3d'] .pf-surface-card,
+  [data-visual='3d'] .pf-surface-panel,
+  [data-visual='3d'] .pf-surface-dialog {
+    background: var(--pf-surface-layer);
+    background:
+      linear-gradient(165deg, rgb(255 255 255 / 24%), rgb(255 255 255 / 0%) 34%),
+      linear-gradient(180deg, color-mix(in srgb, var(--pf-surface-layer) 97%, transparent), color-mix(in srgb, var(--pf-surface-layer-alt) 90%, transparent)),
+      var(--pf-surface-layer);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 35%),
+      inset 0 -1px 0 rgb(0 0 0 / 10%),
+      var(--pf-shadow-lg);
+  }
+}

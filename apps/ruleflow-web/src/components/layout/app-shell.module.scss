@@ -2,7 +2,7 @@
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--rf-bg);
+  background: transparent;
 }
 
 .clientReady {
@@ -154,8 +154,8 @@
 .navCard {
   border: 1px solid var(--rf-border);
   border-radius: var(--rf-radius-lg);
-  background: var(--rf-surface);
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  background: transparent;
+  box-shadow: none;
   padding: var(--rf-space-4);
 }
 
@@ -215,9 +215,7 @@
   border: 1px solid var(--rf-border);
   border-radius: var(--rf-radius-lg);
   padding: var(--rf-space-4);
-  background: radial-gradient(110% 120% at 10% 10%, rgba(37, 99, 235, 0.12), transparent 55%),
-    radial-gradient(120% 120% at 90% 20%, rgba(124, 58, 237, 0.10), transparent 55%),
-    var(--rf-surface);
+  background: transparent;
 }
 
 .rbacTitle {
@@ -252,7 +250,7 @@
   left: 0;
   height: 100%;
   width: min(320px, 85vw);
-  background: var(--rf-bg);
+  background: transparent;
   border-right: 1px solid var(--rf-border);
   box-shadow: var(--rf-shadow-soft);
   padding: var(--rf-space-4);

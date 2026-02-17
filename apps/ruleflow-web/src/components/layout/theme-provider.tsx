@@ -10,17 +10,21 @@ import {
   PlatformThemeProvider,
   usePlatformTheme,
   type PlatformTheme,
+  type PlatformVisualStyle,
 } from '@platform/ui-kit';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ThemeDensity = 'comfortable' | 'compact';
+export type ThemeVisual = PlatformVisualStyle;
 
 type ThemeContextValue = {
   theme: Exclude<ThemeMode, 'system'>;
   density: ThemeDensity;
+  visual: ThemeVisual;
   brandPrimary?: string;
   setTheme: (theme: Exclude<ThemeMode, 'system'>) => void;
   setDensity: (density: ThemeDensity) => void;
+  setVisual: (visual: ThemeVisual) => void;
   setBrandPrimary: (primary: string) => void;
 };
 
@@ -57,15 +61,17 @@ export function ThemeProvider({
 }
 
 function ThemeBridge({ children }: { children: ReactNode }) {
-  const { theme, setMode, setDensity, setBrand } = usePlatformTheme();
+  const { theme, setMode, setDensity, setVisual, setBrand } = usePlatformTheme();
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme: theme.mode,
-      density: theme.density,
+      density: theme.density === 'compact' ? 'compact' : 'comfortable',
+      visual: theme.visual,
       brandPrimary: theme.brand?.primary,
       setTheme: setMode,
       setDensity,
+      setVisual,
       setBrandPrimary: (primary) => {
         setBrand({
           ...theme.brand,
@@ -73,7 +79,7 @@ function ThemeBridge({ children }: { children: ReactNode }) {
         });
       },
     }),
-    [setBrand, setDensity, setMode, theme],
+    [setBrand, setDensity, setMode, setVisual, theme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -97,15 +103,23 @@ async function loadTenantTheme(): Promise<Partial<PlatformTheme> | null> {
     const mode = resolveTenantMode(payload.branding.mode);
     const density: ThemeDensity = payload.branding.spacing <= 7 ? 'compact' : 'comfortable';
     const radiusScale = clamp(payload.branding.radius / 10, 0.5, 2);
+    const visual = resolveVisualStyle(payload.branding.cssVariables);
+    const elevationIntensity = resolveNumberVar(payload.branding.cssVariables, '--pf-elevation-intensity');
+    const noise = resolveNumberVar(payload.branding.cssVariables, '--pf-noise-opacity');
+    const fontFamily = resolveStringVar(payload.branding.cssVariables, '--pf-font-sans');
 
     return {
       mode,
       density,
+      visual,
       brand: {
         logoUrl: payload.branding.logoUrl,
         primary: payload.branding.primaryColor,
         secondary: payload.branding.secondaryColor,
+        fontFamily: fontFamily ?? undefined,
         radiusScale,
+        elevationIntensity: elevationIntensity ?? undefined,
+        noise: noise ?? undefined,
       },
     };
   } catch {
@@ -121,4 +135,32 @@ function resolveTenantMode(mode: ThemeMode): Exclude<ThemeMode, 'system'> {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function resolveVisualStyle(cssVariables: Record<string, unknown> | undefined): ThemeVisual {
+  const value = cssVariables?.['--pf-visual-style'];
+  if (value === 'flat' || value === 'layered' || value === '3d') return value;
+  return 'layered';
+}
+
+function resolveNumberVar(
+  cssVariables: Record<string, unknown> | undefined,
+  key: string,
+): number | null {
+  const value = cssVariables?.[key];
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function resolveStringVar(
+  cssVariables: Record<string, unknown> | undefined,
+  key: string,
+): string | null {
+  const value = cssVariables?.[key];
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  return null;
 }

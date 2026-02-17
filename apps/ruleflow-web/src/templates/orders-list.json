@@ -1,0 +1,344 @@
+{
+  "version": "1.0.0",
+  "pageId": "orders-list-screen",
+  "layoutType": "grid",
+  "layout": {
+    "id": "root",
+    "type": "grid",
+    "columns": 12,
+    "componentIds": [
+      "ordersPageShell",
+      "ordersSection",
+      "ordersToolbar",
+      "ordersSearch",
+      "ordersStatusFilter",
+      "ordersCategoryFilter",
+      "ordersCustomerFilter",
+      "ordersDownloadPdf",
+      "ordersTable",
+      "ordersPagination",
+      "ordersEmptyState"
+    ]
+  },
+  "grid": {
+    "columns": 12,
+    "rowHeight": 56,
+    "gap": 12,
+    "collisionStrategy": "push",
+    "breakpoints": {
+      "md": {
+        "columns": 8,
+        "rowHeight": 52,
+        "gap": 10
+      },
+      "sm": {
+        "columns": 4,
+        "rowHeight": 48,
+        "gap": 8
+      }
+    }
+  },
+  "items": [
+    { "id": "ordersPageShell", "componentId": "ordersPageShell", "x": 0, "y": 0, "w": 12, "h": 2 },
+    { "id": "ordersSection", "componentId": "ordersSection", "x": 0, "y": 2, "w": 12, "h": 2 },
+    { "id": "ordersToolbar", "componentId": "ordersToolbar", "x": 0, "y": 4, "w": 12, "h": 2 },
+    { "id": "ordersSearch", "componentId": "ordersSearch", "x": 0, "y": 6, "w": 3, "h": 2 },
+    { "id": "ordersStatusFilter", "componentId": "ordersStatusFilter", "x": 3, "y": 6, "w": 3, "h": 2 },
+    { "id": "ordersCategoryFilter", "componentId": "ordersCategoryFilter", "x": 6, "y": 6, "w": 3, "h": 2 },
+    { "id": "ordersCustomerFilter", "componentId": "ordersCustomerFilter", "x": 9, "y": 6, "w": 3, "h": 2 },
+    { "id": "ordersDownloadPdf", "componentId": "ordersDownloadPdf", "x": 9, "y": 8, "w": 3, "h": 2 },
+    { "id": "ordersTable", "componentId": "ordersTable", "x": 0, "y": 10, "w": 12, "h": 9 },
+    { "id": "ordersPagination", "componentId": "ordersPagination", "x": 8, "y": 19, "w": 4, "h": 2 },
+    { "id": "ordersEmptyState", "componentId": "ordersEmptyState", "x": 0, "y": 21, "w": 12, "h": 3 },
+
+    { "id": "ordersSearch:md", "componentId": "ordersSearch", "x": 0, "y": 6, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "ordersStatusFilter:md", "componentId": "ordersStatusFilter", "x": 4, "y": 6, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "ordersCategoryFilter:md", "componentId": "ordersCategoryFilter", "x": 0, "y": 8, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "ordersCustomerFilter:md", "componentId": "ordersCustomerFilter", "x": 4, "y": 8, "w": 4, "h": 2, "breakpoint": "md" },
+    { "id": "ordersDownloadPdf:md", "componentId": "ordersDownloadPdf", "x": 0, "y": 10, "w": 8, "h": 2, "breakpoint": "md" },
+    { "id": "ordersTable:md", "componentId": "ordersTable", "x": 0, "y": 12, "w": 8, "h": 9, "breakpoint": "md" },
+    { "id": "ordersPagination:md", "componentId": "ordersPagination", "x": 4, "y": 21, "w": 4, "h": 2, "breakpoint": "md" },
+
+    { "id": "ordersSearch:sm", "componentId": "ordersSearch", "x": 0, "y": 6, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "ordersStatusFilter:sm", "componentId": "ordersStatusFilter", "x": 0, "y": 8, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "ordersCategoryFilter:sm", "componentId": "ordersCategoryFilter", "x": 0, "y": 10, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "ordersCustomerFilter:sm", "componentId": "ordersCustomerFilter", "x": 0, "y": 12, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "ordersDownloadPdf:sm", "componentId": "ordersDownloadPdf", "x": 0, "y": 14, "w": 4, "h": 2, "breakpoint": "sm" },
+    { "id": "ordersTable:sm", "componentId": "ordersTable", "x": 0, "y": 16, "w": 4, "h": 10, "breakpoint": "sm" },
+    { "id": "ordersPagination:sm", "componentId": "ordersPagination", "x": 0, "y": 26, "w": 4, "h": 2, "breakpoint": "sm" }
+  ],
+  "components": [
+    {
+      "id": "ordersPageShell",
+      "type": "layout",
+      "adapterHint": "platform.pageShell",
+      "props": {
+        "sidebarWidth": 280,
+        "collapsedSidebarWidth": 88,
+        "hasRightPanel": true,
+        "headerHeight": 64,
+        "stickyHeader": true,
+        "contentTitleKey": "runtime.templates.orders.content.title",
+        "contentDescriptionKey": "runtime.templates.orders.content.description"
+      },
+      "bindings": {
+        "data": {
+          "sidebarItems": "data.navigation.ordersSidebar",
+          "rightPanelItems": "data.orders.rightPanelItems"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.shell.label",
+        "helperTextKey": "runtime.templates.orders.shell.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.shell.aria",
+        "keyboardNav": true,
+        "focusOrder": 1
+      }
+    },
+    {
+      "id": "ordersSection",
+      "type": "layout",
+      "adapterHint": "platform.section",
+      "props": {
+        "titleKey": "runtime.templates.orders.section.title",
+        "descriptionKey": "runtime.templates.orders.section.description",
+        "intent": "info"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.section.label",
+        "helperTextKey": "runtime.templates.orders.section.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.section.aria",
+        "keyboardNav": true,
+        "focusOrder": 2
+      }
+    },
+    {
+      "id": "ordersToolbar",
+      "type": "layout",
+      "adapterHint": "platform.toolbar",
+      "props": {
+        "align": "space-between",
+        "wrap": true,
+        "searchPlaceholderKey": "runtime.templates.orders.toolbar.searchPlaceholder",
+        "actionLabelKey": "runtime.templates.orders.toolbar.action"
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.toolbar.label",
+        "helperTextKey": "runtime.templates.orders.toolbar.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.toolbar.aria",
+        "keyboardNav": true,
+        "focusOrder": 3
+      }
+    },
+    {
+      "id": "ordersSearch",
+      "type": "input",
+      "adapterHint": "platform.textField",
+      "bindings": {
+        "data": {
+          "value": "data.orders.filters.search"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.filters.search.label",
+        "helperTextKey": "runtime.templates.orders.filters.search.helper",
+        "placeholderKey": "runtime.templates.orders.filters.search.placeholder"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.filters.search.aria",
+        "keyboardNav": true,
+        "focusOrder": 4
+      }
+    },
+    {
+      "id": "ordersStatusFilter",
+      "type": "input",
+      "adapterHint": "platform.select",
+      "props": {
+        "options": [
+          { "value": "all", "labelKey": "runtime.templates.orders.filters.status.all" },
+          { "value": "new", "labelKey": "runtime.templates.orders.filters.status.new" },
+          { "value": "processing", "labelKey": "runtime.templates.orders.filters.status.processing" },
+          { "value": "completed", "labelKey": "runtime.templates.orders.filters.status.completed" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "value": "data.orders.filters.status"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.filters.status.label",
+        "helperTextKey": "runtime.templates.orders.filters.status.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.filters.status.aria",
+        "keyboardNav": true,
+        "focusOrder": 5
+      }
+    },
+    {
+      "id": "ordersCategoryFilter",
+      "type": "input",
+      "adapterHint": "platform.select",
+      "props": {
+        "options": [
+          { "value": "all", "labelKey": "runtime.templates.orders.filters.category.all" },
+          { "value": "standard", "labelKey": "runtime.templates.orders.filters.category.standard" },
+          { "value": "express", "labelKey": "runtime.templates.orders.filters.category.express" },
+          { "value": "returns", "labelKey": "runtime.templates.orders.filters.category.returns" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "value": "data.orders.filters.category"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.filters.category.label",
+        "helperTextKey": "runtime.templates.orders.filters.category.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.filters.category.aria",
+        "keyboardNav": true,
+        "focusOrder": 6
+      }
+    },
+    {
+      "id": "ordersCustomerFilter",
+      "type": "input",
+      "adapterHint": "platform.select",
+      "props": {
+        "options": [
+          { "value": "all", "labelKey": "runtime.templates.orders.filters.customer.all" },
+          { "value": "enterprise", "labelKey": "runtime.templates.orders.filters.customer.enterprise" },
+          { "value": "smb", "labelKey": "runtime.templates.orders.filters.customer.smb" },
+          { "value": "public", "labelKey": "runtime.templates.orders.filters.customer.public" }
+        ]
+      },
+      "bindings": {
+        "data": {
+          "value": "data.orders.filters.customer"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.filters.customer.label",
+        "helperTextKey": "runtime.templates.orders.filters.customer.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.filters.customer.aria",
+        "keyboardNav": true,
+        "focusOrder": 7
+      }
+    },
+    {
+      "id": "ordersDownloadPdf",
+      "type": "action",
+      "adapterHint": "platform.button",
+      "props": {
+        "variant": "outline",
+        "intent": "neutral",
+        "labelKey": "runtime.templates.orders.downloadPdf.label"
+      },
+      "rules": {
+        "visibleWhen": {
+          "op": "eq",
+          "left": { "path": "context.role" },
+          "right": { "value": "admin" }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.downloadPdf.label",
+        "helperTextKey": "runtime.templates.orders.downloadPdf.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.downloadPdf.aria",
+        "keyboardNav": true,
+        "focusOrder": 8
+      }
+    },
+    {
+      "id": "ordersTable",
+      "type": "data",
+      "adapterHint": "platform.table",
+      "props": {
+        "columns": [
+          { "field": "invoice", "headerKey": "runtime.templates.orders.table.invoice" },
+          { "field": "date", "headerKey": "runtime.templates.orders.table.date" },
+          { "field": "status", "headerKey": "runtime.templates.orders.table.status" },
+          { "field": "customerName", "headerKey": "runtime.templates.orders.table.customer" },
+          { "field": "customerEmail", "headerKey": "runtime.templates.orders.table.email" },
+          { "field": "total", "headerKey": "runtime.templates.orders.table.total", "align": "right" }
+        ],
+        "emptyState": "runtime.templates.orders.table.empty"
+      },
+      "bindings": {
+        "data": {
+          "rows": "data.orders.items"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.table.label",
+        "helperTextKey": "runtime.templates.orders.table.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.table.aria",
+        "keyboardNav": true,
+        "focusOrder": 9
+      }
+    },
+    {
+      "id": "ordersPagination",
+      "type": "navigation",
+      "adapterHint": "platform.pagination",
+      "props": {
+        "count": 12,
+        "page": 1
+      },
+      "bindings": {
+        "data": {
+          "value": "data.orders.pagination.page"
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.pagination.label"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.pagination.aria",
+        "keyboardNav": true,
+        "focusOrder": 10
+      }
+    },
+    {
+      "id": "ordersEmptyState",
+      "type": "feedback",
+      "adapterHint": "platform.emptyState",
+      "props": {
+        "descriptionKey": "runtime.templates.orders.empty.description",
+        "actionLabelKey": "runtime.templates.orders.empty.action"
+      },
+      "rules": {
+        "visibleWhen": {
+          "op": "eq",
+          "left": { "path": "data.orders.count" },
+          "right": { "value": 0 }
+        }
+      },
+      "i18n": {
+        "labelKey": "runtime.templates.orders.empty.label",
+        "helperTextKey": "runtime.templates.orders.empty.helper"
+      },
+      "accessibility": {
+        "ariaLabelKey": "runtime.templates.orders.empty.aria",
+        "keyboardNav": true,
+        "focusOrder": 11
+      }
+    }
+  ]
+}

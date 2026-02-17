@@ -1,4 +1,4 @@
-import './globals.css';
+import './globals.scss';
 import '@platform/ui-kit/styles.css';
 import { Manrope, JetBrains_Mono } from 'next/font/google';
 import { Suspense } from 'react';

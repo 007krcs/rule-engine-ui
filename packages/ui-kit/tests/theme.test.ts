@@ -7,6 +7,7 @@ describe('@platform/ui-kit theme', () => {
     const theme: PlatformTheme = {
       mode: 'light',
       density: 'comfortable',
+      visual: 'layered',
     };
     const vars = createThemeVars(theme);
 
@@ -14,6 +15,7 @@ describe('@platform/ui-kit theme', () => {
     expect(vars['--pf-radius-md']).toBe('10px');
     expect(vars['--pf-space-2']).toBe('4px');
     expect(vars['--pf-density']).toBe('comfortable');
+    expect(vars['--pf-visual-style']).toBe('layered');
   });
 
   it('uses compact density control heights when requested', () => {
@@ -29,11 +31,14 @@ describe('@platform/ui-kit theme', () => {
     const vars = createThemeVars({
       mode: 'dark',
       density: 'compact',
+      visual: '3d',
       brand: {
         primary: '#0055aa',
         secondary: '#5b2c90',
         fontFamily: '"IBM Plex Sans", sans-serif',
         radiusScale: 1.2,
+        elevationIntensity: 1.4,
+        noise: 0.05,
       },
     });
 
@@ -42,5 +47,26 @@ describe('@platform/ui-kit theme', () => {
     expect(vars['--pf-radius-md']).toBe('12px');
     expect(vars['--pf-color-primary-500']).toBe(deriveColorScale('#0055aa')[500]);
     expect(vars['--pf-color-secondary-500']).toBe(deriveColorScale('#5b2c90')[500]);
+    expect(vars['--pf-visual-style']).toBe('3d');
+    expect(vars['--pf-bg-0']).toMatch(/^#/);
+    expect(vars['--pf-elevation-intensity']).toBe('1.4');
+    expect(vars['--pf-noise-opacity']).toBe('0.05');
+  });
+
+  it('emits required visual variables for 3d mode', () => {
+    const vars = createThemeVars({
+      mode: 'dark',
+      density: 'cozy',
+      visual: '3d',
+    });
+
+    expect(vars['--pf-visual-style']).toBe('3d');
+    expect(vars['--pf-bg-0']).toBeTruthy();
+    expect(vars['--pf-bg-1']).toBeTruthy();
+    expect(vars['--pf-bg-2']).toBeTruthy();
+    expect(vars['--pf-bg-highlight']).toContain('rgb(');
+    expect(vars['--pf-bg-shadow']).toContain('rgb(');
+    expect(vars['--pf-light-x']).toBeTruthy();
+    expect(vars['--pf-light-y']).toBeTruthy();
   });
 });

@@ -1,0 +1,24 @@
+@layer base {
+  .pf-root,
+  .pf-typography,
+  .pf-box {
+    font-family: var(--pf-font-sans);
+  }
+
+  .pf-typography--h1,
+  .pf-typography--h2,
+  .pf-typography--h3,
+  .pf-typography--h4,
+  .pf-typography--h5,
+  .pf-typography--h6 {
+    line-height: var(--pf-line-height-tight);
+    letter-spacing: -0.01em;
+  }
+
+  .pf-typography--h1 { font-size: clamp(1.875rem, 1.45rem + 1.3vw, 2.5rem); }
+  .pf-typography--h2 { font-size: clamp(1.5rem, 1.2rem + 0.9vw, 2rem); }
+  .pf-typography--h3 { font-size: clamp(1.25rem, 1.05rem + 0.6vw, 1.625rem); }
+  .pf-typography--h4 { font-size: 1.25rem; }
+  .pf-typography--h5 { font-size: 1.125rem; }
+  .pf-typography--h6 { font-size: 1rem; }
+}
