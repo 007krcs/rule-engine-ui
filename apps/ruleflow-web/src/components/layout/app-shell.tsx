@@ -37,6 +37,7 @@ const systemItems = [
   { href: '/console?tab=observability', label: 'Observability', icon: Activity },
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
   { href: '/system/ui-kit', label: 'UI Kit', icon: Sparkles },
+  { href: '/system/translations', label: 'Translations', icon: BookOpen },
   { href: '/system/layout-check', label: 'Layout Check', icon: Boxes },
   { href: '/system/health', label: 'Health', icon: HeartPulse },
   { href: '/system/roadmap', label: 'Roadmap', icon: ListTodo },
@@ -74,6 +75,7 @@ function getPageTitle(pathname: string, tab?: string | null) {
 
   if (pathname.startsWith('/system/health')) return 'Health';
   if (pathname.startsWith('/system/ui-kit')) return 'UI Kit';
+  if (pathname.startsWith('/system/translations')) return 'Translations';
   if (pathname.startsWith('/system/layout-check')) return 'Layout Check';
   if (pathname.startsWith('/system/roadmap')) return 'Roadmap';
 

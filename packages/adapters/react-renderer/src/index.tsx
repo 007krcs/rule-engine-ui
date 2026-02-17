@@ -150,11 +150,11 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       ...component,
       props: {
         ...(component.props ?? {}),
-        disabled: ruleState.disabled || component.props?.disabled,
+        disabled: Boolean(ruleState.disabled || component.props?.disabled),
       },
       validations: {
         ...(component.validations ?? {}),
-        required: ruleState.required || component.validations?.required,
+        required: Boolean(ruleState.required || component.validations?.required),
       },
     };
 

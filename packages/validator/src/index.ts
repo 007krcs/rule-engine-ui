@@ -34,7 +34,11 @@ export function validateExecutionContext(value: ExecutionContext): ValidationRes
 }
 
 export function validateUISchema(value: UISchema): ValidationResult {
-  return mergeResults(validateWithSchema(validators.ui, value), validateAccessibility(value));
+  return mergeResults(
+    validateWithSchema(validators.ui, value),
+    validateAccessibility(value),
+    validateI18nKeyUsage(value),
+  );
 }
 
 export function validateFlowSchema(value: FlowSchema): ValidationResult {
@@ -199,6 +203,52 @@ function pointerToPath(pointer: string): string {
 
 function mergeResults(...results: ValidationResult[]): ValidationResult {
   const issues = results.flatMap((result) => result.issues);
+  return { valid: issues.length === 0, issues };
+}
+
+function validateI18nKeyUsage(uiSchemaValue: UISchema): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  for (const component of uiSchemaValue.components) {
+    const props = component.props as Record<string, JSONValue> | undefined;
+    if (!props) continue;
+
+    const label = props.label;
+    if (typeof label === 'string' && label.trim().length > 0) {
+      issues.push({
+        path: `components.${component.id}.props.label`,
+        message: 'Use i18n.labelKey instead of a raw label string',
+        severity: 'error',
+      });
+    }
+
+    const helperText = props.helperText;
+    if (typeof helperText === 'string' && helperText.trim().length > 0) {
+      issues.push({
+        path: `components.${component.id}.props.helperText`,
+        message: 'Use i18n.helperTextKey instead of a raw helperText string',
+        severity: 'error',
+      });
+    }
+
+    const placeholder = props.placeholder;
+    if (typeof placeholder === 'string' && placeholder.trim().length > 0) {
+      issues.push({
+        path: `components.${component.id}.props.placeholder`,
+        message: 'Use i18n.placeholderKey instead of a raw placeholder string',
+        severity: 'error',
+      });
+    }
+
+    const ariaLabel = props.ariaLabel;
+    if (typeof ariaLabel === 'string' && ariaLabel.trim().length > 0) {
+      issues.push({
+        path: `components.${component.id}.props.ariaLabel`,
+        message: 'Use accessibility.ariaLabelKey instead of a raw ariaLabel string',
+        severity: 'error',
+      });
+    }
+  }
+
   return { valid: issues.length === 0, issues };
 }
 

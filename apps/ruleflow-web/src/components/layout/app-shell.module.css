@@ -200,9 +200,9 @@
 }
 
 .navItemActive {
-  background: rgba(37, 99, 235, 0.10);
-  color: var(--rf-primary);
-  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface));
+  color: var(--pf-color-primary-700, #183fa0);
+  border: 1px solid color-mix(in srgb, var(--rf-primary) 22%, var(--rf-border));
 }
 
 .navIcon {

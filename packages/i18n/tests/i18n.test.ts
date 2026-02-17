@@ -6,6 +6,8 @@ import {
   createMockTenantLoader,
   EXAMPLE_TENANT_BUNDLES,
   PLATFORM_BUNDLES,
+  resolveLocale,
+  upsertBundleMessage,
 } from '../src/index';
 
 describe('i18n', () => {
@@ -69,5 +71,44 @@ describe('i18n', () => {
     vi.advanceTimersByTime(11);
     expect(cache.get('key')).toBeUndefined();
     vi.useRealTimers();
+  });
+
+  it('resolves locale from user/tenant settings with fallback', () => {
+    expect(
+      resolveLocale({
+        tenantLocale: 'de-DE',
+        userLocale: 'fr-CA',
+        fallbackLocale: 'en',
+        supportedLocales: ['en', 'fr', 'de'],
+      }),
+    ).toBe('fr');
+
+    expect(
+      resolveLocale({
+        tenantLocale: 'es-MX',
+        userLocale: null,
+        fallbackLocale: 'en',
+        supportedLocales: ['en', 'de'],
+      }),
+    ).toBe('en');
+  });
+
+  it('upserts and updates bundle messages', () => {
+    const seed = [{ locale: 'en', namespace: 'runtime', messages: { hello: 'Hello' } }];
+    const added = upsertBundleMessage(seed, {
+      locale: 'en',
+      namespace: 'runtime',
+      key: 'bye',
+      value: 'Bye',
+    });
+    expect(added[0]?.messages.bye).toBe('Bye');
+
+    const updated = upsertBundleMessage(added, {
+      locale: 'en',
+      namespace: 'runtime',
+      key: 'hello',
+      value: 'Hello there',
+    });
+    expect(updated[0]?.messages.hello).toBe('Hello there');
   });
 });

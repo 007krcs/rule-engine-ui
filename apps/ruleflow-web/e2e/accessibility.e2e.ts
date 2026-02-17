@@ -18,14 +18,12 @@ async function waitForClientReady(page: Page) {
   await expect(page.getByTestId('client-ready')).toBeVisible({ timeout: 120_000 });
 }
 
-test('axe scan on home page has no serious or critical violations', async ({ page }) => {
-  await page.goto('/');
-  await waitForClientReady(page);
-
+async function runAxe(page: Page) {
   await page.addScriptTag({ url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js' });
   const violations = await page.evaluate(async () => {
-    const axe = (window as Window & { axe: { run: (root?: unknown, options?: unknown) => Promise<{ violations: unknown[] }> } })
-      .axe;
+    const axeWindow = window as unknown as { axe: { run: (root?: unknown, options?: unknown) => Promise<{ violations: unknown[] }> } };
+    const axe = axeWindow.axe;
+    
     const results = await axe.run(document, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
     });
@@ -34,4 +32,24 @@ test('axe scan on home page has no serious or critical violations', async ({ pag
 
   const blocking = violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
   expect(blocking).toEqual([]);
+}
+
+test('axe scan on home page has no serious or critical violations', async ({ page }) => {
+  await page.goto('/');
+  await waitForClientReady(page);
+  await runAxe(page);
+});
+
+test('axe scan on builder page has no serious or critical violations', async ({ page }) => {
+  await page.goto('/builder');
+  await waitForClientReady(page);
+  await expect(page.getByText('Schema Builder')).toBeVisible();
+  await runAxe(page);
+});
+
+test('axe scan on translation editor has no serious or critical violations', async ({ page }) => {
+  await page.goto('/system/translations');
+  await waitForClientReady(page);
+  await expect(page.getByText('Translation Editor')).toBeVisible();
+  await runAxe(page);
 });

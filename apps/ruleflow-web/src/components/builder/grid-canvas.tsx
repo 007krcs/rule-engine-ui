@@ -280,7 +280,7 @@ function GridItemCard({
       onClick={() => onSelect(item.componentId)}
       onKeyDown={onKeyDown}
       tabIndex={0}
-      role="button"
+      role="group"
       aria-label={`Grid item ${item.componentId} at ${item.x},${item.y}`}
     >
       <div className={styles.itemHeader}>
@@ -290,7 +290,9 @@ function GridItemCard({
         </div>
         <div className={styles.itemActions}>
           <span className={styles.chip}>
+            <span data-testid={`builder-grid-item-meta-${item.componentId}`}>
             {item.x},{item.y} {item.w}x{item.h}
+            </span>
           </span>
           <button
             type="button"
@@ -315,7 +317,7 @@ function GridItemCard({
           </button>
         </div>
       </div>
-      <div className={styles.itemBody}>
+      <div className={styles.itemBody} tabIndex={0} aria-label={`Rendered preview for ${item.componentId}`}>
         {component ? (
           <RenderPage
             uiSchema={toSingleComponentSchema(component)}

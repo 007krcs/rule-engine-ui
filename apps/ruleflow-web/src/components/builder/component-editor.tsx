@@ -1,8 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { JSONValue, UIComponent } from '@platform/schema';
+import type {
+  ExecutionContext,
+  JSONValue,
+  RuleCondition,
+  RuleOperator,
+  UIComponent,
+  UISetValueWhenRule,
+} from '@platform/schema';
 import type { ValidationIssue } from '@platform/validator';
+import { evaluateCondition } from '@platform/rules-engine';
 import { AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,9 +39,93 @@ function deepCloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function sanitizeI18nProps(props: Record<string, JSONValue> | undefined): Record<string, JSONValue> {
+  if (!props) return {};
+  const next = { ...props };
+  const keys = ['label', 'helperText', 'placeholder', 'ariaLabel'];
+  for (const key of keys) {
+    const raw = next[key];
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+      delete next[key];
+    }
+  }
+  return next;
+}
+
 function deriveType(adapterHint: string): string {
   const parts = adapterHint.split('.');
   return parts[parts.length - 1] || adapterHint;
+}
+
+const RULE_OPERATORS: RuleOperator[] = [
+  'eq',
+  'neq',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'in',
+  'contains',
+  'startsWith',
+  'endsWith',
+  'exists',
+];
+
+type JsonParseResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string };
+
+function safeParseJson<T>(raw: string): JsonParseResult<T> {
+  try {
+    return { ok: true, value: JSON.parse(raw) as T };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function serializeJson(value: unknown): string {
+  return value ? JSON.stringify(value, null, 2) : '';
+}
+
+function parseJsonValue(raw: string): JSONValue {
+  const parsed = safeParseJson<JSONValue>(raw);
+  if (parsed.ok) return parsed.value;
+  return raw as JSONValue;
+}
+
+function buildComposedCondition(input: {
+  leftPath: string;
+  operator: RuleOperator;
+  rightValueRaw: string;
+}): RuleCondition {
+  const leftPath = input.leftPath.trim() || 'data.value';
+  if (input.operator === 'exists') {
+    return {
+      op: 'exists',
+      left: { path: leftPath },
+    };
+  }
+  return {
+    op: input.operator,
+    left: { path: leftPath },
+    right: { value: parseJsonValue(input.rightValueRaw) },
+  };
+}
+
+function evaluatePreviewCondition(
+  condition: RuleCondition | undefined,
+  previewData: Record<string, JSONValue> | undefined,
+  previewContext: ExecutionContext | undefined,
+): boolean | null {
+  if (!condition || !previewData || !previewContext) return null;
+  try {
+    return evaluateCondition(condition, previewContext, previewData);
+  } catch {
+    return false;
+  }
 }
 
 function defaultForSchema(schema: JsonSchema | undefined): JSONValue {
@@ -343,6 +435,9 @@ export function ComponentEditor({
   onMoveDown,
   onChange,
   onRemove,
+  previewData,
+  previewContext,
+  translate,
 }: {
   component: UIComponent;
   definition?: ComponentDefinition | null;
@@ -354,6 +449,9 @@ export function ComponentEditor({
   onMoveDown?: () => void;
   onChange: (component: UIComponent) => void;
   onRemove: () => void;
+  previewData?: Record<string, JSONValue>;
+  previewContext?: ExecutionContext;
+  translate?: (key: string) => string;
 }) {
   const adapterHintIssues = pickFieldIssues(issues, (path) => path.endsWith('.adapterHint'));
   const labelKeyIssues = pickFieldIssues(issues, (path) => path.includes('.i18n.labelKey'));
@@ -382,12 +480,29 @@ export function ComponentEditor({
   const [advancedPropsOpen, setAdvancedPropsOpen] = useState(false);
   const [propsText, setPropsText] = useState(() => JSON.stringify(props, null, 2));
   const [propsError, setPropsError] = useState<string | null>(null);
+  const [activeRuleEditor, setActiveRuleEditor] = useState<'visibleWhen' | 'disabledWhen' | 'requiredWhen' | 'setValueWhen'>('visibleWhen');
+  const [visibleWhenText, setVisibleWhenText] = useState(() => serializeJson(component.rules?.visibleWhen));
+  const [disabledWhenText, setDisabledWhenText] = useState(() => serializeJson(component.rules?.disabledWhen));
+  const [requiredWhenText, setRequiredWhenText] = useState(() => serializeJson(component.rules?.requiredWhen));
+  const [setValueWhenText, setSetValueWhenText] = useState(() => serializeJson(component.rules?.setValueWhen));
+  const [ruleError, setRuleError] = useState<string | null>(null);
+  const [composeLeftPath, setComposeLeftPath] = useState('data.orderTotal');
+  const [composeOperator, setComposeOperator] = useState<RuleOperator>('gt');
+  const [composeRightValue, setComposeRightValue] = useState('1000');
+  const [composeSetValuePath, setComposeSetValuePath] = useState('data.orderTotal');
+  const [composeSetValue, setComposeSetValue] = useState('1200');
 
   useEffect(() => {
     // When switching components, always reset the JSON editor.
     setPropsText(JSON.stringify(props, null, 2));
     setPropsError(null);
     setAdvancedPropsOpen(false);
+    setVisibleWhenText(serializeJson(component.rules?.visibleWhen));
+    setDisabledWhenText(serializeJson(component.rules?.disabledWhen));
+    setRequiredWhenText(serializeJson(component.rules?.requiredWhen));
+    setSetValueWhenText(serializeJson(component.rules?.setValueWhen));
+    setRuleError(null);
+    setActiveRuleEditor('visibleWhen');
   }, [component.id]);
 
   const propsJson = useMemo(() => JSON.stringify(props, null, 2), [props]);
@@ -429,8 +544,109 @@ export function ComponentEditor({
 
   const resetPropsToDefaults = () => {
     if (!resolvedDefinition?.defaultProps) return;
-    onChange({ ...component, props: deepCloneJson(resolvedDefinition.defaultProps) });
+    onChange({ ...component, props: sanitizeI18nProps(deepCloneJson(resolvedDefinition.defaultProps)) });
   };
+
+  const applyConditionRule = (
+    key: 'visibleWhen' | 'disabledWhen' | 'requiredWhen',
+    raw: string,
+  ) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      const currentRules = { ...(component.rules ?? {}) };
+      delete currentRules[key];
+      onChange({
+        ...component,
+        rules: Object.keys(currentRules).length > 0 ? currentRules : undefined,
+      });
+      setRuleError(null);
+      return;
+    }
+
+    const parsed = safeParseJson<RuleCondition>(raw);
+    if (!parsed.ok) {
+      setRuleError(parsed.error);
+      return;
+    }
+
+    onChange({
+      ...component,
+      rules: {
+        ...(component.rules ?? {}),
+        [key]: parsed.value,
+      },
+    });
+    setRuleError(null);
+  };
+
+  const applySetValueRuleJson = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      const currentRules = { ...(component.rules ?? {}) };
+      delete currentRules.setValueWhen;
+      onChange({
+        ...component,
+        rules: Object.keys(currentRules).length > 0 ? currentRules : undefined,
+      });
+      setRuleError(null);
+      return;
+    }
+
+    const parsed = safeParseJson<UISetValueWhenRule>(raw);
+    if (!parsed.ok) {
+      setRuleError(parsed.error);
+      return;
+    }
+    onChange({
+      ...component,
+      rules: {
+        ...(component.rules ?? {}),
+        setValueWhen: parsed.value,
+      },
+    });
+    setRuleError(null);
+  };
+
+  const composeConditionIntoEditor = () => {
+    const condition = buildComposedCondition({
+      leftPath: composeLeftPath,
+      operator: composeOperator,
+      rightValueRaw: composeRightValue,
+    });
+    const serialized = JSON.stringify(condition, null, 2);
+    if (activeRuleEditor === 'visibleWhen') {
+      setVisibleWhenText(serialized);
+      applyConditionRule('visibleWhen', serialized);
+      return;
+    }
+    if (activeRuleEditor === 'disabledWhen') {
+      setDisabledWhenText(serialized);
+      applyConditionRule('disabledWhen', serialized);
+      return;
+    }
+    if (activeRuleEditor === 'requiredWhen') {
+      setRequiredWhenText(serialized);
+      applyConditionRule('requiredWhen', serialized);
+      return;
+    }
+
+    const composedRule: UISetValueWhenRule = {
+      when: condition,
+      path: composeSetValuePath.trim() || undefined,
+      value: parseJsonValue(composeSetValue),
+    };
+    const serializedRule = JSON.stringify(composedRule, null, 2);
+    setSetValueWhenText(serializedRule);
+    applySetValueRuleJson(serializedRule);
+  };
+
+  const rulePreview = useMemo(() => {
+    const visible = evaluatePreviewCondition(component.rules?.visibleWhen, previewData, previewContext);
+    const disabled = evaluatePreviewCondition(component.rules?.disabledWhen, previewData, previewContext);
+    const required = evaluatePreviewCondition(component.rules?.requiredWhen, previewData, previewContext);
+    const setValueMatches = evaluatePreviewCondition(component.rules?.setValueWhen?.when, previewData, previewContext);
+    return { visible, disabled, required, setValueMatches };
+  }, [component.rules, previewContext, previewData]);
 
   return (
     <Card className={cn(hasIssues ? styles.cardIssues : undefined)}>
@@ -514,7 +730,7 @@ export function ComponentEditor({
                   ...component,
                   adapterHint: nextHint,
                   type: deriveType(nextHint),
-                  props: nextDef?.defaultProps ? deepCloneJson(nextDef.defaultProps) : {},
+                  props: nextDef?.defaultProps ? sanitizeI18nProps(deepCloneJson(nextDef.defaultProps)) : {},
                 });
               }}
             >
@@ -674,6 +890,167 @@ export function ComponentEditor({
         ) : null}
 
         <div className={styles.sectionHeader}>
+          <p className={styles.sectionTitle}>Rules</p>
+          <p className={styles.sectionDesc}>Configure visibility/disabled/required/set-value rules with the rules engine condition language.</p>
+        </div>
+
+        <div className={styles.field}>
+          <label className="rfFieldLabel">Rule Type</label>
+          <Select
+            value={activeRuleEditor}
+            onChange={(event) =>
+              setActiveRuleEditor(
+                event.target.value as 'visibleWhen' | 'disabledWhen' | 'requiredWhen' | 'setValueWhen',
+              )
+            }
+            aria-label="Rule type"
+            data-testid="rule-type-select"
+          >
+            <option value="visibleWhen">visibleWhen</option>
+            <option value="disabledWhen">disabledWhen</option>
+            <option value="requiredWhen">requiredWhen</option>
+            <option value="setValueWhen">setValueWhen</option>
+          </Select>
+        </div>
+
+        <div className={styles.validationGrid}>
+          <div className={styles.field}>
+            <label className="rfFieldLabel">Left Path</label>
+            <Input
+              value={composeLeftPath}
+              onChange={(event) => setComposeLeftPath(event.target.value)}
+              placeholder="data.orderTotal"
+              aria-label="Rule left path"
+            />
+          </div>
+          <div className={styles.field}>
+            <label className="rfFieldLabel">Operator</label>
+            <Select
+              value={composeOperator}
+              onChange={(event) => setComposeOperator(event.target.value as RuleOperator)}
+              aria-label="Rule operator"
+            >
+              <option value="" disabled hidden>
+                Select
+              </option>
+              {RULE_OPERATORS.map((operator) => (
+                <option key={operator} value={operator}>
+                  {operator}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className={styles.field}>
+            <label className="rfFieldLabel">Right Value (JSON)</label>
+            <Input
+              value={composeRightValue}
+              onChange={(event) => setComposeRightValue(event.target.value)}
+              disabled={composeOperator === 'exists'}
+              placeholder={composeOperator === 'exists' ? 'N/A' : '1000 or "US"'}
+              aria-label="Rule right value"
+            />
+          </div>
+          {activeRuleEditor === 'setValueWhen' ? (
+            <>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Set Path</label>
+                <Input
+                  value={composeSetValuePath}
+                  onChange={(event) => setComposeSetValuePath(event.target.value)}
+                  placeholder="data.orderTotal"
+                  aria-label="Rule set path"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className="rfFieldLabel">Set Value (JSON)</label>
+                <Input
+                  value={composeSetValue}
+                  onChange={(event) => setComposeSetValue(event.target.value)}
+                  placeholder='1200 or "approved"'
+                  aria-label="Rule set value"
+                />
+              </div>
+            </>
+          ) : null}
+        </div>
+        <div className={styles.inlineRow}>
+          <Button type="button" size="sm" variant="outline" onClick={composeConditionIntoEditor}>
+            Compose Rule
+          </Button>
+        </div>
+
+        {activeRuleEditor === 'visibleWhen' ? (
+          <div className={styles.field}>
+            <label className="rfFieldLabel">visibleWhen (JSON)</label>
+            <Textarea
+              className={styles.textareaSm}
+              value={visibleWhenText}
+              onChange={(event) => setVisibleWhenText(event.target.value)}
+              onBlur={() => applyConditionRule('visibleWhen', visibleWhenText)}
+              placeholder='{"op":"gt","left":{"path":"data.orderTotal"},"right":{"value":1000}}'
+              aria-label="visibleWhen JSON"
+            />
+          </div>
+        ) : null}
+
+        {activeRuleEditor === 'disabledWhen' ? (
+          <div className={styles.field}>
+            <label className="rfFieldLabel">disabledWhen (JSON)</label>
+            <Textarea
+              className={styles.textareaSm}
+              value={disabledWhenText}
+              onChange={(event) => setDisabledWhenText(event.target.value)}
+              onBlur={() => applyConditionRule('disabledWhen', disabledWhenText)}
+              placeholder='{"op":"eq","left":{"path":"context.role"},"right":{"value":"viewer"}}'
+              aria-label="disabledWhen JSON"
+            />
+          </div>
+        ) : null}
+
+        {activeRuleEditor === 'requiredWhen' ? (
+          <div className={styles.field}>
+            <label className="rfFieldLabel">requiredWhen (JSON)</label>
+            <Textarea
+              className={styles.textareaSm}
+              value={requiredWhenText}
+              onChange={(event) => setRequiredWhenText(event.target.value)}
+              onBlur={() => applyConditionRule('requiredWhen', requiredWhenText)}
+              placeholder='{"op":"eq","left":{"path":"context.country"},"right":{"value":"US"}}'
+              aria-label="requiredWhen JSON"
+            />
+          </div>
+        ) : null}
+
+        {activeRuleEditor === 'setValueWhen' ? (
+          <div className={styles.field}>
+            <label className="rfFieldLabel">setValueWhen (JSON)</label>
+            <Textarea
+              className={styles.textarea}
+              value={setValueWhenText}
+              onChange={(event) => setSetValueWhenText(event.target.value)}
+              onBlur={() => applySetValueRuleJson(setValueWhenText)}
+              placeholder='{"when":{"op":"eq","left":{"path":"context.locale"},"right":{"value":"fr"}},"path":"data.country","value":"FR"}'
+              aria-label="setValueWhen JSON"
+            />
+          </div>
+        ) : null}
+
+        {ruleError ? <p className={styles.fieldError}>Rule JSON error: {ruleError}</p> : null}
+
+        <div className={styles.field}>
+          <label className="rfFieldLabel">Rule Preview</label>
+          <p className={styles.helperText}>
+            visibleWhen: {rulePreview.visible === null ? 'n/a' : rulePreview.visible ? 'true' : 'false'} | disabledWhen:{' '}
+            {rulePreview.disabled === null ? 'n/a' : rulePreview.disabled ? 'true' : 'false'} | requiredWhen:{' '}
+            {rulePreview.required === null ? 'n/a' : rulePreview.required ? 'true' : 'false'} | setValueWhen:{' '}
+            {rulePreview.setValueMatches === null ? 'n/a' : rulePreview.setValueMatches ? 'true' : 'false'}
+          </p>
+          <p className={styles.helperText}>
+            Preview context uses tenant/roles/locale/country from the Builder preview controls.
+          </p>
+        </div>
+
+        <div className={styles.sectionHeader}>
           <p className={styles.sectionTitle}>Validations</p>
           <p className={styles.sectionDesc}>Block save/publish until the UI schema is valid.</p>
         </div>
@@ -737,6 +1114,11 @@ export function ComponentEditor({
             value={component.i18n?.labelKey ?? ''}
             onChange={(event) => onChange({ ...component, i18n: { ...(component.i18n ?? {}), labelKey: event.target.value } })}
           />
+          {component.i18n?.labelKey ? (
+            <p className={styles.helperText}>
+              Preview: {translate ? translate(component.i18n.labelKey) : component.i18n.labelKey}
+            </p>
+          ) : null}
           {firstMessage(labelKeyIssues) ? <p className={styles.fieldError}>{firstMessage(labelKeyIssues)}</p> : null}
         </div>
 
@@ -748,6 +1130,11 @@ export function ComponentEditor({
               onChange({ ...component, i18n: { ...(component.i18n ?? {}), placeholderKey: event.target.value } })
             }
           />
+          {component.i18n?.placeholderKey ? (
+            <p className={styles.helperText}>
+              Preview: {translate ? translate(component.i18n.placeholderKey) : component.i18n.placeholderKey}
+            </p>
+          ) : null}
           {firstMessage(placeholderIssues) ? <p className={styles.fieldError}>{firstMessage(placeholderIssues)}</p> : null}
         </div>
 
@@ -759,6 +1146,11 @@ export function ComponentEditor({
               onChange({ ...component, i18n: { ...(component.i18n ?? {}), helperTextKey: event.target.value } })
             }
           />
+          {component.i18n?.helperTextKey ? (
+            <p className={styles.helperText}>
+              Preview: {translate ? translate(component.i18n.helperTextKey) : component.i18n.helperTextKey}
+            </p>
+          ) : null}
           {firstMessage(helperTextIssues) ? <p className={styles.fieldError}>{firstMessage(helperTextIssues)}</p> : null}
         </div>
 
@@ -783,6 +1175,11 @@ export function ComponentEditor({
               })
             }
           />
+          {component.accessibility?.ariaLabelKey ? (
+            <p className={styles.helperText}>
+              Preview: {translate ? translate(component.accessibility.ariaLabelKey) : component.accessibility.ariaLabelKey}
+            </p>
+          ) : null}
           {firstMessage(ariaIssues) ? <p className={styles.fieldError}>{firstMessage(ariaIssues)}</p> : null}
         </div>
 

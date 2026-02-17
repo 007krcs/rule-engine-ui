@@ -669,4 +669,24 @@ export async function registerComponentRegistryManifest(
   return await demo.registerComponentRegistryManifest(input);
 }
 
+export async function getTranslationsSnapshot(
+  input?: Parameters<typeof demo.getTranslationsSnapshot>[0],
+) {
+  // Translation editor currently uses demo persistence for both providers until
+  // tenant-level translation storage is added to Postgres repository surfaces.
+  return await demo.getTranslationsSnapshot(input);
+}
+
+export async function upsertTranslationMessage(
+  input: Parameters<typeof demo.upsertTranslationMessage>[0],
+) {
+  return await demo.upsertTranslationMessage(input);
+}
+
+export async function updateTranslationPreferences(
+  input: Parameters<typeof demo.updateTranslationPreferences>[0],
+) {
+  return await demo.updateTranslationPreferences(input);
+}
+
 export { listPolicies, registerPolicy, unregisterPolicy };

@@ -12,13 +12,13 @@ import {
 } from 'react';
 import { cn } from './utils';
 
-export interface PFAccordionSummaryProps extends HTMLAttributes<HTMLDivElement> {}
+export type PFAccordionSummaryProps = HTMLAttributes<HTMLDivElement>;
 
 export function PFAccordionSummary({ className, ...rest }: PFAccordionSummaryProps) {
   return <div className={cn('pf-accordion__summary-content', className)} {...rest} />;
 }
 
-export interface PFAccordionDetailsProps extends HTMLAttributes<HTMLDivElement> {}
+export type PFAccordionDetailsProps = HTMLAttributes<HTMLDivElement>;
 
 export function PFAccordionDetails({ className, ...rest }: PFAccordionDetailsProps) {
   return <div className={cn('pf-accordion__details-content', className)} {...rest} />;

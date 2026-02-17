@@ -10,21 +10,21 @@
 }
 
 .default {
-  background: rgba(37, 99, 235, 0.12);
-  color: #1e40af;
-  border-color: rgba(37, 99, 235, 0.18);
+  background: color-mix(in srgb, var(--rf-primary) 12%, var(--rf-surface));
+  color: var(--pf-color-primary-700, #183fa0);
+  border-color: color-mix(in srgb, var(--rf-primary) 26%, var(--rf-border));
 }
 
 .success {
-  background: rgba(5, 150, 105, 0.12);
-  color: var(--rf-success);
-  border-color: rgba(5, 150, 105, 0.18);
+  background: color-mix(in srgb, var(--rf-success) 10%, var(--rf-surface));
+  color: var(--pf-color-success-800, #14563e);
+  border-color: color-mix(in srgb, var(--rf-success) 26%, var(--rf-border));
 }
 
 .warning {
-  background: rgba(217, 119, 6, 0.14);
-  color: var(--rf-warning);
-  border-color: rgba(217, 119, 6, 0.22);
+  background: color-mix(in srgb, var(--rf-warning) 11%, var(--rf-surface));
+  color: var(--pf-color-warning-800, #874514);
+  border-color: color-mix(in srgb, var(--rf-warning) 28%, var(--rf-border));
 }
 
 .muted {

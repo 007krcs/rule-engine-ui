@@ -210,6 +210,97 @@ describe('react-renderer', () => {
     expect(nextContext?.role).toBe('user');
   });
 
+  it('hides components when visibleWhen evaluates to false', () => {
+    registerAdapter('rule-visibility.', (component, ctx) => (
+      <div aria-label={ctx.i18n.t(component.accessibility.ariaLabelKey)}>{component.id}</div>
+    ));
+
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'rule-visibility',
+      layout: { id: 'root', type: 'section', componentIds: ['target'] },
+      components: [
+        {
+          id: 'target',
+          type: 'input',
+          adapterHint: 'rule-visibility.input',
+          rules: {
+            visibleWhen: {
+              op: 'eq',
+              left: { path: 'context.locale' },
+              right: { value: 'fr' },
+            },
+          },
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.customerName.aria',
+            keyboardNav: true,
+            focusOrder: 1,
+          },
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(
+      <RenderPage
+        uiSchema={schema}
+        data={{}}
+        context={context}
+        i18n={createFallbackI18nProvider()}
+      />,
+    );
+    expect(html).not.toContain('data-component-id="target"');
+  });
+
+  it('applies disabled and required states from rule evaluation', () => {
+    let seen: UIComponent | null = null;
+    registerAdapter('rule-state.', (component) => {
+      seen = component;
+      return <div>state</div>;
+    });
+
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'rule-state',
+      layout: { id: 'root', type: 'section', componentIds: ['total'] },
+      components: [
+        {
+          id: 'total',
+          type: 'input',
+          adapterHint: 'rule-state.input',
+          rules: {
+            disabledWhen: {
+              op: 'eq',
+              left: { path: 'context.role' },
+              right: { value: 'admin' },
+            },
+            requiredWhen: {
+              op: 'eq',
+              left: { path: 'context.country' },
+              right: { value: 'US' },
+            },
+          },
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.orderTotal.aria',
+            keyboardNav: true,
+            focusOrder: 1,
+          },
+        },
+      ],
+    };
+
+    renderToStaticMarkup(
+      <RenderPage
+        uiSchema={schema}
+        data={{}}
+        context={context}
+        i18n={createFallbackI18nProvider()}
+      />,
+    );
+
+    expect(seen?.props?.disabled).toBe(true);
+    expect(seen?.validations?.required).toBe(true);
+  });
+
   it('changes runtime rule outcomes after input binding updates', async () => {
     let captured: AdapterContext | null = null;
     registerAdapter('runtime.', (_component, ctx) => {

@@ -30,13 +30,13 @@
   --rf-border: var(--pf-surface-border, #e2e8f0);
   --rf-shadow: rgba(15, 23, 42, 0.08);
 
-  --rf-primary: var(--pf-color-primary-500, #2563eb);
-  --rf-primary-fg: var(--pf-surface-inverse-text, #ffffff);
+  --rf-primary: var(--pf-color-primary-600, #1e53d1);
+  --rf-primary-fg: #ffffff;
   --rf-accent: var(--pf-color-secondary-500, #7c3aed);
   --rf-accent-fg: var(--pf-surface-inverse-text, #ffffff);
-  --rf-success: var(--pf-color-success-500, #059669);
-  --rf-warning: var(--pf-color-warning-500, #d97706);
-  --rf-danger: var(--pf-color-error-500, #e11d48);
+  --rf-success: var(--pf-color-success-700, #166b4b);
+  --rf-warning: var(--pf-color-warning-700, #a6550f);
+  --rf-danger: var(--pf-color-error-700, #b11f43);
 
   --rf-focus: var(--pf-surface-focus, rgba(37, 99, 235, 0.35));
 

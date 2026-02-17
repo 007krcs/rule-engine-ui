@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { flushSync } from 'react-dom';
 import type {
   ExecutionContext,
   JSONValue,
@@ -52,6 +51,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
+  MouseSensor,
   PointerSensor,
   useDraggable,
   useDroppable,
@@ -71,7 +71,7 @@ const scratchComponents: UIComponent[] = [
     id: 'customerName',
     type: 'input',
     adapterHint: 'material.input',
-    props: { label: 'Customer name' },
+    props: {},
     i18n: {
       labelKey: 'runtime.filters.customerName.label',
       placeholderKey: 'runtime.filters.customerName.placeholder',
@@ -227,17 +227,40 @@ function resolveCollisions(
 
 function buildComponentFromRegistry(def: ComponentDefinition, id: string): UIComponent {
   const type = deriveType(def.adapterHint);
+  const defaultProps = def.defaultProps
+    ? stripRawI18nProps(JSON.parse(JSON.stringify(def.defaultProps)) as UIComponent['props'])
+    : undefined;
   return {
     id,
     type,
     adapterHint: def.adapterHint,
-    props: def.defaultProps ? (JSON.parse(JSON.stringify(def.defaultProps)) as UIComponent['props']) : undefined,
+    props: defaultProps,
+    i18n: {
+      labelKey: `runtime.builder.${id}.label`,
+      helperTextKey: `runtime.builder.${id}.helper`,
+      placeholderKey: `runtime.builder.${id}.placeholder`,
+    },
     accessibility: {
       ariaLabelKey: `runtime.builder.${id}.aria`,
       keyboardNav: true,
       focusOrder: 1,
     },
   };
+}
+
+function stripRawI18nProps(
+  props: UIComponent['props'] | undefined,
+): UIComponent['props'] {
+  if (!props) return props;
+  const next = { ...props };
+  const keys = ['label', 'helperText', 'placeholder', 'ariaLabel'];
+  for (const key of keys) {
+    const raw = next[key];
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+      delete next[key];
+    }
+  }
+  return next;
 }
 
 function CanvasDropZone({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
@@ -335,6 +358,7 @@ export default function BuilderPage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [activeDrag, setActiveDrag] = useState<{ kind: 'palette' | 'component'; label: string } | null>(null);
@@ -349,7 +373,20 @@ export default function BuilderPage() {
     [components, schema],
   );
   const gridSpec = useMemo(() => getSchemaGridSpec(effectiveSchema), [effectiveSchema]);
-  const columns = gridSpec.columns;
+  const activeGridSpec = useMemo(() => {
+    if (activeBreakpoint === 'lg') {
+      return {
+        columns: gridSpec.columns,
+        rowHeight: gridSpec.rowHeight,
+        gap: gridSpec.gap,
+      };
+    }
+    return {
+      columns: gridSpec.breakpoints?.[activeBreakpoint]?.columns ?? gridSpec.columns,
+      rowHeight: gridSpec.breakpoints?.[activeBreakpoint]?.rowHeight ?? gridSpec.rowHeight,
+      gap: gridSpec.breakpoints?.[activeBreakpoint]?.gap ?? gridSpec.gap,
+    };
+  }, [activeBreakpoint, gridSpec]);
   const activeItems = useMemo(
     () => getSchemaItemsForBreakpoint(effectiveSchema, activeBreakpoint),
     [activeBreakpoint, effectiveSchema],
@@ -616,6 +653,23 @@ export default function BuilderPage() {
     });
   };
 
+  const updateActiveGridSpec = (partial: Partial<{ columns: number; rowHeight: number; gap: number }>) => {
+    setSchema((current) => {
+      if (activeBreakpoint === 'lg') {
+        return setSchemaGridSpec(current, partial);
+      }
+      return setSchemaGridSpec(current, {
+        breakpoints: {
+          [activeBreakpoint]: {
+            columns: partial.columns,
+            rowHeight: partial.rowHeight,
+            gap: partial.gap,
+          },
+        },
+      });
+    });
+  };
+
   const moveGridItem = (componentId: string, x: number, y: number) => {
     updateGridItems(
       activeBreakpoint,
@@ -727,6 +781,16 @@ export default function BuilderPage() {
     }
   };
 
+  const dragGridCoordinates = useMemo(() => {
+    const rect = canvasMetrics.canvasRect;
+    if (!dragPointer || !rect) return null;
+    const stepX = canvasMetrics.cellWidth + canvasMetrics.gap;
+    const stepY = canvasMetrics.rowHeight + canvasMetrics.gap;
+    const x = Math.max(0, Math.floor((dragPointer.x - rect.left) / stepX));
+    const y = Math.max(0, Math.floor((dragPointer.y - rect.top) / stepY));
+    return { x, y };
+  }, [canvasMetrics, dragPointer]);
+
   return (
     <div className={cn(styles.page, styles.builderRoot)}>
       <Card>
@@ -789,38 +853,38 @@ export default function BuilderPage() {
             />
           </div>
           <div>
-            <label className="rfFieldLabel">Columns</label>
+            <label className="rfFieldLabel">Columns ({activeBreakpoint.toUpperCase()})</label>
             <Input
               type="number"
-              value={gridSpec.columns}
+              value={activeGridSpec.columns}
               onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const nextColumns = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 1;
-                setSchema((current) => setSchemaGridSpec(current, { columns: nextColumns }));
+                updateActiveGridSpec({ columns: nextColumns });
               }}
             />
           </div>
           <div>
-            <label className="rfFieldLabel">Row Height</label>
+            <label className="rfFieldLabel">Row Height ({activeBreakpoint.toUpperCase()})</label>
             <Input
               type="number"
-              value={gridSpec.rowHeight}
+              value={activeGridSpec.rowHeight}
               onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const rowHeight = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 56;
-                setSchema((current) => setSchemaGridSpec(current, { rowHeight }));
+                updateActiveGridSpec({ rowHeight });
               }}
             />
           </div>
           <div>
-            <label className="rfFieldLabel">Gap</label>
+            <label className="rfFieldLabel">Gap ({activeBreakpoint.toUpperCase()})</label>
             <Input
               type="number"
-              value={gridSpec.gap}
+              value={activeGridSpec.gap}
               onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const gap = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 12;
-                setSchema((current) => setSchemaGridSpec(current, { gap }));
+                updateActiveGridSpec({ gap });
               }}
             />
           </div>
@@ -845,6 +909,8 @@ export default function BuilderPage() {
             <Select
               value={activeBreakpoint}
               onChange={(event) => setActiveBreakpoint(event.target.value as LayoutBreakpoint)}
+              aria-label="Builder breakpoint"
+              data-testid="builder-breakpoint-select"
             >
               {listSupportedBreakpoints().map((breakpoint) => (
                 <option key={breakpoint} value={breakpoint}>
@@ -868,6 +934,8 @@ export default function BuilderPage() {
             <Input
               value={previewLocale}
               onChange={(event) => setPreviewLocale(event.target.value)}
+              aria-label="Builder locale"
+              data-testid="builder-locale-input"
             />
           </div>
         </CardContent>
@@ -930,8 +998,9 @@ export default function BuilderPage() {
                       placeholder="Component id"
                       value={draft.id}
                       onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))}
+                      data-testid="builder-quick-add-id"
                     />
-                    <Button size="sm" onClick={addComponent} disabled={loading}>
+                    <Button size="sm" onClick={addComponent} disabled={loading} data-testid="builder-quick-add-button">
                       Add
                     </Button>
                   </div>
@@ -943,9 +1012,16 @@ export default function BuilderPage() {
               <CardHeader>
                 <div className={styles.canvasHeaderRow}>
                   <CardTitle>Canvas</CardTitle>
-                  <Badge variant={validation.valid ? 'success' : 'warning'}>
-                    {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
-                  </Badge>
+                  <div className={styles.actions}>
+                    {dragGridCoordinates ? (
+                      <Badge variant="muted">
+                        {dragGridCoordinates.x},{dragGridCoordinates.y}
+                      </Badge>
+                    ) : null}
+                    <Badge variant={validation.valid ? 'success' : 'warning'}>
+                      {validation.valid ? 'Valid' : `${validation.issues.length} Issues`}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className={styles.canvasContent}>
@@ -955,9 +1031,9 @@ export default function BuilderPage() {
                   <GridCanvas
                     components={components}
                     items={activeItems}
-                    columns={activeBreakpoint === 'lg' ? gridSpec.columns : gridSpec.breakpoints?.[activeBreakpoint]?.columns ?? gridSpec.columns}
-                    rowHeight={activeBreakpoint === 'lg' ? gridSpec.rowHeight : gridSpec.breakpoints?.[activeBreakpoint]?.rowHeight ?? gridSpec.rowHeight}
-                    gap={activeBreakpoint === 'lg' ? gridSpec.gap : gridSpec.breakpoints?.[activeBreakpoint]?.gap ?? gridSpec.gap}
+                    columns={activeGridSpec.columns}
+                    rowHeight={activeGridSpec.rowHeight}
+                    gap={activeGridSpec.gap}
                     selectedComponentId={selectedComponentId}
                     data={previewData}
                     context={effectivePreviewContext}
@@ -984,6 +1060,9 @@ export default function BuilderPage() {
                   definition={selectedDefinition}
                   registry={registry}
                   issues={issuesByComponentId.get(selectedComponent.id)}
+                  previewData={previewData}
+                  previewContext={effectivePreviewContext}
+                  translate={i18n.t}
                   onChange={(next) =>
                     setSchema((current) =>
                       withUpdatedComponents(current, (currentComponents) =>

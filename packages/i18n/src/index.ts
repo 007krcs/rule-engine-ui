@@ -336,9 +336,10 @@ export function resolveLocale(input: LocaleResolverInput): string {
 }
 
 export function listBundleLocales(bundles: TranslationBundle[]): string[] {
-  return Array.from(new Set(bundles.map((bundle) => normalizeLocale(bundle.locale)).filter(Boolean))).sort((a, b) =>
-    a.localeCompare(b),
-  ) as string[];
+  const locales = bundles
+    .map((bundle) => normalizeLocale(bundle.locale))
+    .filter((locale): locale is string => typeof locale === 'string');
+  return Array.from(new Set(locales)).sort((a, b) => a.localeCompare(b));
 }
 
 export function upsertBundleMessage(

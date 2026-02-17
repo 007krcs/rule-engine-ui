@@ -305,15 +305,17 @@ export function upsertSchemaItemsForBreakpoint(
 
 export function setSchemaGridSpec(schema: UISchema, grid: Partial<UIGridSpec>): UISchema {
   const normalized = normalizeSchema(schema);
-  const nextGrid = normalizeGridSpec(
-    {
-      ...normalized.grid,
-      ...grid,
-      breakpoints: {
-        ...normalized.grid?.breakpoints,
-        ...grid.breakpoints,
-      },
+  const currentGrid = getSchemaGridSpec(normalized);
+  const mergedGrid: UIGridSpec = {
+    ...currentGrid,
+    ...grid,
+    breakpoints: {
+      ...currentGrid.breakpoints,
+      ...grid.breakpoints,
     },
+  };
+  const nextGrid = normalizeGridSpec(
+    mergedGrid,
     normalized.layout?.type === 'grid' ? normalized.layout.columns : undefined,
   );
 

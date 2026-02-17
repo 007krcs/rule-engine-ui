@@ -308,6 +308,7 @@ abstract class BaseConfigStore implements ConfigStore {
       approvals: state.approvals,
       audit: state.audit,
       componentRegistry: state.componentRegistry,
+      translations: state.translations,
     });
   }
 
@@ -319,6 +320,7 @@ abstract class BaseConfigStore implements ConfigStore {
       approvals: deepCloneJson(input.approvals),
       audit: deepCloneJson(input.audit),
       componentRegistry: deepCloneJson(input.componentRegistry),
+      translations: deepCloneJson(input.translations),
     }));
   }
 
