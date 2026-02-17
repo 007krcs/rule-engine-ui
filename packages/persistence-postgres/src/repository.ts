@@ -297,7 +297,12 @@ export class PostgresTenantRepository {
         action: 'Created config package',
         target: input.packageId,
         severity: 'info',
-        metadata: { versionId: input.versionId },
+        metadata: {
+          stage: 'package.create',
+          packageId: input.packageId,
+          versionId: input.versionId,
+          configId: input.configId,
+        },
       });
     });
 
@@ -328,6 +333,12 @@ export class PostgresTenantRepository {
         action: 'Created config version',
         target: `${input.packageId}@${input.versionLabel}`,
         severity: 'info',
+        metadata: {
+          stage: 'version.create',
+          packageId: input.packageId,
+          versionId: input.versionId,
+          versionLabel: input.versionLabel,
+        },
       });
     });
 
@@ -348,6 +359,12 @@ export class PostgresTenantRepository {
       if (!current) {
         return { ok: false as const, error: 'Version not found' };
       }
+      if (current.status !== 'DRAFT') {
+        return {
+          ok: false as const,
+          error: `Cannot edit version in status ${current.status}. Only DRAFT versions can be edited.`,
+        };
+      }
       const nextBundle = input.mutate(current.bundle);
       await client.query(
         `
@@ -363,6 +380,12 @@ export class PostgresTenantRepository {
         action: input.action,
         target: input.versionId,
         severity: 'info',
+        metadata: {
+          stage: 'version.update_bundle',
+          packageId: current.packageId,
+          versionId: current.id,
+          status: current.status,
+        },
       });
       return { ok: true as const };
     });
@@ -379,6 +402,15 @@ export class PostgresTenantRepository {
     return await this.withTenantTransaction(session.tenantId, async (client) => {
       const version = await this.loadVersionOrNull(client, session.tenantId, input.versionId);
       if (!version) return { ok: false as const, error: 'Version not found' };
+      if (version.status !== 'DRAFT') {
+        return {
+          ok: false as const,
+          error: `Cannot submit version in status ${version.status} for review. Expected DRAFT.`,
+        };
+      }
+      if (version.isKilled) {
+        return { ok: false as const, error: 'Cannot submit a killed version for review' };
+      }
 
       await client.query(
         `UPDATE config_versions SET status = 'REVIEW', updated_by = $1, updated_at = NOW() WHERE tenant_id = $2 AND id = $3`,
@@ -399,7 +431,14 @@ export class PostgresTenantRepository {
         action: 'Submitted version for review',
         target: `${version.packageId}@${version.version}`,
         severity: 'info',
-        metadata: { approvalId, scope: input.scope, risk: input.risk },
+        metadata: {
+          stage: 'review.submit',
+          packageId: version.packageId,
+          versionId: version.id,
+          approvalId,
+          scope: input.scope,
+          risk: input.risk,
+        },
       });
       return { ok: true as const, approvalId };
     });
@@ -459,6 +498,13 @@ export class PostgresTenantRepository {
         action: 'Promoted version to ACTIVE',
         target: `${version.packageId}@${version.version}`,
         severity: 'info',
+        metadata: {
+          stage: 'version.promote',
+          packageId: version.packageId,
+          versionId: version.id,
+          fromStatus: version.status,
+          toStatus: 'ACTIVE',
+        },
       });
       return { ok: true as const };
     });
@@ -470,7 +516,12 @@ export class PostgresTenantRepository {
     return await this.withTenantTransaction(session.tenantId, async (client) => {
       const target = await this.loadVersionOrNull(client, session.tenantId, input.versionId);
       if (!target) return { ok: false as const, error: 'Version not found' };
-      if (target.status === 'RETIRED') return { ok: false as const, error: 'Cannot rollback to retired version' };
+      if (target.status !== 'DEPRECATED') {
+        return {
+          ok: false as const,
+          error: `Cannot rollback to version in status ${target.status}. Expected DEPRECATED.`,
+        };
+      }
       if (target.isKilled) return { ok: false as const, error: 'Cannot rollback to killed version' };
 
       await client.query(
@@ -491,6 +542,13 @@ export class PostgresTenantRepository {
         action: 'Rolled back version',
         target: `${target.packageId}@${target.version}`,
         severity: 'warning',
+        metadata: {
+          stage: 'version.rollback',
+          packageId: target.packageId,
+          versionId: target.id,
+          fromStatus: target.status,
+          toStatus: 'ACTIVE',
+        },
       });
       return { ok: true as const };
     });
@@ -561,7 +619,12 @@ export class PostgresTenantRepository {
         action: 'Updated feature flag',
         target: `${input.env}:${input.key}`,
         severity: 'info',
-        metadata: { enabled: input.enabled },
+        metadata: {
+          stage: 'feature_flag.upsert',
+          env: input.env,
+          key: input.key,
+          enabled: input.enabled,
+        },
       });
       return mapFeatureFlag(row);
     });
@@ -631,6 +694,7 @@ export class PostgresTenantRepository {
         target: input.scope,
         severity: input.active ? 'warning' : 'info',
         metadata: {
+          stage: 'kill_switch.upsert',
           packageId: input.packageId,
           versionId: input.versionId,
           rulesetKey: input.rulesetKey,
@@ -703,6 +767,9 @@ export class PostgresTenantRepository {
         action: 'Updated tenant branding',
         target: session.tenantId,
         severity: 'info',
+        metadata: {
+          stage: 'branding.upsert',
+        },
       });
       return mapBranding(row);
     });
@@ -728,6 +795,19 @@ export class PostgresTenantRepository {
       );
       const row = result.rows[0];
       if (!row) throw new Error('Execution trace write failed');
+      await this.insertAudit(client, {
+        tenantId: input.tenantId,
+        actor: 'system',
+        action: 'Recorded execution trace',
+        target: input.executionId,
+        severity: 'info',
+        metadata: {
+          stage: 'execution_trace.insert',
+          packageId: input.packageId,
+          versionId: input.versionId,
+          correlationId: input.correlationId,
+        },
+      });
       return mapTrace(row);
     });
   }
@@ -874,6 +954,24 @@ export class PostgresTenantRepository {
           [session.tenantId, b.logoUrl ?? null, b.mode, b.primaryColor, b.secondaryColor, b.typographyScale, b.radius, b.spacing, JSON.stringify(b.cssVariables), b.updatedBy ?? null, b.updatedAt],
         );
       }
+
+      await this.insertAudit(client, {
+        tenantId: session.tenantId,
+        actor: session.userName,
+        action: 'Imported tenant bundle',
+        target: session.tenantId,
+        severity: 'warning',
+        metadata: {
+          stage: 'tenant_bundle.import',
+          packageCount: payload.packages.length,
+          versionCount: payload.versions.length,
+          approvalCount: payload.approvals.length,
+          auditCount: payload.audit.length,
+          featureFlagCount: payload.featureFlags.length,
+          killSwitchCount: payload.killSwitches.length,
+          hasBranding: Boolean(payload.branding),
+        },
+      });
     });
     return { ok: true };
   }
@@ -916,6 +1014,12 @@ export class PostgresTenantRepository {
     severity: AuditSeverity;
     notes?: string;
   }): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (input.nextApprovalStatus === 'APPROVED' && input.nextVersionStatus !== 'APPROVED') {
+      return { ok: false as const, error: 'Invalid transition: APPROVED decision must set version to APPROVED' };
+    }
+    if (input.nextApprovalStatus === 'CHANGES_REQUESTED' && input.nextVersionStatus !== 'DRAFT') {
+      return { ok: false as const, error: 'Invalid transition: CHANGES_REQUESTED decision must set version to DRAFT' };
+    }
     const { session } = input;
     await this.ensureSession(session);
     return await this.withTenantTransaction(session.tenantId, async (client) => {
@@ -930,6 +1034,24 @@ export class PostgresTenantRepository {
       );
       const approval = approvalResult.rows[0];
       if (!approval) return { ok: false as const, error: 'Approval not found' };
+      if (approval.status !== 'PENDING') {
+        return {
+          ok: false as const,
+          error: `Approval is in status ${approval.status}. Only PENDING approvals can be decided.`,
+        };
+      }
+
+      const version = await this.loadVersionOrNull(client, session.tenantId, approval.version_id);
+      if (!version) return { ok: false as const, error: 'Version not found for approval' };
+      if (version.status !== 'REVIEW') {
+        return {
+          ok: false as const,
+          error: `Version is in status ${version.status}. Expected REVIEW for approval decisions.`,
+        };
+      }
+      if (version.isKilled) {
+        return { ok: false as const, error: 'Cannot decide approval for a killed version' };
+      }
 
       await client.query(
         `
@@ -953,7 +1075,17 @@ export class PostgresTenantRepository {
         action: input.action,
         target: `${approval.package_id}@${approval.version_id}`,
         severity: input.severity,
-        metadata: { approvalId: approval.id, notes: input.notes },
+        metadata: {
+          stage: 'review.decide',
+          packageId: approval.package_id,
+          versionId: approval.version_id,
+          approvalId: approval.id,
+          previousApprovalStatus: approval.status,
+          nextApprovalStatus: input.nextApprovalStatus,
+          previousVersionStatus: version.status,
+          nextVersionStatus: input.nextVersionStatus,
+          notes: input.notes,
+        },
       });
       return { ok: true as const };
     });

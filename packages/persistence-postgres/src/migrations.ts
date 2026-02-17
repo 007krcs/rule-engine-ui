@@ -37,7 +37,25 @@ async function listMigrationFiles(dir: string): Promise<string[]> {
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
     .map((entry) => entry.name)
-    .sort((a, b) => a.localeCompare(b));
+    .sort(compareMigrationFileNames);
+}
+
+function compareMigrationFileNames(a: string, b: string): number {
+  const prefixDiff = migrationOrderPrefix(a) - migrationOrderPrefix(b);
+  if (prefixDiff !== 0) {
+    return prefixDiff;
+  }
+
+  // If two migrations intentionally share the same numeric prefix,
+  // apply the lexicographically later file last as a hardening/patch layer.
+  return b.localeCompare(a);
+}
+
+function migrationOrderPrefix(file: string): number {
+  const match = /^(\d+)(?:_|-)/.exec(file);
+  const value = match?.[1];
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  return Number.parseInt(value, 10);
 }
 
 async function ensureMigrationsTable(pool: SqlPool): Promise<void> {
