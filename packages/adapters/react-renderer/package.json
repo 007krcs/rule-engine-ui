@@ -8,7 +8,8 @@
   "dependencies": {
     "@platform/i18n": "workspace:*",
     "@platform/rules-engine": "workspace:*",
-    "@platform/schema": "workspace:*"
+    "@platform/schema": "workspace:*",
+    "@platform/ui-kit": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0",

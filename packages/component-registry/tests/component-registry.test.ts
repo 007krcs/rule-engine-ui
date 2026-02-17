@@ -71,6 +71,26 @@ describe('@platform/component-registry', () => {
     const planned = definitions.find((definition) => definition.adapterHint === 'platform.svgIcon');
     expect(planned).toBeTruthy();
     expect(planned?.availability).toBe('planned');
+    expect(planned?.supportsDrag).toBe(false);
     expect(planned ? isPaletteComponentEnabled(planned) : true).toBe(false);
+  });
+
+  it('requires availability on custom definitions', () => {
+    const manifest = {
+      schemaVersion: 1 as const,
+      components: [
+        {
+          id: 'platform.customThing',
+          adapterHint: 'platform.customThing',
+          displayName: 'Custom Thing',
+          description: 'Custom',
+          category: 'Inputs',
+          propsSchema: { type: 'object' },
+        },
+      ],
+    };
+    const result = validateComponentRegistryManifest(manifest);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((issue) => issue.path.endsWith('availability'))).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import type {
   TextareaHTMLAttributes,
 } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { PFButton } from './buttons';
 import { cn, sizeClass, type PFBaseProps } from './utils';
 
 type FieldVariant = 'outline' | 'filled' | 'ghost';
@@ -665,6 +666,144 @@ export function PFTimeField({
         onValueChange?.(normalizeTime(event.target.value));
       }}
     />
+  );
+}
+
+export interface PFDatePickerProps extends PFDateFieldProps {
+  showCalendar?: boolean;
+  closeOnSelect?: boolean;
+}
+
+export function PFDatePicker({
+  className,
+  value,
+  showCalendar = true,
+  closeOnSelect = true,
+  onValueChange,
+  ...rest
+}: PFDatePickerProps) {
+  const controlled = value !== undefined;
+  const [internalValue, setInternalValue] = useState<string>(() => normalizeIsoDate(value));
+  const [calendarOpen, setCalendarOpen] = useState(showCalendar);
+  const resolvedValue = controlled ? normalizeIsoDate(value) : internalValue;
+
+  useEffect(() => {
+    setCalendarOpen(showCalendar);
+  }, [showCalendar]);
+
+  useEffect(() => {
+    if (!controlled) return;
+    setInternalValue(normalizeIsoDate(value));
+  }, [controlled, value]);
+
+  const handleValueChange = (nextValue: string) => {
+    if (!controlled) setInternalValue(nextValue);
+    onValueChange?.(nextValue);
+    if (closeOnSelect) setCalendarOpen(false);
+  };
+
+  return (
+    <div className={cn('pf-date-picker', className)}>
+      <PFDateField
+        {...rest}
+        value={resolvedValue}
+        onValueChange={handleValueChange}
+      />
+      <PFButton
+        type="button"
+        size="sm"
+        variant="outline"
+        intent="neutral"
+        className="pf-date-picker__toggle"
+        onClick={() => setCalendarOpen((current) => !current)}
+        aria-expanded={calendarOpen}
+        aria-label={calendarOpen ? 'Hide calendar' : 'Show calendar'}
+      >
+        {calendarOpen ? 'Hide calendar' : 'Show calendar'}
+      </PFButton>
+      {calendarOpen ? (
+        <PFCalendar
+          className="pf-date-picker__calendar"
+          value={resolvedValue}
+          minDate={rest.minDate}
+          maxDate={rest.maxDate}
+          locale={rest.locale}
+          timezone={rest.timezone}
+          onValueChange={handleValueChange}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export interface PFTimePickerProps extends PFTimeFieldProps {
+  showClock?: boolean;
+  closeOnSelect?: boolean;
+  locale?: string;
+  timezone?: string;
+}
+
+export function PFTimePicker({
+  className,
+  value,
+  showClock = true,
+  closeOnSelect = false,
+  locale = 'en-US',
+  timezone = 'UTC',
+  onValueChange,
+  ...rest
+}: PFTimePickerProps) {
+  const controlled = value !== undefined;
+  const [internalValue, setInternalValue] = useState<string>(() => normalizeTime(value));
+  const [clockOpen, setClockOpen] = useState(showClock);
+  const resolvedValue = controlled ? normalizeTime(value) : internalValue;
+
+  useEffect(() => {
+    setClockOpen(showClock);
+  }, [showClock]);
+
+  useEffect(() => {
+    if (!controlled) return;
+    setInternalValue(normalizeTime(value));
+  }, [controlled, value]);
+
+  const handleValueChange = (nextValue: string) => {
+    if (!controlled) setInternalValue(nextValue);
+    onValueChange?.(nextValue);
+    if (closeOnSelect) setClockOpen(false);
+  };
+
+  return (
+    <div className={cn('pf-time-picker', className)}>
+      <PFTimeField
+        {...rest}
+        value={resolvedValue}
+        onValueChange={handleValueChange}
+      />
+      <PFButton
+        type="button"
+        size="sm"
+        variant="outline"
+        intent="neutral"
+        className="pf-time-picker__toggle"
+        onClick={() => setClockOpen((current) => !current)}
+        aria-expanded={clockOpen}
+        aria-label={clockOpen ? 'Hide clock' : 'Show clock'}
+      >
+        {clockOpen ? 'Hide clock' : 'Show clock'}
+      </PFButton>
+      {clockOpen ? (
+        <PFClock
+          className="pf-time-picker__clock"
+          picker
+          live={false}
+          locale={locale}
+          timezone={timezone}
+          value={resolvedValue}
+          onValueChange={handleValueChange}
+        />
+      ) : null}
+    </div>
   );
 }
 

@@ -18,6 +18,53 @@ async function waitForClientReady(page: Page) {
   await expect(page.getByTestId('client-ready')).toBeVisible({ timeout: 120_000 });
 }
 
+async function listCanvasItemIds(page: Page): Promise<string[]> {
+  const nodes = page.locator('[data-testid^="builder-grid-item-"]');
+  const ids = await nodes.evaluateAll((elements) =>
+    elements
+      .map((el) => el.getAttribute('data-testid') ?? '')
+      .filter((value) => value.startsWith('builder-grid-item-'))
+      .map((value) => value.replace(/^builder-grid-item-/, '')),
+  );
+  return ids.sort();
+}
+
+async function dragPaletteItemToCanvas(page: Page, testId: string) {
+  const paletteItem = page.getByTestId(testId);
+  const canvas = page.getByTestId('builder-canvas');
+  await expect(paletteItem).toBeVisible();
+  await expect(paletteItem).toBeEnabled();
+  await expect(canvas).toBeVisible();
+  await paletteItem.scrollIntoViewIfNeeded();
+  await canvas.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(100);
+
+  const paletteBox = await paletteItem.boundingBox();
+  const canvasBox = await canvas.boundingBox();
+  if (!paletteBox || !canvasBox) {
+    throw new Error('Missing bounding boxes for drag operation');
+  }
+
+  await page.mouse.move(paletteBox.x + paletteBox.width / 2, paletteBox.y + paletteBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + Math.min(80, canvasBox.height / 2), {
+    steps: 20,
+  });
+  await page.mouse.up();
+}
+
+async function waitForDroppedComponentId(page: Page, before: string[]): Promise<string | null> {
+  const beforeSet = new Set(before);
+  await expect
+    .poll(async () => {
+      const now = await listCanvasItemIds(page);
+      return now.find((id) => !beforeSet.has(id)) ?? '';
+    }, { timeout: 12_000 })
+    .not.toBe('');
+  const now = await listCanvasItemIds(page);
+  return now.find((id) => !beforeSet.has(id)) ?? null;
+}
+
 async function createPackageVersion(request: APIRequestContext, name: string): Promise<string> {
   const response = await request.post('/api/config-packages', {
     data: { name },
@@ -42,11 +89,12 @@ test('enforces planned palette guardrails and supports unsupported placeholder r
   await expect(plannedItem).toBeVisible();
   await expect(plannedItem).toBeDisabled();
 
-  await page.getByTestId('palette-item-platform-chip').click();
-  await page.getByTestId('builder-quick-add-id').fill('chipWidget');
-  await page.getByTestId('builder-quick-add-button').click();
+  const beforeIds = await listCanvasItemIds(page);
+  await dragPaletteItemToCanvas(page, 'palette-item-platform-chip');
+  const droppedId = await waitForDroppedComponentId(page, beforeIds);
+  expect(droppedId).not.toBeNull();
   await expect(page.getByText('Unsupported platform component: platform.chip')).toHaveCount(0);
-  await expect(page.getByTestId('builder-grid-item-chipWidget')).toBeVisible();
+  await expect(page.getByTestId(`builder-grid-item-${droppedId!}`)).toBeVisible();
 
   const versionResponse = await request.get(`/api/config-versions/${encodeURIComponent(versionId)}`);
   expect(versionResponse.ok()).toBeTruthy();
@@ -93,7 +141,7 @@ test('enforces planned palette guardrails and supports unsupported placeholder r
 
   await page.reload();
   await waitForClientReady(page);
-  await expect(page.getByText('Component not available')).toBeVisible();
+  await expect(page.getByText('Component not enabled')).toBeVisible();
   await expect(page.locator('code', { hasText: 'platform.fakeUnsupported' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Replace component' }).first()).toBeVisible();
 

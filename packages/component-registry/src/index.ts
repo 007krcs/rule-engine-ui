@@ -5,6 +5,11 @@ import type {
   PlatformComponentCategory,
   PlatformComponentMeta,
 } from '@platform/types';
+export type {
+  PlatformComponentMeta,
+  PlatformComponentAvailability,
+  PlatformComponentCategory,
+} from '@platform/types';
 
 export type RegistryScope = 'global' | 'tenant';
 
@@ -973,7 +978,7 @@ export function listImplemented(
 ): ComponentDefinition[] {
   return definitions
     .map((definition) => enrichComponentDefinition(definition))
-    .filter((definition) => definition.availability === 'implemented');
+    .filter((definition) => definition.availability === 'implemented' && definition.supportsDrag);
 }
 
 export function isImplemented(

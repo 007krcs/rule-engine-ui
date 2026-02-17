@@ -5,7 +5,7 @@ import { builtinComponentDefinitions } from '@platform/component-registry';
 import type { ComponentDefinition } from '@platform/component-registry';
 import type { AdapterContext } from '@platform/react-renderer';
 import type { ExecutionContext, JSONValue, UIComponent } from '@platform/schema';
-import { getImplementedComponentIds, renderPlatformComponent } from '../src/index';
+import { getImplementedComponentIds, getPlatformComponent, renderPlatformComponent } from '../src/index';
 
 const context: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -60,10 +60,7 @@ function createComponent(overrides: Partial<UIComponent>): UIComponent {
 function registryImplementedPlatformIds(definitions: ComponentDefinition[]): string[] {
   return definitions
     .filter((definition) => definition.adapterHint.startsWith('platform.'))
-    .filter((definition) => {
-      if (definition.availability) return definition.availability === 'implemented';
-      return definition.status !== 'planned' && definition.palette?.disabled !== true;
-    })
+    .filter((definition) => definition.availability === 'implemented' && definition.supportsDrag)
     .map((definition) => definition.adapterHint);
 }
 
@@ -96,15 +93,39 @@ describe('react-platform-adapter', () => {
       createAdapterContext({ startDate: '2026-03-20' }),
     );
 
+    const datePicker = renderPlatformComponent(
+      createComponent({
+        id: 'date-picker',
+        type: 'datePicker',
+        adapterHint: 'platform.datePicker',
+        validations: { minDate: '2026-01-01', maxDate: '2026-12-31' },
+      }),
+      createAdapterContext({ startDate: '2026-03-20' }),
+    );
+
+    const timePicker = renderPlatformComponent(
+      createComponent({
+        id: 'time-picker',
+        type: 'timePicker',
+        adapterHint: 'platform.timePicker',
+        props: { showClock: true, step: 300 },
+      }),
+      createAdapterContext({ startDate: '09:15' }),
+    );
+
     const html = renderToStaticMarkup(
       <div>
         {dateField}
         {calendar}
+        {datePicker}
+        {timePicker}
       </div>,
     );
 
     expect(html).toContain('type="date"');
     expect(html).toContain('pf-calendar');
+    expect(html).toContain('pf-date-picker');
+    expect(html).toContain('pf-time-picker');
   });
 
   it('renders chip/avatar/badge/divider components without unsupported fallback', () => {
@@ -162,5 +183,11 @@ describe('react-platform-adapter', () => {
     expect(html).toContain('pf-badge');
     expect(html).toContain('pf-divider');
     expect(html).not.toContain('Unsupported platform component');
+  });
+
+  it('returns placeholder component factory for unknown ids', () => {
+    const Unknown = getPlatformComponent('platform.unknownWidget');
+    const html = renderToStaticMarkup(<Unknown />);
+    expect(html).toContain('Component not enabled');
   });
 });

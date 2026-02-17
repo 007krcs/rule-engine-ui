@@ -12,6 +12,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:e2e": "playwright test",
+    "check:components": "tsx scripts/check-components.ts",
     "lint": "turbo run lint",
     "lint:docs": "node scripts/lint-docs.js",
     "lint:docs:todo": "node scripts/lint-docs-todo.js",

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { I18nProvider } from '@platform/i18n';
 import { createFallbackI18nProvider } from '@platform/i18n';
 import { evaluateCondition } from '@platform/rules-engine';
+import { UnsupportedComponentPlaceholder } from '@platform/ui-kit';
 import type {
   ExecutionContext,
   JSONValue,
@@ -452,58 +453,36 @@ function renderUnavailableComponent(
   component: UIComponent,
   reason: 'missing-adapter' | 'unsupported-component',
 ): React.ReactElement {
-  const adapterPrefix = component.adapterHint.split('.')[0] ?? 'unknown';
-  const instructions =
-    reason === 'missing-adapter'
-      ? `Install and register the "${adapterPrefix}" adapter.`
-      : `Enable support for "${component.adapterHint}".`;
-
   return (
-    <section
+    <UnsupportedComponentPlaceholder
+      id={component.adapterHint}
       data-component-id={component.id}
       data-component-not-available
       data-component-reason={reason}
-    >
-      <h3>Component not available</h3>
-      <p>
-        This page uses <code>{component.adapterHint}</code>, but it is not enabled in this environment.
-      </p>
-      <p>{instructions}</p>
-      <div>
-        <a href={`/component-registry?c=${encodeURIComponent(component.adapterHint)}`}>
-          View in Component Registry
-        </a>
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window === 'undefined') return;
-            window.dispatchEvent(
-              new CustomEvent('ruleflow:replace-component-request', {
-                detail: {
-                  componentId: component.id,
-                  adapterHint: component.adapterHint,
-                },
-              }),
-            );
-          }}
-        >
-          Replace component
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof navigator === 'undefined' || !navigator.clipboard) return;
-            const requestText =
-              `Please enable support for ${component.adapterHint}.\n` +
-              `Component id: ${component.id}\n` +
-              'This component is required by an active schema.';
-            void navigator.clipboard.writeText(requestText);
-          }}
-        >
-          Contact admin
-        </button>
-      </div>
-    </section>
+      onReplace={() => {
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(
+          new CustomEvent('ruleflow:replace-component-request', {
+            detail: {
+              componentId: component.id,
+              adapterHint: component.adapterHint,
+            },
+          }),
+        );
+      }}
+      onViewRegistry={() => {
+        if (typeof window === 'undefined') return;
+        window.location.assign(`/component-registry?c=${encodeURIComponent(component.adapterHint)}`);
+      }}
+      onContactAdmin={() => {
+        if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+        const requestText =
+          `Please enable support for ${component.adapterHint}.\n` +
+          `Component id: ${component.id}\n` +
+          'This component is required by an active schema.';
+        void navigator.clipboard.writeText(requestText);
+      }}
+    />
   );
 }
 

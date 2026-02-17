@@ -1077,6 +1077,39 @@
     gap: var(--pf-space-2);
   }
 
+  .pf-date-picker,
+  .pf-time-picker {
+    display: grid;
+    gap: var(--pf-space-2);
+  }
+
+  .pf-date-picker__calendar,
+  .pf-time-picker__clock {
+    padding-top: var(--pf-space-1);
+  }
+
+  .pf-date-picker__toggle,
+  .pf-time-picker__toggle {
+    justify-self: start;
+  }
+
+  .pf-unsupported {
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--pf-color-warning-500) 38%, var(--pf-surface-border));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--pf-color-warning-50) 46%, transparent),
+        transparent 66%
+      ),
+      var(--pf-surface-layer);
+  }
+
+  .pf-unsupported__content {
+    display: grid;
+    gap: var(--pf-space-3);
+  }
+
   .pf-choice,
   .pf-switch {
     display: inline-flex;

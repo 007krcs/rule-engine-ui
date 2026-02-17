@@ -12,6 +12,7 @@ import {
   PFCardGrid,
   PFChip,
   PFDateField,
+  PFDatePicker,
   PFDateTimeField,
   PFDivider,
   PFEmptyState,
@@ -19,48 +20,26 @@ import {
   PFPagination,
   PFSection,
   PFSelect,
-  PFStack,
   PFSplitLayout,
   PFTable,
   PFTab,
   PFTabs,
   PFTextField,
   PFTimeField,
+  PFTimePicker,
   PFToolbar,
   PFTypography,
   PFClock,
+  UnsupportedComponentPlaceholder,
 } from '@platform/ui-kit';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
 import type { JSONValue, UIComponent } from '@platform/schema';
+import { platformComponentMap } from './component-map';
+export { getPlatformComponent, platformComponentMap } from './component-map';
 
 let registered = false;
 let reportedHandshake = false;
-
-const PLATFORM_IMPLEMENTED_COMPONENT_IDS = [
-  'platform.pageShell',
-  'platform.section',
-  'platform.splitLayout',
-  'platform.toolbar',
-  'platform.cardGrid',
-  'platform.emptyState',
-  'platform.button',
-  'platform.textField',
-  'platform.select',
-  'platform.table',
-  'platform.pagination',
-  'platform.tabs',
-  'platform.alert',
-  'platform.avatar',
-  'platform.badge',
-  'platform.chip',
-  'platform.divider',
-  'platform.dateField',
-  'platform.timeField',
-  'platform.dateTimeField',
-  'platform.calendar',
-  'platform.clock',
-] as const;
 
 type ReplaceComponentRequestEvent = {
   componentId: string;
@@ -68,7 +47,7 @@ type ReplaceComponentRequestEvent = {
 };
 
 export function getImplementedComponentIds(): string[] {
-  return [...PLATFORM_IMPLEMENTED_COMPONENT_IDS];
+  return Object.keys(platformComponentMap).sort((a, b) => a.localeCompare(b));
 }
 
 export function registerPlatformAdapter(): void {
@@ -427,7 +406,25 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           timezone={timezone || undefined}
           displayFormat={displayFormat === 'short' || displayFormat === 'long' ? displayFormat : 'medium'}
           aria-label={ariaLabel}
-          onValueChange={(value) => ctx.events.onChange?.(value, valueBindingPath)}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
+        />
+      );
+    case 'platform.datePicker':
+      return (
+        <PFDatePicker
+          id={component.id}
+          label={label}
+          helperText={helperText}
+          value={asString(resolveBoundDataValue(component, ctx), asString(component.props?.defaultValue, ''))}
+          minDate={asString(component.validations?.minDate, asString(component.props?.minDate, ''))}
+          maxDate={asString(component.validations?.maxDate, asString(component.props?.maxDate, ''))}
+          required={Boolean(component.validations?.required)}
+          disabled={Boolean(component.props?.disabled)}
+          timezone={timezone || undefined}
+          displayFormat={displayFormat === 'short' || displayFormat === 'long' ? displayFormat : 'medium'}
+          showCalendar={asBoolean(component.props?.showCalendar, true)}
+          aria-label={ariaLabel}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
         />
       );
     case 'platform.timeField':
@@ -443,7 +440,26 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           required={Boolean(component.validations?.required)}
           disabled={Boolean(component.props?.disabled)}
           aria-label={ariaLabel}
-          onValueChange={(value) => ctx.events.onChange?.(value, valueBindingPath)}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
+        />
+      );
+    case 'platform.timePicker':
+      return (
+        <PFTimePicker
+          id={component.id}
+          label={label}
+          helperText={helperText}
+          value={asString(resolveBoundDataValue(component, ctx), asString(component.props?.defaultValue, ''))}
+          minTime={asString(component.validations?.minTime, asString(component.props?.minTime, ''))}
+          maxTime={asString(component.validations?.maxTime, asString(component.props?.maxTime, ''))}
+          step={asNumber(component.props?.step, 60)}
+          required={Boolean(component.validations?.required)}
+          disabled={Boolean(component.props?.disabled)}
+          timezone={timezone || undefined}
+          locale={ctx.context.locale}
+          showClock={asBoolean(component.props?.showClock, true)}
+          aria-label={ariaLabel}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
         />
       );
     case 'platform.dateTimeField':
@@ -459,7 +475,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           required={Boolean(component.validations?.required)}
           disabled={Boolean(component.props?.disabled)}
           aria-label={ariaLabel}
-          onValueChange={(value) => ctx.events.onChange?.(value, valueBindingPath)}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
         />
       );
     case 'platform.calendar':
@@ -470,7 +486,7 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           maxDate={asString(component.validations?.maxDate, asString(component.props?.maxDate, '')) || undefined}
           timezone={timezone || undefined}
           aria-label={ariaLabel}
-          onValueChange={(value) => ctx.events.onChange?.(value, valueBindingPath)}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
         />
       );
     case 'platform.clock':
@@ -481,14 +497,21 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           picker={Boolean(component.props?.picker)}
           showSeconds={Boolean(component.props?.showSeconds)}
           aria-label={ariaLabel}
-          onValueChange={(value) => ctx.events.onChange?.(value, valueBindingPath)}
+          onValueChange={(value: string) => ctx.events.onChange?.(value, valueBindingPath)}
         />
       );
     default:
       return (
-        <UnavailableComponentCard
-          component={component}
-          reason="unsupported-platform-component"
+        <UnsupportedComponentPlaceholder
+          id={component.adapterHint}
+          onReplace={() =>
+            dispatchReplaceComponentRequest({
+              componentId: component.id,
+              adapterHint: component.adapterHint,
+            })
+          }
+          onViewRegistry={() => openRegistryFor(component.adapterHint)}
+          onContactAdmin={() => copyAdminRequestText(component)}
         />
       );
   }
@@ -743,18 +766,13 @@ function assertRegistryAdapterHandshake(): void {
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
-
-  // eslint-disable-next-line no-console
-  console.error(message);
+  throw new Error(message);
 }
 
 function getRegistryImplementedPlatformIds(definitions: ComponentDefinition[]): string[] {
   return definitions
     .filter((definition) => definition.adapterHint.startsWith('platform.'))
-    .filter((definition) => {
-      if (definition.availability) return definition.availability === 'implemented';
-      return definition.status !== 'planned' && definition.palette?.disabled !== true;
-    })
+    .filter((definition) => definition.availability === 'implemented' && definition.supportsDrag)
     .map((definition) => definition.adapterHint);
 }
 
@@ -776,58 +794,9 @@ function copyAdminRequestText(component: UIComponent): void {
   void navigator.clipboard.writeText(requestText);
 }
 
-function UnavailableComponentCard({
-  component,
-  reason,
-}: {
-  component: UIComponent;
-  reason: 'unsupported-platform-component' | 'missing-adapter';
-}): React.ReactElement {
-  const adapterPrefix = component.adapterHint.split('.')[0] ?? 'unknown';
-  const actionHint =
-    reason === 'missing-adapter'
-      ? `Install and register the "${adapterPrefix}" adapter package.`
-      : `Add "${component.adapterHint}" to the platform adapter map.`;
-
-  return (
-    <PFCard data-unsupported data-unsupported-reason={reason}>
-      <PFCardContent>
-        <PFTypography variant="h6">Component not available</PFTypography>
-        <PFTypography variant="body2">
-          This page uses <code>{component.adapterHint}</code>, but it is not enabled in this environment.
-        </PFTypography>
-        <PFTypography variant="body2" muted>
-          {actionHint}
-        </PFTypography>
-        <PFStack direction="row" wrap="wrap" gap="var(--pf-space-2)" align="center">
-          <a href={`/component-registry?c=${encodeURIComponent(component.adapterHint)}`}>
-            View in Component Registry
-          </a>
-          <PFButton
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              dispatchReplaceComponentRequest({
-                componentId: component.id,
-                adapterHint: component.adapterHint,
-              })
-            }
-          >
-            Replace component
-          </PFButton>
-          <PFButton
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => copyAdminRequestText(component)}
-          >
-            Contact admin
-          </PFButton>
-        </PFStack>
-      </PFCardContent>
-    </PFCard>
-  );
+function openRegistryFor(adapterHint: string): void {
+  if (typeof window === 'undefined') return;
+  window.location.assign(`/component-registry?c=${encodeURIComponent(adapterHint)}`);
 }
 
 function resolveText(
