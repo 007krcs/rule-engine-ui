@@ -1,0 +1,247 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-6);
+  width: 100%;
+  min-height: 0;
+}
+
+.builderRoot {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.subtext {
+  margin: var(--rf-space-2) 0 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.metaGrid {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.metaGrid input {
+  margin-top: 6px;
+}
+
+.builderGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-6);
+  align-items: stretch;
+  width: 100%;
+  min-height: 0;
+}
+
+.paletteContent {
+  display: grid;
+  gap: var(--rf-space-3);
+  font-size: 14px;
+}
+
+.paletteButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+  padding: 10px 12px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  text-align: left;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.paletteButton:hover {
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+}
+
+.paletteButton:active {
+  cursor: grabbing;
+}
+
+.paletteButtonActive {
+  border-color: color-mix(in srgb, var(--rf-primary) 40%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 8%, var(--rf-surface));
+}
+
+.addSection {
+  padding-top: var(--rf-space-4);
+  border-top: 1px solid var(--rf-border);
+}
+
+.addTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--rf-muted);
+}
+
+.addStack {
+  margin-top: var(--rf-space-2);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.canvasHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.canvasContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-4);
+  min-height: 0;
+}
+
+.previewContent {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.previewFrameWrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.previewFrame {
+  border-radius: var(--rf-radius-lg);
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  padding: var(--rf-space-4);
+  box-shadow: var(--rf-shadow-soft);
+  overflow: hidden;
+}
+
+.canvasZone {
+  width: 100%;
+  max-width: 100%;
+  border-radius: var(--rf-radius-lg);
+  border: 1px dashed color-mix(in srgb, var(--rf-border) 70%, var(--rf-primary));
+  background: color-mix(in srgb, var(--rf-surface-2) 35%, transparent);
+  padding: var(--rf-space-4);
+  min-height: 220px;
+  overflow: auto;
+  touch-action: none;
+}
+
+.builderCanvas {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.paletteColumn {
+  width: 100%;
+}
+
+.canvasColumn {
+  width: 100%;
+  min-width: 0;
+}
+
+.sideColumn {
+  width: 100%;
+  min-width: 0;
+}
+
+.canvasZoneOver {
+  border-color: color-mix(in srgb, var(--rf-primary) 65%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-primary) 10%, var(--rf-surface-2));
+}
+
+.canvasEmptyHint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+.canvasHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-muted);
+}
+
+.dragOverlay {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+  box-shadow: var(--rf-shadow-soft);
+}
+
+.dragOverlayTitle {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.dragOverlaySub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.emptyText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--rf-muted);
+}
+
+@media (min-width: 768px) {
+  .metaGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .builderGrid {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .paletteColumn {
+    flex: 0 0 260px;
+    width: 260px;
+  }
+
+  .canvasColumn {
+    flex: 1 1 auto;
+  }
+
+  .sideColumn {
+    flex: 0 0 420px;
+    width: 420px;
+  }
+}

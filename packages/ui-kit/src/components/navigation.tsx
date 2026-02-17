@@ -1,7 +1,9 @@
 import {
+  type ButtonHTMLAttributes,
   Children,
   isValidElement,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -171,33 +173,69 @@ export function PFBreadcrumbs({
   );
 }
 
-export interface PFMenuItem {
+export interface PFMenuOption {
   id: string;
   label: ReactNode;
   disabled?: boolean;
 }
 
+export interface PFMenuItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  inset?: boolean;
+  selected?: boolean;
+}
+
+export function PFMenuItem({
+  className,
+  children,
+  inset = false,
+  selected = false,
+  ...rest
+}: PFMenuItemProps) {
+  return (
+    <button
+      {...rest}
+      type={rest.type ?? 'button'}
+      className={cn(
+        'pf-menu__item',
+        inset && 'pf-menu__item--inset',
+        selected && 'is-selected',
+        className,
+      )}
+      role="menuitem"
+    >
+      {children}
+    </button>
+  );
+}
+
 export interface PFMenuProps extends PFBaseProps {
   triggerLabel: ReactNode;
-  items: PFMenuItem[];
+  items?: PFMenuOption[];
+  children?: ReactNode;
   onSelect?: (id: string) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
+  align?: 'start' | 'end';
 }
 
 export function PFMenu({
   triggerLabel,
-  items,
+  items = [],
+  children,
   onSelect,
   open,
   onOpenChange,
   className,
   size = 'md',
+  align = 'start',
 }: PFMenuProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const isOpen = open ?? internalOpen;
+  const menuId = useId();
 
   const setOpen = (next: boolean): void => {
     onOpenChange?.(next);
@@ -212,47 +250,104 @@ export function PFMenu({
         setOpen(false);
       }
     };
+    const onEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
     document.addEventListener('mousedown', onDocumentClick);
+    window.addEventListener('keydown', onEscape);
     return () => {
       document.removeEventListener('mousedown', onDocumentClick);
+      window.removeEventListener('keydown', onEscape);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const first = listRef.current?.querySelector<HTMLElement>('.pf-menu__item:not(:disabled)');
+    first?.focus();
+  }, [isOpen]);
+
+  const renderedItems =
+    children ??
+    items.map((item) => (
+      <li key={item.id} role="none">
+        <PFMenuItem
+          disabled={item.disabled}
+          onClick={() => {
+            onSelect?.(item.id);
+            setOpen(false);
+            triggerRef.current?.focus();
+          }}
+          onKeyDown={(event) =>
+            keyboardSelectionHandler(event, () => {
+              onSelect?.(item.id);
+              setOpen(false);
+              triggerRef.current?.focus();
+            })
+          }
+        >
+          {item.label}
+        </PFMenuItem>
+      </li>
+    ));
 
   return (
     <div className={cn('pf-menu', sizeClass(size), className)} ref={menuRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="pf-menu__trigger"
         aria-haspopup="menu"
         aria-expanded={isOpen}
+        aria-controls={isOpen ? menuId : undefined}
         onClick={() => setOpen(!isOpen)}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          setOpen(true);
+        }}
       >
         {triggerLabel}
       </button>
       {isOpen ? (
-        <ul className="pf-menu__list" role="menu">
-          {items.map((item) => (
-            <li key={item.id} role="none">
-              <button
-                type="button"
-                className="pf-menu__item"
-                role="menuitem"
-                disabled={item.disabled}
-                onClick={() => {
-                  onSelect?.(item.id);
-                  setOpen(false);
-                }}
-                onKeyDown={(event) =>
-                  keyboardSelectionHandler(event, () => {
-                    onSelect?.(item.id);
-                    setOpen(false);
-                  })
-                }
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
+        <ul
+          className={cn('pf-menu__list', align === 'end' && 'pf-menu__list--end')}
+          role="menu"
+          id={menuId}
+          ref={listRef}
+          onKeyDown={(event) => {
+            const nodes = Array.from(
+              listRef.current?.querySelectorAll<HTMLElement>('.pf-menu__item:not(:disabled)') ?? [],
+            );
+            if (nodes.length === 0) return;
+
+            const activeIndex = nodes.findIndex((node) => node === document.activeElement);
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              const next = activeIndex < 0 ? 0 : (activeIndex + 1) % nodes.length;
+              nodes[next]?.focus();
+            }
+            if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              const next = activeIndex < 0 ? nodes.length - 1 : (activeIndex - 1 + nodes.length) % nodes.length;
+              nodes[next]?.focus();
+            }
+            if (event.key === 'Home') {
+              event.preventDefault();
+              nodes[0]?.focus();
+            }
+            if (event.key === 'End') {
+              event.preventDefault();
+              nodes[nodes.length - 1]?.focus();
+            }
+            if (event.key === 'Tab') {
+              setOpen(false);
+            }
+          }}
+        >
+          {renderedItems}
         </ul>
       ) : null}
     </div>

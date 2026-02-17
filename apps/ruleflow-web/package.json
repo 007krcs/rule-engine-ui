@@ -48,6 +48,7 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.41",
+    "sass": "^1.86.0",
     "typescript": "^5.9.3"
   }
 }

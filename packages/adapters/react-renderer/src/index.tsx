@@ -1,7 +1,15 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { I18nProvider } from '@platform/i18n';
 import { createFallbackI18nProvider } from '@platform/i18n';
-import type { ExecutionContext, JSONValue, UIComponent, UIEventAction, UISchema } from '@platform/schema';
+import { evaluateCondition } from '@platform/rules-engine';
+import type {
+  ExecutionContext,
+  JSONValue,
+  UIComponent,
+  UIEventAction,
+  UIGridItem,
+  UISchema,
+} from '@platform/schema';
 
 export type UIEventName = 'onChange' | 'onClick' | 'onSubmit';
 
@@ -101,9 +109,15 @@ export function RenderPage(props: RendererProps): React.ReactElement {
   const componentMap = new Map(props.uiSchema.components.map((component) => [component.id, component]));
   const i18n = props.i18n ?? createFallbackI18nProvider();
 
-  const renderComponent = (componentId: string): React.ReactElement => {
-    const component = componentMap.get(componentId);
-    if (!component) {
+  let renderData = currentData;
+  let renderContext = currentContext;
+
+  const renderComponent = (
+    componentId: string,
+    itemOverride?: Pick<UIGridItem, 'props' | 'bindings' | 'rules'>,
+  ): React.ReactNode => {
+    const sourceComponent = componentMap.get(componentId);
+    if (!sourceComponent) {
       return (
         <div key={componentId} data-missing-component>
           Missing component: {componentId}
@@ -111,7 +125,15 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       );
     }
 
+    const component = mergeComponent(sourceComponent, itemOverride);
     assertAccessibility(component);
+
+    const setValueResult = applySetValueRule(component, renderData, renderContext);
+    renderData = setValueResult.data;
+    renderContext = setValueResult.context;
+
+    const ruleState = resolveComponentRuleState(component, renderData, renderContext);
+    if (!ruleState.visible) return null;
 
     const adapter = resolveAdapter(component.adapterHint);
     if (!adapter) {
@@ -124,8 +146,20 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       return React.cloneElement(wrapped, { key: component.id });
     }
 
-    const bindings = resolveBindings(component, currentData, currentContext);
-    const events = buildEvents(component, {
+    const componentForAdapter: UIComponent = {
+      ...component,
+      props: {
+        ...(component.props ?? {}),
+        disabled: ruleState.disabled || component.props?.disabled,
+      },
+      validations: {
+        ...(component.validations ?? {}),
+        required: ruleState.required || component.validations?.required,
+      },
+    };
+
+    const bindings = resolveBindings(componentForAdapter, renderData, renderContext);
+    const events = buildEvents(componentForAdapter, {
       onEvent: props.onEvent,
       onAdapterEvent: props.onAdapterEvent,
       onChange: props.onChange,
@@ -136,14 +170,51 @@ export function RenderPage(props: RendererProps): React.ReactElement {
     });
     const rendered = (
       <div data-component-id={component.id}>
-        {adapter(component, { data: currentData, context: currentContext, events, i18n, bindings })}
+        {adapter(componentForAdapter, {
+          data: renderData,
+          context: renderContext,
+          events,
+          i18n,
+          bindings,
+        })}
       </div>
     );
-    const wrapped = props.componentWrapper ? props.componentWrapper(component, rendered) : rendered;
+    const wrapped = props.componentWrapper ? props.componentWrapper(componentForAdapter, rendered) : rendered;
     return React.cloneElement(wrapped, { key: component.id });
   };
 
   const renderLayout = (node: UISchema['layout']): React.ReactElement => {
+    if (props.uiSchema.layoutType === 'grid' && Array.isArray(props.uiSchema.items) && props.uiSchema.items.length > 0) {
+      const breakpoint = resolveBreakpoint(renderContext.device);
+      const spec = resolveGridSpecForBreakpoint(props.uiSchema, breakpoint);
+      const items = resolveGridItemsForBreakpoint(props.uiSchema, breakpoint);
+
+      return (
+        <div
+          data-layout="grid-v2"
+          style={{
+            display: 'grid',
+            gap: spec.gap,
+            gridTemplateColumns: `repeat(${spec.columns}, minmax(0, 1fr))`,
+            gridAutoRows: `${spec.rowHeight}px`,
+          }}
+        >
+          {items.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                gridColumn: `${item.x + 1} / span ${item.w}`,
+                gridRow: `${item.y + 1} / span ${item.h}`,
+                minWidth: 0,
+              }}
+            >
+              {renderComponent(item.componentId, item)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     switch (node.type) {
       case 'grid':
         return (
@@ -156,7 +227,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
                 typeof node.columns === 'number' && node.columns > 0 ? `repeat(${node.columns}, minmax(0, 1fr))` : undefined,
             }}
           >
-            {node.componentIds?.map(renderComponent)}
+            {node.componentIds?.map((componentId) => renderComponent(componentId))}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -165,7 +236,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       case 'stack':
         return (
           <div data-layout="stack" style={{ display: 'flex', flexDirection: node.direction === 'horizontal' ? 'row' : 'column', gap: 12 }}>
-            {node.componentIds?.map(renderComponent)}
+            {node.componentIds?.map((componentId) => renderComponent(componentId))}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -186,7 +257,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
         return (
           <section data-layout="section">
             {node.title && <h2>{node.title}</h2>}
-            {node.componentIds?.map(renderComponent)}
+            {node.componentIds?.map((componentId) => renderComponent(componentId))}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -199,7 +270,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
         };
         return (
           <div data-layout="unknown">
-            {fallback.componentIds?.map(renderComponent)}
+            {fallback.componentIds?.map((componentId) => renderComponent(componentId))}
             {fallback.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -214,6 +285,167 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       {renderLayout(props.uiSchema.layout)}
     </div>
   );
+}
+
+function mergeComponent(
+  base: UIComponent,
+  itemOverride?: Pick<UIGridItem, 'props' | 'bindings' | 'rules'>,
+): UIComponent {
+  if (!itemOverride) return base;
+  return {
+    ...base,
+    props: {
+      ...(base.props ?? {}),
+      ...(itemOverride.props ?? {}),
+    },
+    bindings: {
+      ...(base.bindings ?? {}),
+      ...(itemOverride.bindings ?? {}),
+      data: {
+        ...(base.bindings?.data ?? {}),
+        ...(itemOverride.bindings?.data ?? {}),
+      },
+      context: {
+        ...(base.bindings?.context ?? {}),
+        ...(itemOverride.bindings?.context ?? {}),
+      },
+      computed: {
+        ...(base.bindings?.computed ?? {}),
+        ...(itemOverride.bindings?.computed ?? {}),
+      },
+    },
+    rules: {
+      ...(base.rules ?? {}),
+      ...(itemOverride.rules ?? {}),
+    },
+  };
+}
+
+function resolveComponentRuleState(
+  component: UIComponent,
+  data: Record<string, JSONValue>,
+  context: ExecutionContext,
+): { visible: boolean; disabled: boolean; required: boolean } {
+  const rules = component.rules;
+  if (!rules) return { visible: true, disabled: false, required: false };
+  return {
+    visible: rules.visibleWhen ? safeEvaluateCondition(rules.visibleWhen, context, data) : true,
+    disabled: rules.disabledWhen ? safeEvaluateCondition(rules.disabledWhen, context, data) : false,
+    required: rules.requiredWhen ? safeEvaluateCondition(rules.requiredWhen, context, data) : false,
+  };
+}
+
+function applySetValueRule(
+  component: UIComponent,
+  data: Record<string, JSONValue>,
+  context: ExecutionContext,
+): { data: Record<string, JSONValue>; context: ExecutionContext } {
+  const setValueRule = component.rules?.setValueWhen;
+  if (!setValueRule) return { data, context };
+  if (!safeEvaluateCondition(setValueRule.when, context, data)) return { data, context };
+
+  const targetPath =
+    setValueRule.path ??
+    component.bindings?.data?.value ??
+    component.bindings?.data?.[component.id] ??
+    `data.${component.id}`;
+  const parsed = parseBindingPath(targetPath, 'data');
+  if (!parsed) return { data, context };
+
+  if (parsed.target === 'context') {
+    const nextContext = setPath(context as unknown as Record<string, JSONValue>, parsed.path, setValueRule.value);
+    return { data, context: nextContext as unknown as ExecutionContext };
+  }
+  const nextData = setPath(data, parsed.path, setValueRule.value);
+  return { data: nextData, context };
+}
+
+function safeEvaluateCondition(
+  condition: NonNullable<UIComponent['rules']>[keyof NonNullable<UIComponent['rules']>] extends infer T
+    ? T extends { when: infer C }
+      ? C
+      : T
+    : never,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+): boolean {
+  try {
+    return evaluateCondition(condition as never, context, data);
+  } catch {
+    return false;
+  }
+}
+
+function resolveGridItemsForBreakpoint(schema: UISchema, breakpoint: 'lg' | 'md' | 'sm'): UIGridItem[] {
+  const all = Array.isArray(schema.items) ? schema.items : [];
+  const lgItems = all.filter((item) => !item.breakpoint || item.breakpoint === 'lg');
+  const sortedLg = sortGridItems(lgItems);
+  if (breakpoint === 'lg') return sortedLg;
+
+  const overrides = new Map(
+    all.filter((item) => item.breakpoint === breakpoint).map((item) => [item.componentId, item]),
+  );
+
+  return sortGridItems(
+    sortedLg.map((base) => {
+      const override = overrides.get(base.componentId);
+      if (!override) {
+        return {
+          ...base,
+          id: `${base.componentId}:${breakpoint}`,
+          breakpoint,
+        };
+      }
+      return {
+        ...base,
+        ...override,
+        breakpoint,
+      };
+    }),
+  );
+}
+
+function resolveGridSpecForBreakpoint(
+  schema: UISchema,
+  breakpoint: 'lg' | 'md' | 'sm',
+): { columns: number; rowHeight: number; gap: number } {
+  const grid = schema.grid;
+  const baseColumns =
+    grid?.columns ?? (schema.layout?.type === 'grid' ? Math.max(1, Number(schema.layout.columns ?? 1)) : 12);
+  const baseRowHeight = grid?.rowHeight ?? 56;
+  const baseGap = grid?.gap ?? 12;
+  if (breakpoint === 'lg') {
+    return {
+      columns: Math.max(1, Math.trunc(baseColumns)),
+      rowHeight: Math.max(1, Math.trunc(baseRowHeight)),
+      gap: Math.max(1, Math.trunc(baseGap)),
+    };
+  }
+
+  const bp = grid?.breakpoints?.[breakpoint];
+  return {
+    columns: Math.max(1, Math.trunc(bp?.columns ?? baseColumns)),
+    rowHeight: Math.max(1, Math.trunc(bp?.rowHeight ?? baseRowHeight)),
+    gap: Math.max(1, Math.trunc(bp?.gap ?? baseGap)),
+  };
+}
+
+function sortGridItems(items: UIGridItem[]): UIGridItem[] {
+  return [...items].sort((a, b) => {
+    const ay = Number(a.y) || 0;
+    const by = Number(b.y) || 0;
+    if (ay !== by) return ay - by;
+    const ax = Number(a.x) || 0;
+    const bx = Number(b.x) || 0;
+    if (ax !== bx) return ax - bx;
+    return a.componentId.localeCompare(b.componentId);
+  });
+}
+
+function resolveBreakpoint(device: ExecutionContext['device']): 'lg' | 'md' | 'sm' {
+  if (device === 'mobile') return 'sm';
+  if (device === 'tablet') return 'md';
+  return 'lg';
 }
 
 function resolveAdapter(adapterHint: string): AdapterRenderFn | undefined {

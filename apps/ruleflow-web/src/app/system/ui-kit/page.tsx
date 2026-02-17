@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from 'react';
 import {
+  PFAccordion,
   PFAlert,
   PFAvatar,
   PFBadge,
@@ -14,6 +15,9 @@ import {
   PFDialog,
   PFGrid,
   PFPagination,
+  PFPopover,
+  PFProgressCircular,
+  PFProgressLinear,
   PFSelect,
   PFSkeleton,
   PFSnackbar,
@@ -54,7 +58,7 @@ const groups = [
   {
     id: 'surfaces',
     title: 'Surfaces',
-    components: ['PFCard', 'PFCardHeader', 'PFCardContent', 'PFCardActions'],
+    components: ['PFCard', 'PFCardHeader', 'PFCardContent', 'PFCardActions', 'PFAccordion', 'PFPopover'],
     code: `<PFCard>
   <PFCardHeader>Title</PFCardHeader>
   <PFCardContent>Body</PFCardContent>
@@ -102,8 +106,10 @@ export default function UiKitCatalogPage() {
   const [tab, setTab] = useState('overview');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [primaryInput, setPrimaryInput] = useState(brandPrimary ?? '#2f6af5');
   const [screenPreset, setScreenPreset] = useState<'default' | 'console' | 'builder' | 'playground' | 'docs' | 'system'>('system');
+  const popoverAnchorRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     setPrimaryInput(brandPrimary ?? '#2f6af5');
@@ -199,7 +205,9 @@ export default function UiKitCatalogPage() {
                 ))}
               </ul>
 
-              <div className={styles.preview}>{renderPreview(group.id, tab, setTab, setDialogOpen, setSnackbarOpen)}</div>
+              <div className={styles.preview}>
+                {renderPreview(group.id, tab, setTab, setDialogOpen, setSnackbarOpen, setPopoverOpen, popoverAnchorRef)}
+              </div>
 
               <pre className={styles.snippet}>
                 <code>{group.code}</code>
@@ -236,6 +244,15 @@ export default function UiKitCatalogPage() {
         intent="success"
         autoHideDuration={1800}
       />
+
+      <PFPopover
+        open={popoverOpen}
+        anchorRef={popoverAnchorRef}
+        onClose={() => setPopoverOpen(false)}
+        placement="bottom"
+      >
+        <PFTypography variant="body2">Popover anchored to catalog demo button.</PFTypography>
+      </PFPopover>
     </div>
   );
 }
@@ -246,6 +263,8 @@ function renderPreview(
   setTab: (value: string) => void,
   setDialogOpen: (open: boolean) => void,
   setSnackbarOpen: (open: boolean) => void,
+  setPopoverOpen: (open: boolean) => void,
+  popoverAnchorRef: RefObject<HTMLButtonElement | null>,
 ) {
   switch (group) {
     case 'inputs':
@@ -294,22 +313,39 @@ function renderPreview(
               </PFButton>
             </PFTooltip>
           </PFStack>
+          <PFProgressLinear value={62} />
+          <PFProgressCircular value={72} />
           <PFSkeleton variant="rounded" width={240} height={24} />
         </PFStack>
       );
     case 'surfaces':
       return (
-        <PFCard elevated>
-          <PFCardHeader>
-            <PFTypography variant="h5">Quarterly Rollout</PFTypography>
-            <PFChip intent="primary">Q1</PFChip>
-          </PFCardHeader>
-          <PFCardContent>
-            <PFTypography variant="body2" muted>
-              High-priority schema migration across 4 business units.
+        <PFStack gap={12}>
+          <PFCard elevated>
+            <PFCardHeader>
+              <PFTypography variant="h5">Quarterly Rollout</PFTypography>
+              <PFChip intent="primary">Q1</PFChip>
+            </PFCardHeader>
+            <PFCardContent>
+              <PFTypography variant="body2" muted>
+                High-priority schema migration across 4 business units.
+              </PFTypography>
+            </PFCardContent>
+          </PFCard>
+          <PFAccordion title="Regional Expansion Plan" defaultExpanded>
+            <PFTypography variant="body2">
+              Asia-Pacific rollout is gated by locale-specific compliance checks.
             </PFTypography>
-          </PFCardContent>
-        </PFCard>
+          </PFAccordion>
+          <button
+            ref={popoverAnchorRef}
+            type="button"
+            className={styles.focusDemo}
+            onClick={() => setPopoverOpen(true)}
+          >
+            Open Popover
+          </button>
+        </PFStack>
       );
     case 'navigation':
       return (

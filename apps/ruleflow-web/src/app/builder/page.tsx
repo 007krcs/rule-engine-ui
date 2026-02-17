@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
-import type { ExecutionContext, JSONValue, UIComponent, UISchema } from '@platform/schema';
+import type {
+  ExecutionContext,
+  JSONValue,
+  LayoutBreakpoint,
+  UIComponent,
+  UIGridItem,
+  UISchema,
+} from '@platform/schema';
 import { validateUISchema, type ValidationIssue } from '@platform/validator';
 import { RenderPage } from '@platform/react-renderer';
 import { registerMaterialAdapters } from '@platform/react-material-adapter';
@@ -23,35 +30,38 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ComponentEditor } from '@/components/builder/component-editor';
 import { SchemaPreview } from '@/components/builder/schema-preview';
-import { CanvasItem } from '@/components/builder/canvas-item';
+import { GridCanvas } from '@/components/builder/grid-canvas';
 import {
   createSchemaFromComponents,
-  getSchemaColumns,
+  getSchemaGridSpec,
+  getSchemaItemsForBreakpoint,
   isSchemaLike,
-  moveComponentInSchema,
+  listSupportedBreakpoints,
   normalizeFocusOrder,
   normalizeSchema,
   removeComponentFromSchema,
+  setSchemaGridSpec,
+  upsertSchemaItemsForBreakpoint,
   withUpdatedComponents,
 } from '@/components/builder/schema-state';
 import { useToast } from '@/components/ui/toast';
-import styles from './builder.module.css';
+import styles from './builder.module.scss';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  MouseSensor,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 const BUILDER_LOCAL_STORAGE_KEY = 'ruleflow:builder:schema';
@@ -154,6 +164,67 @@ function toTestIdSuffix(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
+function clampItem(item: UIGridItem, columns: number): UIGridItem {
+  const safeW = Math.max(1, Math.min(columns, Math.trunc(item.w || 1)));
+  const safeH = Math.max(1, Math.trunc(item.h || 1));
+  const maxX = Math.max(0, columns - safeW);
+  return {
+    ...item,
+    x: Math.max(0, Math.min(maxX, Math.trunc(item.x || 0))),
+    y: Math.max(0, Math.trunc(item.y || 0)),
+    w: safeW,
+    h: safeH,
+  };
+}
+
+function overlap(a: UIGridItem, b: UIGridItem): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function resolveCollisions(
+  items: UIGridItem[],
+  anchorId: string,
+  columns: number,
+  strategy: 'push' | 'swap' = 'push',
+): UIGridItem[] {
+  const normalized = items.map((item) => clampItem(item, columns));
+  const anchor = normalized.find((item) => item.componentId === anchorId);
+  if (!anchor) return normalized;
+
+  if (strategy === 'swap') {
+    const conflict = normalized.find(
+      (candidate) => candidate.componentId !== anchor.componentId && overlap(anchor, candidate),
+    );
+    if (!conflict) return normalized;
+    return normalized.map((candidate) => {
+      if (candidate.componentId === anchor.componentId) {
+        return { ...candidate, x: conflict.x, y: conflict.y };
+      }
+      if (candidate.componentId === conflict.componentId) {
+        return { ...candidate, x: anchor.x, y: anchor.y };
+      }
+      return candidate;
+    });
+  }
+
+  const placed: UIGridItem[] = [anchor];
+  const rest = normalized
+    .filter((item) => item.componentId !== anchor.componentId)
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x) || a.componentId.localeCompare(b.componentId));
+
+  for (const current of rest) {
+    let candidate = { ...current };
+    while (placed.some((item) => overlap(candidate, item))) {
+      const blockers = placed.filter((item) => overlap(candidate, item));
+      const nextY = Math.max(...blockers.map((item) => item.y + item.h));
+      candidate = { ...candidate, y: nextY };
+    }
+    placed.push(candidate);
+  }
+
+  return placed.sort((a, b) => (a.y - b.y) || (a.x - b.x) || a.componentId.localeCompare(b.componentId));
+}
+
 function buildComponentFromRegistry(def: ComponentDefinition, id: string): UIComponent {
   const type = deriveType(def.adapterHint);
   return {
@@ -220,6 +291,7 @@ function PaletteItem({
     >
       <span>{def.displayName}</span>
       <Badge variant="muted">{def.adapterHint}</Badge>
+      {def.palette?.disabled ? <Badge variant="warning">{def.palette.reason ?? 'Planned'}</Badge> : null}
     </button>
   );
 }
@@ -241,20 +313,33 @@ export default function BuilderPage() {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => (versionId ? null : scratchComponents[0]?.id ?? null));
   const [previewMode, setPreviewMode] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<ExecutionContext['device']>('desktop');
+  const [previewLocale, setPreviewLocale] = useState(previewContext.locale);
+  const [activeBreakpoint, setActiveBreakpoint] = useState<LayoutBreakpoint>('lg');
+  const [showGridOverlay, setShowGridOverlay] = useState(true);
   const [draft, setDraft] = useState({
     id: '',
     adapterHint: DEFAULT_ADAPTER_HINT,
   });
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
+  const [canvasMetrics, setCanvasMetrics] = useState<{
+    cellWidth: number;
+    rowHeight: number;
+    gap: number;
+    canvasRect: DOMRect | null;
+  }>({
+    cellWidth: 96,
+    rowHeight: 56,
+    gap: 12,
+    canvasRect: null,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [activeDrag, setActiveDrag] = useState<{ kind: 'palette' | 'component'; label: string } | null>(null);
 
   const components = useMemo(() => normalizeFocusOrder(schema.components as UIComponent[]), [schema.components]);
-  const columns = useMemo(() => getSchemaColumns(schema), [schema]);
   const effectiveSchema = useMemo(
     () =>
       normalizeSchema({
@@ -262,6 +347,12 @@ export default function BuilderPage() {
         components,
       }),
     [components, schema],
+  );
+  const gridSpec = useMemo(() => getSchemaGridSpec(effectiveSchema), [effectiveSchema]);
+  const columns = gridSpec.columns;
+  const activeItems = useMemo(
+    () => getSchemaItemsForBreakpoint(effectiveSchema, activeBreakpoint),
+    [activeBreakpoint, effectiveSchema],
   );
   const localStorageKey = useMemo(
     () => `${BUILDER_LOCAL_STORAGE_KEY}:${versionId ?? 'scratch'}`,
@@ -400,6 +491,14 @@ export default function BuilderPage() {
 
     const def = registry.find((item) => item.adapterHint === draft.adapterHint) ?? registry[0];
     if (!def) return;
+    if (def.palette?.disabled) {
+      toast({
+        variant: 'error',
+        title: 'Component unavailable',
+        description: def.palette.reason ?? 'This component is planned but not implemented yet.',
+      });
+      return;
+    }
 
     const nextComponent = buildComponentFromRegistry(def, trimmedId);
     setSchema((current) => withUpdatedComponents(current, (currentComponents) => [...currentComponents, nextComponent]));
@@ -468,7 +567,7 @@ export default function BuilderPage() {
     setSelectedComponentId(componentId);
     window.setTimeout(() => {
       const safe = componentId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const el = document.querySelector(`[data-component-id="${safe}"]`);
+      const el = document.querySelector(`[data-testid="builder-grid-item-${safe}"]`);
       if (el && el instanceof HTMLElement) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -476,11 +575,11 @@ export default function BuilderPage() {
   };
 
   const effectivePreviewContext = useMemo(
-    () => ({ ...previewContext, device: previewDevice }),
-    [previewDevice],
+    () => ({ ...previewContext, device: previewDevice, locale: previewLocale }),
+    [previewDevice, previewLocale],
   );
   const previewMaxWidth = previewDevice === 'mobile' ? 390 : previewDevice === 'tablet' ? 820 : 1280;
-  const baseLocale = previewContext.locale.split('-')[0] ?? previewContext.locale;
+  const baseLocale = previewLocale.split('-')[0] ?? previewLocale;
   const i18n = useMemo(
     () =>
       createProviderFromBundles({
@@ -492,10 +591,47 @@ export default function BuilderPage() {
     [baseLocale],
   );
 
-  const moveComponent = (componentId: string, newIndex: number) => {
-    flushSync(() => {
-      setSchema((current) => moveComponentInSchema(current, componentId, newIndex));
+  const updateGridItems = (
+    breakpoint: LayoutBreakpoint,
+    updater: (items: UIGridItem[]) => UIGridItem[],
+    anchorId?: string,
+  ) => {
+    setSchema((current) => {
+      const normalized = normalizeSchema(current);
+      const spec = getSchemaGridSpec(normalized);
+      const currentItems = getSchemaItemsForBreakpoint(normalized, breakpoint);
+      const nextItems = updater(currentItems);
+      const resolved =
+        anchorId
+          ? resolveCollisions(
+              nextItems,
+              anchorId,
+              breakpoint === 'lg'
+                ? spec.columns
+                : spec.breakpoints?.[breakpoint]?.columns ?? spec.columns,
+              spec.collisionStrategy ?? 'push',
+            )
+          : nextItems;
+      return upsertSchemaItemsForBreakpoint(normalized, breakpoint, resolved);
     });
+  };
+
+  const moveGridItem = (componentId: string, x: number, y: number) => {
+    updateGridItems(
+      activeBreakpoint,
+      (items) =>
+        items.map((item) => (item.componentId === componentId ? { ...item, x, y } : item)),
+      componentId,
+    );
+  };
+
+  const resizeGridItem = (componentId: string, w: number, h: number) => {
+    updateGridItems(
+      activeBreakpoint,
+      (items) =>
+        items.map((item) => (item.componentId === componentId ? { ...item, w, h } : item)),
+      componentId,
+    );
   };
 
   const removeComponent = (componentId: string) => {
@@ -509,11 +645,23 @@ export default function BuilderPage() {
       setActiveDrag({ kind: 'palette', label: String(event.active.data.current?.label ?? 'Palette item') });
       return;
     }
-    setActiveDrag({ kind: 'component', label: activeId });
+    setActiveDrag({
+      kind: 'component',
+      label: activeId.startsWith('canvas:') ? activeId.slice('canvas:'.length) : activeId,
+    });
+  };
+
+  const onDragMove = (event: DragMoveEvent) => {
+    const translated = event.active.rect.current.translated;
+    const initial = event.active.rect.current.initial;
+    const rect = translated ?? initial;
+    if (!rect) return;
+    setDragPointer({ x: rect.left + rect.width * 0.5, y: rect.top + rect.height * 0.5 });
   };
 
   const onDragEnd = (event: DragEndEvent) => {
     setActiveDrag(null);
+    setDragPointer(null);
     const { active, over } = event;
     const activeId = String(active.id);
     if (!over) {
@@ -528,42 +676,56 @@ export default function BuilderPage() {
       const adapterHint = activeId.slice('palette:'.length);
       const def = registry.find((item) => item.adapterHint === adapterHint);
       if (!def) return;
+      if (def.palette?.disabled) {
+        toast({
+          variant: 'error',
+          title: 'Component unavailable',
+          description: def.palette.reason ?? 'This component is not implemented yet.',
+        });
+        return;
+      }
 
       const existingIds = new Set(components.map((component) => component.id));
       const base = deriveType(adapterHint);
       const id = nextId(base, existingIds);
       const nextComponent = buildComponentFromRegistry(def, id);
+      setSchema((current) => withUpdatedComponents(current, (currentComponents) => [...currentComponents, nextComponent]));
 
-      setSchema((current) =>
-        withUpdatedComponents(current, (currentComponents) => {
-          const insertIndex = overId === 'canvas' ? currentComponents.length : currentComponents.findIndex((component) => component.id === overId);
-          if (insertIndex < 0) return [...currentComponents, nextComponent];
-          return [
-            ...currentComponents.slice(0, insertIndex),
-            nextComponent,
-            ...currentComponents.slice(insertIndex),
-          ];
-        }),
-      );
+      const rect = canvasMetrics.canvasRect;
+      const pointer = dragPointer;
+      if (rect && pointer) {
+        const stepX = canvasMetrics.cellWidth + canvasMetrics.gap;
+        const stepY = canvasMetrics.rowHeight + canvasMetrics.gap;
+        const rawX = Math.floor((pointer.x - rect.left) / stepX);
+        const rawY = Math.floor((pointer.y - rect.top) / stepY);
+        updateGridItems(
+          activeBreakpoint,
+          (items) =>
+            items.map((item) =>
+              item.componentId === id
+                ? { ...item, x: Math.max(0, rawX), y: Math.max(0, rawY) }
+                : item,
+            ),
+          id,
+        );
+      }
       setSelectedComponentId(id);
       toast({ variant: 'success', title: 'Dropped component', description: id });
       return;
     }
 
-    if (overId === 'canvas') return;
-
-    setSchema((current) => {
-      const currentComponents = current.components as UIComponent[];
-      const overIndex = currentComponents.findIndex((component) => component.id === overId);
-      return moveComponentInSchema(current, activeId, overIndex);
-    });
+    if (activeId.startsWith('canvas:') && overId === 'canvas') {
+      const componentId = activeId.slice('canvas:'.length);
+      const payload = active.data.current as { x?: number; y?: number } | undefined;
+      const startX = Number(payload?.x ?? 0);
+      const startY = Number(payload?.y ?? 0);
+      const stepX = canvasMetrics.cellWidth + canvasMetrics.gap;
+      const stepY = canvasMetrics.rowHeight + canvasMetrics.gap;
+      const nextX = Math.max(0, startX + Math.round(event.delta.x / stepX));
+      const nextY = Math.max(0, startY + Math.round(event.delta.y / stepY));
+      moveGridItem(componentId, nextX, nextY);
+    }
   };
-
-  const componentIndexById = useMemo(() => {
-    const map = new Map<string, number>();
-    components.forEach((component, index) => map.set(component.id, index));
-    return map;
-  }, [components]);
 
   return (
     <div className={cn(styles.page, styles.builderRoot)}>
@@ -630,27 +792,88 @@ export default function BuilderPage() {
             <label className="rfFieldLabel">Columns</label>
             <Input
               type="number"
-              value={columns}
+              value={gridSpec.columns}
               onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const nextColumns = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 1;
-                setSchema((current) => {
-                  const normalized = normalizeSchema(current);
-                  return {
-                    ...normalized,
-                    layout: {
-                      ...normalized.layout,
-                      columns: nextColumns,
-                    },
-                  };
-                });
+                setSchema((current) => setSchemaGridSpec(current, { columns: nextColumns }));
               }}
+            />
+          </div>
+          <div>
+            <label className="rfFieldLabel">Row Height</label>
+            <Input
+              type="number"
+              value={gridSpec.rowHeight}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const rowHeight = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 56;
+                setSchema((current) => setSchemaGridSpec(current, { rowHeight }));
+              }}
+            />
+          </div>
+          <div>
+            <label className="rfFieldLabel">Gap</label>
+            <Input
+              type="number"
+              value={gridSpec.gap}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const gap = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 12;
+                setSchema((current) => setSchemaGridSpec(current, { gap }));
+              }}
+            />
+          </div>
+          <div>
+            <label className="rfFieldLabel">Collision</label>
+            <Select
+              value={gridSpec.collisionStrategy ?? 'push'}
+              onChange={(event) =>
+                setSchema((current) =>
+                  setSchemaGridSpec(current, {
+                    collisionStrategy: event.target.value === 'swap' ? 'swap' : 'push',
+                  }),
+                )
+              }
+            >
+              <option value="push">Push down</option>
+              <option value="swap">Swap</option>
+            </Select>
+          </div>
+          <div>
+            <label className="rfFieldLabel">Breakpoint</label>
+            <Select
+              value={activeBreakpoint}
+              onChange={(event) => setActiveBreakpoint(event.target.value as LayoutBreakpoint)}
+            >
+              {listSupportedBreakpoints().map((breakpoint) => (
+                <option key={breakpoint} value={breakpoint}>
+                  {breakpoint.toUpperCase()}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="rfFieldLabel">Grid Overlay</label>
+            <Select
+              value={showGridOverlay ? 'on' : 'off'}
+              onChange={(event) => setShowGridOverlay(event.target.value === 'on')}
+            >
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </Select>
+          </div>
+          <div>
+            <label className="rfFieldLabel">Locale</label>
+            <Input
+              value={previewLocale}
+              onChange={(event) => setPreviewLocale(event.target.value)}
             />
           </div>
         </CardContent>
       </Card>
 
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd}>
         {previewMode ? (
           <Card>
             <CardHeader>
@@ -695,7 +918,7 @@ export default function BuilderPage() {
                     key={def.adapterHint}
                     def={def}
                     selected={draft.adapterHint === def.adapterHint}
-                    disabled={loading || registryLoading}
+                    disabled={loading || registryLoading || Boolean(def.palette?.disabled)}
                     onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
                   />
                 ))}
@@ -729,30 +952,28 @@ export default function BuilderPage() {
                 <CanvasDropZone disabled={loading}>
                   {loading && components.length === 0 ? <p className={styles.canvasHint}>Loading schema...</p> : null}
                   {!loading && components.length === 0 ? <p className={styles.canvasEmptyHint}>Drag from the palette to start.</p> : null}
-                  <SortableContext items={components.map((component) => component.id)} strategy={rectSortingStrategy}>
-                    <RenderPage
-                      uiSchema={effectiveSchema}
-                      data={previewData}
-                      context={previewContext}
-                      i18n={i18n}
-                      componentWrapper={(component, rendered) => (
-                        <CanvasItem
-                          component={component}
-                          index={componentIndexById.get(component.id) ?? -1}
-                          totalItems={components.length}
-                          selected={component.id === selectedComponentId}
-                          disabled={loading}
-                          onSelect={() => setSelectedComponentId(component.id)}
-                          onMove={moveComponent}
-                          onRemove={removeComponent}
-                        >
-                          {rendered}
-                        </CanvasItem>
-                      )}
-                    />
-                  </SortableContext>
+                  <GridCanvas
+                    components={components}
+                    items={activeItems}
+                    columns={activeBreakpoint === 'lg' ? gridSpec.columns : gridSpec.breakpoints?.[activeBreakpoint]?.columns ?? gridSpec.columns}
+                    rowHeight={activeBreakpoint === 'lg' ? gridSpec.rowHeight : gridSpec.breakpoints?.[activeBreakpoint]?.rowHeight ?? gridSpec.rowHeight}
+                    gap={activeBreakpoint === 'lg' ? gridSpec.gap : gridSpec.breakpoints?.[activeBreakpoint]?.gap ?? gridSpec.gap}
+                    selectedComponentId={selectedComponentId}
+                    data={previewData}
+                    context={effectivePreviewContext}
+                    i18n={i18n}
+                    disabled={loading}
+                    showGrid={showGridOverlay}
+                    onSelect={setSelectedComponentId}
+                    onRemove={removeComponent}
+                    onMove={moveGridItem}
+                    onResize={resizeGridItem}
+                    onMetricsChange={setCanvasMetrics}
+                  />
                 </CanvasDropZone>
-                <p className={styles.canvasHint}>Drag to reorder. Click a component to edit its properties.</p>
+                <p className={styles.canvasHint}>
+                  Drag from palette to place anywhere. Use item handles to move/resize, arrows to nudge, Shift+arrows to resize.
+                </p>
               </CardContent>
             </Card>
 

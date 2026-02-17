@@ -12,6 +12,12 @@
     "components": {
       "type": "array",
       "items": { "$ref": "#/$defs/component" }
+    },
+    "layoutType": { "type": "string", "enum": ["grid"] },
+    "grid": { "$ref": "#/$defs/gridSpec" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gridItem" }
     }
   },
   "$defs": {
@@ -120,6 +126,53 @@
         }
       ]
     },
+    "gridSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["columns", "rowHeight", "gap"],
+      "properties": {
+        "columns": { "type": "integer", "minimum": 1 },
+        "rowHeight": { "type": "integer", "minimum": 12 },
+        "gap": { "type": "integer", "minimum": 0 },
+        "collisionStrategy": { "type": "string", "enum": ["push", "swap"] },
+        "breakpoints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lg": { "$ref": "#/$defs/gridBreakpoint" },
+            "md": { "$ref": "#/$defs/gridBreakpoint" },
+            "sm": { "$ref": "#/$defs/gridBreakpoint" }
+          }
+        }
+      }
+    },
+    "gridBreakpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["columns"],
+      "properties": {
+        "columns": { "type": "integer", "minimum": 1 },
+        "rowHeight": { "type": "integer", "minimum": 12 },
+        "gap": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "gridItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "componentId", "x", "y", "w", "h"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "componentId": { "type": "string", "minLength": 1 },
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "breakpoint": { "type": "string", "enum": ["lg", "md", "sm"] },
+        "props": { "type": "object", "additionalProperties": true },
+        "bindings": { "$ref": "#/$defs/bindings" },
+        "rules": { "$ref": "#/$defs/componentRules" }
+      }
+    },
     "component": {
       "type": "object",
       "additionalProperties": false,
@@ -134,7 +187,8 @@
         "i18n": { "$ref": "#/$defs/i18n" },
         "accessibility": { "$ref": "#/$defs/accessibility" },
         "responsive": { "$ref": "#/$defs/responsive" },
-        "events": { "$ref": "#/$defs/events" }
+        "events": { "$ref": "#/$defs/events" },
+        "rules": { "$ref": "#/$defs/componentRules" }
       }
     },
     "i18n": {
@@ -195,6 +249,111 @@
           }
         }
       }
+    },
+    "componentRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "visibleWhen": { "$ref": "#/$defs/ruleCondition" },
+        "disabledWhen": { "$ref": "#/$defs/ruleCondition" },
+        "requiredWhen": { "$ref": "#/$defs/ruleCondition" },
+        "setValueWhen": { "$ref": "#/$defs/setValueWhen" }
+      }
+    },
+    "setValueWhen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when", "value"],
+      "properties": {
+        "when": { "$ref": "#/$defs/ruleCondition" },
+        "value": {
+          "type": ["string", "number", "boolean", "object", "array", "null"]
+        },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ruleCondition": {
+      "oneOf": [
+        { "$ref": "#/$defs/ruleAll" },
+        { "$ref": "#/$defs/ruleAny" },
+        { "$ref": "#/$defs/ruleNot" },
+        { "$ref": "#/$defs/ruleCompare" }
+      ]
+    },
+    "ruleAll": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all"],
+      "properties": {
+        "all": { "type": "array", "items": { "$ref": "#/$defs/ruleCondition" } }
+      }
+    },
+    "ruleAny": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["any"],
+      "properties": {
+        "any": { "type": "array", "items": { "$ref": "#/$defs/ruleCondition" } }
+      }
+    },
+    "ruleNot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["not"],
+      "properties": {
+        "not": { "$ref": "#/$defs/ruleCondition" }
+      }
+    },
+    "ruleCompare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "left"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "dateEq",
+            "dateBefore",
+            "dateAfter",
+            "dateBetween",
+            "in",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "exists"
+          ]
+        },
+        "left": { "$ref": "#/$defs/ruleOperand" },
+        "right": { "$ref": "#/$defs/ruleOperand" }
+      }
+    },
+    "ruleOperand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string", "pattern": "^(data|context)\\." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": {
+            "value": {
+              "type": ["string", "number", "boolean", "object", "array", "null"]
+            }
+          }
+        }
+      ]
     },
     "events": {
       "type": "object",

@@ -1,5 +1,6 @@
 import type { ApiMapping, FlowSchema, RuleSet, UISchema } from '@platform/schema';
 import type { ComponentDefinition } from '@platform/component-registry';
+import type { TranslationBundle } from '@platform/i18n';
 
 export type ConfigStatus =
   | 'DRAFT'
@@ -124,6 +125,12 @@ export type GitOpsBundle = {
     componentRegistry?: {
       global: ComponentDefinition[];
       tenants: Record<string, ComponentDefinition[]>;
+    };
+    translations?: {
+      fallbackLocale: string;
+      tenantLocale?: string;
+      userLocale?: string;
+      bundles: TranslationBundle[];
     };
   };
   signature: {

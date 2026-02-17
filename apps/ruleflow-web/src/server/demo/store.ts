@@ -2,6 +2,7 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import type { ComponentDefinition } from '@platform/component-registry';
+import type { TranslationBundle } from '@platform/i18n';
 import type { ApprovalRequest, AuditEvent, ConfigPackage, ConfigVersion } from '@/lib/demo/types';
 
 export type StoreState = {
@@ -15,6 +16,13 @@ export type StoreState = {
     global: ComponentDefinition[];
     tenants: Record<string, ComponentDefinition[]>;
   };
+  translations: {
+    schemaVersion: 1;
+    fallbackLocale: string;
+    tenantLocale?: string;
+    userLocale?: string;
+    bundles: TranslationBundle[];
+  };
 };
 
 export type GitOpsPayload = {
@@ -23,6 +31,7 @@ export type GitOpsPayload = {
   approvals: ApprovalRequest[];
   audit: AuditEvent[];
   componentRegistry: StoreState['componentRegistry'];
+  translations: StoreState['translations'];
 };
 
 export type ConfigStoreProvider = 'file' | 'tmp' | 'memory';

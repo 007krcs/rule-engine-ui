@@ -29,6 +29,9 @@ export interface UISchema {
   pageId: string;
   layout: LayoutNode;
   components: UIComponent[];
+  layoutType?: 'grid';
+  grid?: UIGridSpec;
+  items?: UIGridItem[];
 }
 
 export type LayoutNode = GridLayout | StackLayout | TabsLayout | SectionLayout;
@@ -45,6 +48,35 @@ export interface GridLayout extends BaseLayoutNode {
   type: 'grid';
   columns?: number;
   rows?: number;
+}
+
+export type LayoutBreakpoint = 'lg' | 'md' | 'sm';
+
+export interface UIGridSpec {
+  columns: number;
+  rowHeight: number;
+  gap: number;
+  collisionStrategy?: 'push' | 'swap';
+  breakpoints?: Partial<Record<LayoutBreakpoint, UIGridBreakpoint>>;
+}
+
+export interface UIGridBreakpoint {
+  columns: number;
+  rowHeight?: number;
+  gap?: number;
+}
+
+export interface UIGridItem {
+  id: string;
+  componentId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  breakpoint?: LayoutBreakpoint;
+  props?: Record<string, JSONValue>;
+  bindings?: BindingSpec;
+  rules?: UIComponentRules;
 }
 
 export interface StackLayout extends BaseLayoutNode {
@@ -73,6 +105,7 @@ export interface UIComponent {
   accessibility: AccessibilitySpec;
   responsive?: ResponsiveSpec;
   events?: EventHandlers;
+  rules?: UIComponentRules;
 }
 
 export interface BindingSpec {
@@ -118,6 +151,19 @@ export interface EventHandlers {
   onChange?: UIEventAction[];
   onClick?: UIEventAction[];
   onSubmit?: UIEventAction[];
+}
+
+export interface UIComponentRules {
+  visibleWhen?: RuleCondition;
+  disabledWhen?: RuleCondition;
+  requiredWhen?: RuleCondition;
+  setValueWhen?: UISetValueWhenRule;
+}
+
+export interface UISetValueWhenRule {
+  when: RuleCondition;
+  value: JSONValue;
+  path?: string;
 }
 
 export interface UIEventAction {

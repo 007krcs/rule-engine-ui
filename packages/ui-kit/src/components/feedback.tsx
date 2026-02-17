@@ -233,6 +233,18 @@ export function PFProgress({
   );
 }
 
+export type PFProgressLinearProps = Omit<PFProgressProps, 'variant'>;
+
+export function PFProgressLinear(props: PFProgressLinearProps) {
+  return <PFProgress {...props} variant="linear" />;
+}
+
+export type PFProgressCircularProps = Omit<PFProgressProps, 'variant'>;
+
+export function PFProgressCircular(props: PFProgressCircularProps) {
+  return <PFProgress {...props} variant="circular" />;
+}
+
 export interface PFSkeletonProps extends PFBaseProps, HTMLAttributes<HTMLDivElement> {
   variant?: 'text' | 'rectangular' | 'rounded' | 'circular';
   width?: number | string;

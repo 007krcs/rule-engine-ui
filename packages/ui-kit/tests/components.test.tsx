@@ -2,10 +2,14 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  PFAccordion,
   PFAlert,
   PFButton,
   PFDialog,
+  PFMenuItem,
   PFMenu,
+  PFProgressCircular,
+  PFProgressLinear,
   PFSwitch,
   PFTable,
   PFTextField,
@@ -88,5 +92,35 @@ describe('@platform/ui-kit components', () => {
 
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).not.toContain('role="menuitem"');
+  });
+
+  it('renders accordion and progress wrappers', () => {
+    const html = renderToStaticMarkup(
+      <div>
+        <PFAccordion title="Details" defaultExpanded>
+          <p>Body</p>
+        </PFAccordion>
+        <PFProgressLinear value={55} />
+        <PFProgressCircular value={70} />
+      </div>,
+    );
+
+    expect(html).toContain('pf-accordion');
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('pf-progress');
+    expect(html).toContain('pf-progress-circular');
+  });
+
+  it('renders composable PFMenuItem', () => {
+    const html = renderToStaticMarkup(
+      <PFMenu triggerLabel="Open">
+        <li role="none">
+          <PFMenuItem selected>Edit</PFMenuItem>
+        </li>
+      </PFMenu>,
+    );
+
+    expect(html).toContain('pf-menu__item');
+    expect(html).toContain('is-selected');
   });
 });

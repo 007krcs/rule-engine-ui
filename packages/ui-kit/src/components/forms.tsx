@@ -7,6 +7,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cn, sizeClass, type PFBaseProps } from './utils';
 
 type FieldVariant = 'outline' | 'filled' | 'ghost';
@@ -293,47 +294,226 @@ export function PFSlider({
 export interface PFAutocompleteOption {
   value: string;
   label?: string;
+  disabled?: boolean;
 }
 
 export interface PFAutocompleteProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>,
     PFBaseProps {
-  options: PFAutocompleteOption[];
+  options?: PFAutocompleteOption[];
   variant?: FieldVariant;
   loading?: boolean;
+  loadOptions?: (query: string) => Promise<PFAutocompleteOption[]>;
+  debounceMs?: number;
+  noOptionsText?: string;
+  loadingText?: string;
+  onValueChange?: (value: string, option: PFAutocompleteOption) => void;
+  openOnFocus?: boolean;
+  filterStaticOptions?: boolean;
 }
 
 export function PFAutocomplete({
   className,
   size = 'md',
-  options,
+  options = [],
   variant = 'outline',
   id,
   loading = false,
+  loadOptions,
+  debounceMs = 240,
+  noOptionsText = 'No matches',
+  loadingText = 'Loading...',
+  onValueChange,
+  openOnFocus = true,
+  filterStaticOptions = true,
+  disabled,
+  value,
+  defaultValue,
+  onChange,
+  onFocus,
+  onKeyDown,
   ...rest
 }: PFAutocompleteProps) {
-  const listId = id ? `${id}-list` : undefined;
+  const generatedId = useId();
+  const inputId = id ?? `pf-autocomplete-${generatedId}`;
+  const listId = `${inputId}-listbox`;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const requestRef = useRef(0);
+
+  const isControlled = typeof value === 'string';
+  const [internalValue, setInternalValue] = useState<string>(() =>
+    typeof defaultValue === 'string' ? defaultValue : '',
+  );
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [asyncOptions, setAsyncOptions] = useState<PFAutocompleteOption[]>([]);
+  const [asyncLoading, setAsyncLoading] = useState(false);
+
+  const inputValue = isControlled ? value : internalValue;
+  const query = typeof inputValue === 'string' ? inputValue : '';
+  const isBusy = loading || asyncLoading;
+
+  useEffect(() => {
+    if (!loadOptions) return;
+    const currentRequest = requestRef.current + 1;
+    requestRef.current = currentRequest;
+
+    const timeout = window.setTimeout(() => {
+      setAsyncLoading(true);
+      loadOptions(query)
+        .then((result) => {
+          if (requestRef.current !== currentRequest) return;
+          setAsyncOptions(Array.isArray(result) ? result : []);
+        })
+        .catch(() => {
+          if (requestRef.current !== currentRequest) return;
+          setAsyncOptions([]);
+        })
+        .finally(() => {
+          if (requestRef.current !== currentRequest) return;
+          setAsyncLoading(false);
+        });
+    }, debounceMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [debounceMs, loadOptions, query]);
+
+  useEffect(() => {
+    const handleClickAway = (event: MouseEvent): void => {
+      if (!rootRef.current) return;
+      if (event.target instanceof Node && !rootRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setActiveIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => {
+      document.removeEventListener('mousedown', handleClickAway);
+    };
+  }, []);
+
+  const sourceOptions = loadOptions ? asyncOptions : options;
+  const visibleOptions = useMemo(() => {
+    if (!filterStaticOptions || loadOptions) return sourceOptions;
+    const needle = query.trim().toLowerCase();
+    if (!needle) return sourceOptions;
+    return sourceOptions.filter((option) => {
+      const label = (option.label ?? option.value).toLowerCase();
+      return label.includes(needle);
+    });
+  }, [filterStaticOptions, loadOptions, query, sourceOptions]);
+
+  const selectOption = (option: PFAutocompleteOption): void => {
+    if (disabled || option.disabled) return;
+    const nextValue = option.label ?? option.value;
+    if (!isControlled) setInternalValue(nextValue);
+    onValueChange?.(nextValue, option);
+    setIsOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const moveActive = (offset: 1 | -1): void => {
+    if (visibleOptions.length === 0) return;
+    let candidate = activeIndex;
+    for (let step = 0; step < visibleOptions.length; step += 1) {
+      candidate = (candidate + offset + visibleOptions.length) % visibleOptions.length;
+      if (!visibleOptions[candidate]?.disabled) {
+        setActiveIndex(candidate);
+        return;
+      }
+    }
+  };
+
   return (
-    <span className={cn('pf-field-wrap', loading && 'is-loading')}>
+    <div className={cn('pf-autocomplete', className)} ref={rootRef}>
+      <span className={cn('pf-field-wrap', isBusy && 'is-loading')}>
       <input
         {...rest}
-        id={id}
-        list={listId}
+        id={inputId}
         autoComplete="off"
-        className={cn('pf-input', sizeClass(size), `pf-input--${variant}`, className)}
+        value={typeof inputValue === 'string' ? inputValue : ''}
+        onChange={(event) => {
+          if (!isControlled) setInternalValue(event.target.value);
+          onChange?.(event);
+          if (!isOpen) setIsOpen(true);
+        }}
+        onFocus={(event) => {
+          if (openOnFocus && !disabled) setIsOpen(true);
+          onFocus?.(event);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!isOpen) setIsOpen(true);
+            moveActive(1);
+            return;
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (!isOpen) setIsOpen(true);
+            moveActive(-1);
+            return;
+          }
+          if (event.key === 'Enter' && isOpen && activeIndex >= 0) {
+            event.preventDefault();
+            const option = visibleOptions[activeIndex];
+            if (option) selectOption(option);
+            return;
+          }
+          if (event.key === 'Escape') {
+            setIsOpen(false);
+            setActiveIndex(-1);
+            return;
+          }
+          onKeyDown?.(event);
+        }}
+        disabled={disabled}
+        className={cn('pf-input', sizeClass(size), `pf-input--${variant}`, 'pf-autocomplete__input')}
         role="combobox"
         aria-autocomplete="list"
-        aria-expanded={undefined}
-        aria-busy={loading || undefined}
+        aria-expanded={isOpen}
+        aria-controls={listId}
+        aria-activedescendant={activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined}
+        aria-busy={isBusy || undefined}
+        aria-disabled={disabled || undefined}
       />
-      <datalist id={listId}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label ?? option.value}
-          </option>
-        ))}
-      </datalist>
-      {loading ? <span className="pf-spinner pf-field-wrap__spinner" aria-hidden="true" /> : null}
+      {isBusy ? <span className="pf-spinner pf-field-wrap__spinner" aria-hidden="true" /> : null}
     </span>
+      {isOpen ? (
+        <ul className={cn('pf-autocomplete__list', sizeClass(size))} id={listId} role="listbox">
+          {visibleOptions.length === 0 ? (
+            <li className="pf-autocomplete__empty" aria-live="polite">
+              {isBusy ? loadingText : noOptionsText}
+            </li>
+          ) : (
+            visibleOptions.map((option, index) => {
+              const optionId = `${listId}-option-${index}`;
+              const selected = activeIndex === index;
+              return (
+                <li
+                  key={`${option.value}-${index}`}
+                  id={optionId}
+                  className={cn(
+                    'pf-autocomplete__option',
+                    selected && 'is-active',
+                    option.disabled && 'is-disabled',
+                  )}
+                  role="option"
+                  aria-selected={selected}
+                  aria-disabled={option.disabled || undefined}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => selectOption(option)}
+                >
+                  {option.label ?? option.value}
+                </li>
+              );
+            })
+          )}
+        </ul>
+      ) : null}
+    </div>
   );
 }

@@ -303,6 +303,82 @@ export function createHttpBundleLoader(options: {
   };
 }
 
+export interface LocaleResolverInput {
+  tenantLocale?: string | null;
+  userLocale?: string | null;
+  fallbackLocale?: string;
+  supportedLocales?: string[];
+}
+
+export function resolveLocale(input: LocaleResolverInput): string {
+  const fallbackLocale = normalizeLocale(input.fallbackLocale) ?? 'en';
+  const supported = (input.supportedLocales ?? []).map((locale) => normalizeLocale(locale)).filter(Boolean) as string[];
+
+  const preferred = [
+    normalizeLocale(input.userLocale),
+    normalizeLocale(input.tenantLocale),
+    fallbackLocale,
+  ].filter(Boolean) as string[];
+
+  if (supported.length === 0) {
+    return preferred[0] ?? fallbackLocale;
+  }
+
+  for (const candidate of preferred) {
+    if (supported.includes(candidate)) return candidate;
+    const language = candidate.split('-')[0];
+    if (language) {
+      const languageMatch = supported.find((locale) => locale === language || locale.startsWith(`${language}-`));
+      if (languageMatch) return languageMatch;
+    }
+  }
+  return fallbackLocale;
+}
+
+export function listBundleLocales(bundles: TranslationBundle[]): string[] {
+  return Array.from(new Set(bundles.map((bundle) => normalizeLocale(bundle.locale)).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b),
+  ) as string[];
+}
+
+export function upsertBundleMessage(
+  bundles: TranslationBundle[],
+  payload: { locale: string; namespace: string; key: string; value: string },
+): TranslationBundle[] {
+  const locale = normalizeLocale(payload.locale) ?? payload.locale;
+  const namespace = payload.namespace.trim() || 'runtime';
+  const key = payload.key.trim();
+  const value = payload.value;
+  if (!key) return bundles;
+
+  const next = bundles.map((bundle) => ({
+    ...bundle,
+    messages: { ...bundle.messages },
+  }));
+
+  const existing = next.find((bundle) => bundle.locale === locale && bundle.namespace === namespace);
+  if (existing) {
+    existing.messages[key] = value;
+    return next;
+  }
+
+  next.push({
+    locale,
+    namespace,
+    messages: {
+      [key]: value,
+    },
+  });
+  return next;
+}
+
+function normalizeLocale(locale: string | null | undefined): string | null {
+  if (!locale) return null;
+  const trimmed = locale.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
 function buildCacheKey(tenantId: string | undefined, locale: string, namespace: string): string {
   return `${tenantId ?? 'platform'}:${locale}:${namespace}`;
 }

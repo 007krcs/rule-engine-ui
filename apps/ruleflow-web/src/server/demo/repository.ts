@@ -6,7 +6,12 @@ import {
   mergeComponentDefinitions,
   validateComponentRegistryManifest,
 } from '@platform/component-registry';
-import { EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
+import {
+  EXAMPLE_TENANT_BUNDLES,
+  PLATFORM_BUNDLES,
+  resolveLocale,
+  upsertBundleMessage,
+} from '@platform/i18n';
 import type { ValidationIssue } from '@platform/validator';
 import {
   validateApiMapping,
@@ -634,6 +639,17 @@ function seedState(): StoreState {
       global: builtinComponentDefinitions(),
       tenants: {},
     },
+    translations: {
+      schemaVersion: 1,
+      fallbackLocale: 'en',
+      tenantLocale: 'en',
+      userLocale: 'en',
+      bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES].map((bundle) => ({
+        locale: bundle.locale,
+        namespace: bundle.namespace,
+        messages: { ...bundle.messages },
+      })),
+    },
   };
 }
 
@@ -661,6 +677,20 @@ function normalizeState(raw: unknown): StoreState {
   const global = mergeComponentDefinitions(builtinComponentDefinitions(), rawGlobal);
   const tenants = isPlainRecord(crRaw) && isPlainRecord(crRaw.tenants) ? (crRaw.tenants as Record<string, ComponentDefinition[]>) : {};
 
+  const trRaw = raw.translations;
+  const bundles =
+    isPlainRecord(trRaw) && Array.isArray(trRaw.bundles)
+      ? (trRaw.bundles as typeof PLATFORM_BUNDLES).map((bundle) => ({
+          locale: bundle.locale,
+          namespace: bundle.namespace,
+          messages: { ...bundle.messages },
+        }))
+      : [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES].map((bundle) => ({
+          locale: bundle.locale,
+          namespace: bundle.namespace,
+          messages: { ...bundle.messages },
+        }));
+
   return {
     schemaVersion: 1,
     tenantId,
@@ -672,11 +702,88 @@ function normalizeState(raw: unknown): StoreState {
       global,
       tenants,
     },
+    translations: {
+      schemaVersion: 1,
+      fallbackLocale:
+        isPlainRecord(trRaw) && typeof trRaw.fallbackLocale === 'string' && trRaw.fallbackLocale.trim().length > 0
+          ? trRaw.fallbackLocale
+          : 'en',
+      tenantLocale:
+        isPlainRecord(trRaw) && typeof trRaw.tenantLocale === 'string' && trRaw.tenantLocale.trim().length > 0
+          ? trRaw.tenantLocale
+          : 'en',
+      userLocale:
+        isPlainRecord(trRaw) && typeof trRaw.userLocale === 'string' && trRaw.userLocale.trim().length > 0
+          ? trRaw.userLocale
+          : 'en',
+      bundles,
+    },
   };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function collectRequiredTranslationRefs(state: StoreState): TranslationRef[] {
+  const refs = new Map<string, TranslationRef>();
+
+  const add = (fullKey: string | undefined) => {
+    if (!fullKey || fullKey.trim().length === 0) return;
+    const parsed = splitTranslationKey(fullKey.trim());
+    refs.set(`${parsed.namespace}:${parsed.key}`, parsed);
+  };
+
+  for (const definition of state.componentRegistry.global) {
+    add(definition.i18n?.nameKey);
+    add(definition.i18n?.descriptionKey);
+  }
+  for (const tenantDefs of Object.values(state.componentRegistry.tenants)) {
+    for (const definition of tenantDefs) {
+      add(definition.i18n?.nameKey);
+      add(definition.i18n?.descriptionKey);
+    }
+  }
+
+  for (const pkg of state.packages) {
+    for (const version of pkg.versions) {
+      const schema = version.bundle.uiSchema;
+      for (const component of schema.components) {
+        add(component.i18n?.labelKey);
+        add(component.i18n?.helperTextKey);
+        add(component.i18n?.placeholderKey);
+        add(component.accessibility?.ariaLabelKey);
+      }
+    }
+  }
+
+  return Array.from(refs.values()).sort((a, b) => `${a.namespace}.${a.key}`.localeCompare(`${b.namespace}.${b.key}`));
+}
+
+function splitTranslationKey(fullKey: string): TranslationRef {
+  if (fullKey.includes(':')) {
+    const [namespace, key] = fullKey.split(':', 2);
+    return { namespace: namespace || 'runtime', key: key ?? fullKey };
+  }
+  if (fullKey.includes('.')) {
+    const [namespace, ...rest] = fullKey.split('.');
+    return {
+      namespace: namespace || 'runtime',
+      key: rest.length > 0 ? rest.join('.') : fullKey,
+    };
+  }
+  return { namespace: 'runtime', key: fullKey };
+}
+
+function hasBundleMessage(
+  bundles: StoreState['translations']['bundles'],
+  locale: string,
+  namespace: string,
+  key: string,
+): boolean {
+  return bundles.some(
+    (bundle) => bundle.locale === locale && bundle.namespace === namespace && bundle.messages[key] !== undefined,
+  );
 }
 
 function flattenVersions(packages: ConfigPackage[]): ConfigVersion[] {
@@ -967,6 +1074,112 @@ export async function registerComponentRegistryManifest(input: {
   return { ok: true as const, count: defs.length };
 }
 
+type TranslationRef = {
+  namespace: string;
+  key: string;
+};
+
+export async function getTranslationsSnapshot(input?: {
+  locale?: string;
+  namespace?: string;
+  tenantLocale?: string;
+  userLocale?: string;
+}) {
+  const state = await loadState();
+  const bundles = state.translations.bundles;
+  const supportedLocales = Array.from(new Set(bundles.map((bundle) => bundle.locale))).sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const locale = resolveLocale({
+    tenantLocale: input?.tenantLocale ?? state.translations.tenantLocale,
+    userLocale: input?.userLocale ?? state.translations.userLocale,
+    fallbackLocale: state.translations.fallbackLocale,
+    supportedLocales,
+  });
+  const namespaceFilter = input?.namespace?.trim() || 'runtime';
+
+  const messages = bundles
+    .filter((bundle) => bundle.locale === locale && bundle.namespace === namespaceFilter)
+    .reduce<Record<string, string>>((acc, bundle) => ({ ...acc, ...bundle.messages }), {});
+
+  const required = collectRequiredTranslationRefs(state).filter((ref) => ref.namespace === namespaceFilter);
+  const missingKeys = required
+    .filter((ref) => !hasBundleMessage(bundles, locale, ref.namespace, ref.key))
+    .map((ref) => `${ref.namespace}.${ref.key}`);
+
+  return {
+    ok: true as const,
+    locale,
+    namespace: namespaceFilter,
+    locales: supportedLocales,
+    fallbackLocale: state.translations.fallbackLocale,
+    tenantLocale: state.translations.tenantLocale ?? 'en',
+    userLocale: state.translations.userLocale ?? 'en',
+    messages,
+    missingKeys,
+    requiredKeys: required.map((ref) => `${ref.namespace}.${ref.key}`),
+  };
+}
+
+export async function upsertTranslationMessage(input: {
+  locale: string;
+  namespace?: string;
+  key: string;
+  value: string;
+}) {
+  const session = getMockSession();
+  const state = await loadState();
+
+  const locale = input.locale.trim();
+  const namespace = input.namespace?.trim() || 'runtime';
+  const key = input.key.trim();
+  if (!locale || !key) {
+    return { ok: false as const, error: 'locale and key are required' };
+  }
+
+  const nextBundles = upsertBundleMessage(state.translations.bundles, {
+    locale,
+    namespace,
+    key,
+    value: input.value,
+  });
+
+  let next: StoreState = {
+    ...state,
+    translations: {
+      ...state.translations,
+      bundles: nextBundles,
+    },
+  };
+  next = addAudit(next, {
+    actor: session.user.name,
+    action: 'Updated translation',
+    target: `${locale}:${namespace}.${key}`,
+    severity: 'info',
+  });
+  await persistState(next);
+  return { ok: true as const };
+}
+
+export async function updateTranslationPreferences(input: {
+  tenantLocale?: string;
+  userLocale?: string;
+  fallbackLocale?: string;
+}) {
+  const state = await loadState();
+  const next: StoreState = {
+    ...state,
+    translations: {
+      ...state.translations,
+      tenantLocale: input.tenantLocale?.trim() || state.translations.tenantLocale,
+      userLocale: input.userLocale?.trim() || state.translations.userLocale,
+      fallbackLocale: input.fallbackLocale?.trim() || state.translations.fallbackLocale,
+    },
+  };
+  await persistState(next);
+  return { ok: true as const };
+}
+
 export async function submitForReview(input: { versionId: string; scope: string; risk: RiskLevel }) {
   const session = getMockSession();
   const state = await loadState();
@@ -1201,6 +1414,7 @@ export async function exportGitOpsBundle(): Promise<GitOpsBundle> {
     approvals: state.approvals,
     audit: state.audit,
     componentRegistry: state.componentRegistry,
+    translations: state.translations,
   });
 
   const key = await loadSigningKey();
@@ -1250,7 +1464,23 @@ export async function importGitOpsBundle(input: { bundle: GitOpsBundle }) {
     : {
         schemaVersion: 1,
         global: builtinComponentDefinitions(),
-        tenants: {},
+      tenants: {},
+      };
+
+  const normalizedTranslations: StoreState['translations'] = bundle.payload.translations
+    ? {
+        schemaVersion: 1,
+        fallbackLocale: bundle.payload.translations.fallbackLocale ?? 'en',
+        tenantLocale: bundle.payload.translations.tenantLocale ?? 'en',
+        userLocale: bundle.payload.translations.userLocale ?? 'en',
+        bundles: bundle.payload.translations.bundles ?? [],
+      }
+    : {
+        schemaVersion: 1,
+        fallbackLocale: 'en',
+        tenantLocale: 'en',
+        userLocale: 'en',
+        bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
       };
 
   let next: StoreState = {
@@ -1260,6 +1490,7 @@ export async function importGitOpsBundle(input: { bundle: GitOpsBundle }) {
     approvals: bundle.payload.approvals,
     audit: bundle.payload.audit,
     componentRegistry: normalizedComponentRegistry,
+    translations: normalizedTranslations,
   };
 
   next = addAudit(next, {
