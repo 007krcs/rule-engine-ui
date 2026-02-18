@@ -75,6 +75,25 @@ describe('@platform/component-registry', () => {
     expect(planned ? isPaletteComponentEnabled(planned) : true).toBe(false);
   });
 
+  it('enables external entries only when their adapter prefix is registered', () => {
+    const definitions = builtinComponentDefinitions();
+    const external = definitions.find((definition) => definition.adapterHint === 'material.input');
+    expect(external).toBeTruthy();
+    if (!external) return;
+
+    expect(isPaletteComponentEnabled(external)).toBe(false);
+    expect(
+      isPaletteComponentEnabled(external, {
+        enabledAdapterPrefixes: ['material.'],
+      }),
+    ).toBe(true);
+    expect(
+      isPaletteComponentEnabled(external, {
+        enabledAdapterPrefixes: ['aggrid.'],
+      }),
+    ).toBe(false);
+  });
+
   it('requires availability on custom definitions', () => {
     const manifest = {
       schemaVersion: 1 as const,

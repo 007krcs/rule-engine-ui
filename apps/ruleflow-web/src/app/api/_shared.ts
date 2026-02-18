@@ -25,10 +25,15 @@ export function noStoreJson(body: unknown, status = 200) {
 
 export async function withApiErrorHandling(handler: () => Promise<NextResponse>) {
   const startedAt = Date.now();
+  const session = getMockSession();
+  const metricLabels = {
+    tenantId: session.tenantId,
+    env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
+  };
   try {
     await getConfigStore();
     const response = await handler();
-    recordApiCall(Date.now() - startedAt, response.status);
+    recordApiCall(Date.now() - startedAt, response.status, metricLabels);
     return response;
   } catch (error) {
     const diagnostics = await getStoreDiagnostics().catch(() => null);
@@ -42,7 +47,7 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
         },
         500,
       );
-      recordApiCall(Date.now() - startedAt, response.status);
+      recordApiCall(Date.now() - startedAt, response.status, metricLabels);
       return response;
     }
 
@@ -56,7 +61,7 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
       },
       500,
     );
-    recordApiCall(Date.now() - startedAt, response.status);
+    recordApiCall(Date.now() - startedAt, response.status, metricLabels);
     return response;
   }
 }

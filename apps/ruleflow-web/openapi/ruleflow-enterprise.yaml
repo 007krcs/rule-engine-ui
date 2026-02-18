@@ -1,0 +1,555 @@
+openapi: 3.1.0
+info:
+  title: RuleFlow Enterprise API
+  version: 1.0.0
+  description: |
+    Consolidated API contract for governance, builder persistence, runtime controls,
+    and observability endpoints used by the RuleFlow web console.
+servers:
+  - url: /api
+tags:
+  - name: Governance
+  - name: Builder
+  - name: Runtime
+  - name: Observability
+paths:
+  /config-packages:
+    post:
+      tags: [Governance]
+      summary: Create config package with initial draft version
+      operationId: createConfigPackage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConfigPackageRequest'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateConfigPackageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /config-packages/{packageId}/versions:
+    post:
+      tags: [Governance]
+      summary: Create a new DRAFT version for an existing package
+      operationId: createConfigVersion
+      parameters:
+        - $ref: '#/components/parameters/PackageId'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /config-versions/{versionId}/ui-schema:
+    patch:
+      tags: [Builder]
+      summary: Save UI schema bundle (single or multi-page)
+      operationId: saveUiSchema
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveUiSchemaRequest'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config-versions/{versionId}/rules:
+    patch:
+      tags: [Builder]
+      summary: Save rules set
+      operationId: saveRules
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveRulesRequest'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /config-versions/{versionId}/flow:
+    patch:
+      tags: [Builder]
+      summary: Save flow state machine
+      operationId: saveFlow
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveFlowRequest'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /config-versions/{versionId}/api-mappings:
+    patch:
+      tags: [Builder]
+      summary: Save API mappings
+      operationId: saveApiMappings
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveApiMappingsRequest'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /config-versions/{versionId}/submit-review:
+    post:
+      tags: [Governance]
+      summary: Submit a DRAFT version for approval
+      operationId: submitForReview
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /approvals/{approvalId}/approve:
+    post:
+      tags: [Governance]
+      summary: Approve pending review
+      operationId: approveReview
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config-versions/{versionId}/promote:
+    post:
+      tags: [Governance]
+      summary: Promote approved version to published
+      operationId: promoteVersion
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: Promoted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config-versions/{versionId}/rollback:
+    post:
+      tags: [Governance]
+      summary: Roll back to previous published version
+      operationId: rollbackVersion
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: Rolled back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOperationResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /runtime-flags:
+    get:
+      tags: [Runtime]
+      summary: Resolve effective feature flags and active kill switch
+      operationId: getRuntimeFlags
+      parameters:
+        - name: env
+          in: query
+          required: false
+          schema:
+            type: string
+            default: prod
+        - name: packageId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: versionId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Runtime controls resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeFlagsResponse'
+  /feature-flags:
+    get:
+      tags: [Runtime]
+      summary: List tenant feature flags
+      operationId: listFeatureFlags
+      responses:
+        '200':
+          description: Feature flags list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureFlagsResponse'
+    post:
+      tags: [Runtime]
+      summary: Upsert feature flag
+      operationId: upsertFeatureFlag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureFlagWriteRequest'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureFlagWriteResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /kill-switches:
+    get:
+      tags: [Runtime]
+      summary: List tenant kill switches
+      operationId: listKillSwitches
+      responses:
+        '200':
+          description: Kill switches list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillSwitchesResponse'
+    post:
+      tags: [Runtime]
+      summary: Upsert kill switch
+      operationId: upsertKillSwitch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KillSwitchWriteRequest'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillSwitchWriteResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+  /metrics:
+    get:
+      tags: [Observability]
+      summary: Prometheus metrics endpoint
+      operationId: scrapeMetrics
+      responses:
+        '200':
+          description: Prometheus text exposition
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  parameters:
+    PackageId:
+      name: packageId
+      in: path
+      required: true
+      schema:
+        type: string
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: string
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Lifecycle state conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PolicyDenied:
+      description: Policy denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PolicyDeniedResponse'
+  schemas:
+    CreateConfigPackageRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        tenantId:
+          type: string
+        configId:
+          type: string
+        description:
+          type: string
+    CreateConfigPackageResponse:
+      type: object
+      required: [ok, packageId, versionId]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        packageId:
+          type: string
+        versionId:
+          type: string
+    SaveUiSchemaRequest:
+      type: object
+      properties:
+        uiSchema:
+          $ref: '#/components/schemas/GenericObject'
+        uiSchemasById:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/GenericObject'
+        activeUiPageId:
+          type: string
+    SaveRulesRequest:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+    SaveFlowRequest:
+      type: object
+      required: [flowSchema]
+      properties:
+        flowSchema:
+          $ref: '#/components/schemas/GenericObject'
+    SaveApiMappingsRequest:
+      type: object
+      required: [apiMappingsById]
+      properties:
+        apiMappingsById:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/GenericObject'
+    VersionOperationResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        version:
+          $ref: '#/components/schemas/GenericObject'
+        approval:
+          $ref: '#/components/schemas/GenericObject'
+        traceId:
+          type: string
+    RuntimeFlagsResponse:
+      type: object
+      required: [ok, featureFlags, killSwitch]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        featureFlags:
+          type: object
+          additionalProperties:
+            type: boolean
+        killSwitch:
+          type: object
+          required: [active]
+          properties:
+            active:
+              type: boolean
+            reason:
+              type: string
+            sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/GenericObject'
+    FeatureFlagWriteRequest:
+      type: object
+      required: [key, enabled]
+      properties:
+        key:
+          type: string
+        enabled:
+          type: boolean
+        env:
+          type: string
+          default: prod
+    FeatureFlagsResponse:
+      type: object
+      required: [ok, featureFlags]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        featureFlags:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+    FeatureFlagWriteResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        featureFlag:
+          $ref: '#/components/schemas/GenericObject'
+    KillSwitchWriteRequest:
+      type: object
+      required: [scope, active]
+      properties:
+        scope:
+          type: string
+          enum: [TENANT, VERSION, RULESET]
+        active:
+          type: boolean
+        versionId:
+          type: string
+        packageId:
+          type: string
+        reason:
+          type: string
+    KillSwitchesResponse:
+      type: object
+      required: [ok, killSwitches]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        killSwitches:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+    KillSwitchWriteResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        killSwitch:
+          $ref: '#/components/schemas/GenericObject'
+    ErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        error:
+          type: string
+        details:
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+    PolicyDeniedResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            policy:
+              type: object
+              properties:
+                stage:
+                  type: string
+                errors:
+                  type: array
+                  items:
+                    type: string
+    GenericObject:
+      type: object
+      additionalProperties: true

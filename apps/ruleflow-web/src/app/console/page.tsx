@@ -53,6 +53,119 @@ type KillSwitch = {
   reason?: string;
 };
 
+type ParsedPrometheusMetrics = {
+  apiCalls: number;
+  errors: number;
+  ruleEvaluations: number;
+  ruleMatches: number;
+  flowTransitions: number;
+  apiLatencyP95Ms: number | null;
+  apiLatencyAvgMs: number | null;
+};
+
+const OBSERVABILITY_PROMQL_EXAMPLES = [
+  'rate(api_call_count[5m])',
+  'histogram_quantile(0.95, sum by (le) (rate(api_latency_ms_bucket[5m])))',
+  'sum(rate(error_count[5m]))',
+];
+
+function parsePrometheusMetrics(text: string): ParsedPrometheusMetrics {
+  const lines = text.split('\n');
+
+  let apiCalls = 0;
+  let errors = 0;
+  let ruleEvaluations = 0;
+  let ruleMatches = 0;
+  let flowTransitions = 0;
+  let apiLatencySum = 0;
+  let apiLatencyCount = 0;
+
+  const apiLatencyBuckets = new Map<string, number>();
+  let apiLatencyTotalCount = 0;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const match = /^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{([^}]*)\})?\s+(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)$/.exec(line);
+    if (!match) continue;
+
+    const name = match[1];
+    const labels = parsePrometheusLabelString(match[3] ?? '');
+    const value = Number(match[4]);
+    if (!Number.isFinite(value)) continue;
+
+    if (name === 'api_call_count') apiCalls += value;
+    if (name === 'error_count') errors += value;
+    if (name === 'rule_eval_count') ruleEvaluations += value;
+    if (name === 'rule_match_count') ruleMatches += value;
+    if (name === 'flow_transitions_count') flowTransitions += value;
+    if (name === 'api_latency_ms_sum') apiLatencySum += value;
+    if (name === 'api_latency_ms_count') apiLatencyCount += value;
+
+    if (name === 'api_latency_ms_bucket') {
+      const le = labels.le;
+      if (le === '+Inf') {
+        apiLatencyTotalCount += value;
+      } else if (le) {
+        const current = apiLatencyBuckets.get(le) ?? 0;
+        apiLatencyBuckets.set(le, current + value);
+      }
+    }
+  }
+
+  let apiLatencyP95Ms: number | null = null;
+  if (apiLatencyTotalCount > 0 && apiLatencyBuckets.size > 0) {
+    const target = apiLatencyTotalCount * 0.95;
+    const sortedBuckets = [...apiLatencyBuckets.entries()]
+      .map(([le, value]) => ({ le: Number(le), value }))
+      .filter((item) => Number.isFinite(item.le))
+      .sort((left, right) => left.le - right.le);
+    for (const bucket of sortedBuckets) {
+      if (bucket.value >= target) {
+        apiLatencyP95Ms = bucket.le;
+        break;
+      }
+    }
+  }
+
+  return {
+    apiCalls,
+    errors,
+    ruleEvaluations,
+    ruleMatches,
+    flowTransitions,
+    apiLatencyP95Ms,
+    apiLatencyAvgMs: apiLatencyCount > 0 ? apiLatencySum / apiLatencyCount : null,
+  };
+}
+
+function parsePrometheusLabelString(input: string): Record<string, string> {
+  const labels: Record<string, string> = {};
+  if (!input) return labels;
+  const matcher = /([a-zA-Z_][a-zA-Z0-9_]*)="((?:\\.|[^"\\])*)"/g;
+  let match = matcher.exec(input);
+  while (match) {
+    const key = match[1];
+    if (!key) {
+      match = matcher.exec(input);
+      continue;
+    }
+    const value = match[2]?.replace(/\\"/g, '"').replace(/\\\\/g, '\\') ?? '';
+    labels[key] = value;
+    match = matcher.exec(input);
+  }
+  return labels;
+}
+
+function formatMetricNumber(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatMetricMs(value: number | null): string {
+  if (value === null) return '-';
+  return `${formatMetricNumber(value)} ms`;
+}
+
 export default function ConsolePage() {
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab');
@@ -386,6 +499,7 @@ export default function ConsolePage() {
   const canAuthor = sessionRoles.includes('Author');
   const canApprove = sessionRoles.includes('Approver');
   const canPublish = sessionRoles.includes('Publisher');
+  const topMetrics = useMemo(() => parsePrometheusMetrics(metricsText), [metricsText]);
 
   return (
     <div className={styles.page}>
@@ -663,10 +777,58 @@ export default function ConsolePage() {
           {showObservability ? (
             <Card>
               <CardHeader>
+                <CardTitle>Top Metrics</CardTitle>
+              </CardHeader>
+              <CardContent className={styles.metricsWidgetGrid}>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>API Calls</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricNumber(topMetrics.apiCalls)}</p>
+                </div>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>Errors</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricNumber(topMetrics.errors)}</p>
+                </div>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>API Latency P95</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricMs(topMetrics.apiLatencyP95Ms)}</p>
+                </div>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>API Latency Avg</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricMs(topMetrics.apiLatencyAvgMs)}</p>
+                </div>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>Rule Evaluations</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricNumber(topMetrics.ruleEvaluations)}</p>
+                </div>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>Rule Matches</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricNumber(topMetrics.ruleMatches)}</p>
+                </div>
+                <div className={styles.metricWidget}>
+                  <p className={styles.metricWidgetLabel}>Flow Transitions</p>
+                  <p className={styles.metricWidgetValue}>{formatMetricNumber(topMetrics.flowTransitions)}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showObservability ? (
+            <Card>
+              <CardHeader>
                 <CardTitle>Prometheus Metrics</CardTitle>
               </CardHeader>
-              <CardContent>
-                <pre className={styles.diffPre}>{metricsText || '# metrics unavailable'}</pre>
+              <CardContent className={styles.stack}>
+                <div className={styles.promqlStack}>
+                  {OBSERVABILITY_PROMQL_EXAMPLES.map((query) => (
+                    <code key={query} className={styles.promqlCode}>
+                      {query}
+                    </code>
+                  ))}
+                </div>
+                <details>
+                  <summary className={styles.metricsSummary}>Raw exposition</summary>
+                  <pre className={styles.diffPre}>{metricsText || '# metrics unavailable'}</pre>
+                </details>
               </CardContent>
             </Card>
           ) : null}

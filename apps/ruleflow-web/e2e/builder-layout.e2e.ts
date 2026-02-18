@@ -19,7 +19,7 @@ async function waitForClientReady(page: Page) {
 }
 
 async function dragPaletteInputToViewport(page: Page) {
-  const paletteItem = page.getByTestId('palette-item-material-input');
+  const paletteItem = page.getByTestId('palette-item-platform-textField');
   const viewport = page.getByTestId('builder-canvas-viewport');
   await expect(paletteItem).toBeVisible();
   await expect(paletteItem).toBeEnabled();
@@ -68,7 +68,7 @@ async function waitForDroppedComponentId(page: Page, before: string[]): Promise<
 
 async function addComponentViaQuickAdd(page: Page): Promise<string> {
   const id = `input${Date.now().toString().slice(-6)}`;
-  await page.getByTestId('palette-item-material-input').click();
+  await page.getByTestId('palette-item-platform-textField').click();
   await page.getByTestId('builder-quick-add-id').fill(id);
   await page.getByTestId('builder-quick-add-button').click();
   await expect(page.getByTestId(`builder-grid-item-${id}`)).toBeVisible({ timeout: 30_000 });
@@ -153,3 +153,4 @@ test('builder shell keeps workspace bounded with independent panes', async ({ pa
 
   await page.screenshot({ path: testInfo.outputPath('builder-shell-layout.png'), fullPage: true });
 });
+

@@ -42,6 +42,9 @@ test('runtime flags toggle external palette and kill switch disables promote', a
     data: { env: 'prod', key: 'builder.palette.externalAdapters', enabled: true },
   });
   expect(enableExternal.ok()).toBeTruthy();
+  await request.post('/api/feature-flags', {
+    data: { env: 'prod', key: 'adapter.material', enabled: true },
+  });
 
   await page.reload();
   await waitForClientReady(page);

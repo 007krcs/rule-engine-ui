@@ -7,6 +7,7 @@ import exampleUi from '@platform/schema/examples/example.ui.json';
 import { getMockSession, type Role } from '@/lib/auth';
 import type { ConfigBundle, ConfigVersion, ConsoleSnapshot, GitOpsBundle, JsonDiffItem } from '@/lib/demo/types';
 import { applyUiPageUpdateToBundle, createSinglePageBundle } from '@/lib/demo/ui-pages';
+import { listRuntimeAdapterDefinitions, resolveRuntimeAdapterIds } from '@/lib/runtime-adapters';
 import { buildGitOpsBundlePayloadFromPostgres, normalizeGitOpsBundleForPostgres } from '@/server/gitops';
 import * as demo from '@/server/demo/repository';
 import { recordRuntimeTrace } from '@/server/metrics';
@@ -895,6 +896,23 @@ export async function getRuntimeFlags(input?: {
   };
 }
 
+export async function getRuntimeAdapters(input?: {
+  env?: string;
+  versionId?: string;
+  packageId?: string;
+}) {
+  const runtimeFlags = await getRuntimeFlags(input);
+  const enabledAdapterIds = resolveRuntimeAdapterIds(runtimeFlags.featureFlags);
+
+  return {
+    ok: true as const,
+    tenantId: runtimeFlags.tenantId,
+    env: runtimeFlags.env,
+    enabledAdapterIds,
+    definitions: listRuntimeAdapterDefinitions(),
+  };
+}
+
 export async function upsertKillSwitch(input: {
   scope: KillScope;
   active: boolean;
@@ -957,12 +975,17 @@ export async function recordExecutionTrace(input: {
   trace: JsonRecord;
   coldStorageUri?: string;
 }) {
+  const session = toRepoSession();
+  const metricLabels = {
+    tenantId: session.tenantId,
+    env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
+  };
   if (providerMode() === 'postgres') {
     const repo = await getPostgresRepo();
-    recordRuntimeTrace(input.trace);
-    return { ok: true as const, trace: await repo.addExecutionTrace({ tenantId: toRepoSession().tenantId, ...input }) };
+    recordRuntimeTrace(input.trace, metricLabels);
+    return { ok: true as const, trace: await repo.addExecutionTrace({ tenantId: session.tenantId, ...input }) };
   }
-  recordRuntimeTrace(input.trace);
+  recordRuntimeTrace(input.trace, metricLabels);
   return { ok: true as const };
 }
 

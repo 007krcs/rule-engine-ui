@@ -18,8 +18,11 @@ async function waitForClientReady(page: Page) {
   await expect(page.getByTestId('client-ready')).toBeVisible({ timeout: 120_000 });
 }
 
-async function dragPaletteInputToCanvas(page: Page) {
-  const paletteItem = page.getByTestId('palette-item-material-input');
+async function dragPaletteInputToCanvas(
+  page: Page,
+  paletteItemTestId = 'palette-item-platform-textField',
+) {
+  const paletteItem = page.getByTestId(paletteItemTestId);
   const canvas = page.getByTestId('builder-canvas');
   await expect(paletteItem).toBeVisible();
   await expect(paletteItem).toBeEnabled();
@@ -75,7 +78,7 @@ async function waitForDroppedComponentId(page: Page, before: string[]): Promise<
 
 async function addComponentViaQuickAdd(page: Page): Promise<string> {
   const id = `input${Date.now().toString().slice(-6)}`;
-  await page.getByTestId('palette-item-material-input').click();
+  await page.getByTestId('palette-item-platform-textField').click();
   await page.getByTestId('builder-quick-add-id').fill(id);
   await page.getByTestId('builder-quick-add-button').click();
   await expect(page.getByTestId(`builder-grid-item-${id}`)).toBeVisible({ timeout: 30_000 });
@@ -154,4 +157,28 @@ test('supports grid DnD + breakpoint persistence + i18n + visibleWhen rules', as
   await localeInput.fill('en');
   await page.getByRole('button', { name: 'Preview' }).click();
   await expect(page.getByText('Customer name')).toHaveCount(0);
+});
+
+test('material adapter renders material.input after drag when adapter is enabled', async ({ page, request }) => {
+  const enableExternal = await request.post('/api/feature-flags', {
+    data: { env: 'prod', key: 'builder.palette.externalAdapters', enabled: true },
+  });
+  if (!enableExternal.ok()) {
+    test.skip(true, 'Feature flags persistence requires Postgres provider');
+  }
+
+  await request.post('/api/feature-flags', {
+    data: { env: 'prod', key: 'adapter.material', enabled: true },
+  });
+
+  await page.goto('/builder');
+  await waitForClientReady(page);
+  await expect(page.getByTestId('palette-item-material-input')).toBeVisible();
+  await expect(page.getByTestId('palette-item-material-input')).toBeEnabled();
+
+  const beforeIds = await listCanvasItemIds(page);
+  await dragPaletteInputToCanvas(page, 'palette-item-material-input');
+  const droppedId = await waitForDroppedComponentId(page, beforeIds);
+  await expect(page.getByTestId(`builder-grid-item-${droppedId}`)).toBeVisible();
+  await expect(page.locator('[data-component-not-available]')).toHaveCount(0);
 });

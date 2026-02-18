@@ -1005,8 +1005,23 @@ export function listPlatformComponentMeta(
   return definitions.map((definition) => toPlatformComponentMeta(definition));
 }
 
-export function isPaletteComponentEnabled(definition: ComponentDefinition): boolean {
+export function adapterPrefixFromHint(adapterHint: string): string {
+  const prefix = adapterHint.split('.')[0]?.trim();
+  return prefix ? `${prefix}.` : '';
+}
+
+export function isPaletteComponentEnabled(
+  definition: ComponentDefinition,
+  input?: {
+    enabledAdapterPrefixes?: Iterable<string>;
+  },
+): boolean {
   const enriched = enrichComponentDefinition(definition);
+  if (enriched.availability === 'external') {
+    if (!input?.enabledAdapterPrefixes) return false;
+    const enabledPrefixes = new Set(input.enabledAdapterPrefixes);
+    return enabledPrefixes.has(adapterPrefixFromHint(enriched.adapterHint));
+  }
   if (enriched.availability !== 'implemented') return false;
   if (!enriched.supportsDrag) return false;
   return !enriched.palette?.disabled;

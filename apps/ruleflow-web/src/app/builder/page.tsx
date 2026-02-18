@@ -12,12 +12,6 @@ import type {
 } from '@platform/schema';
 import { validateUISchema, type ValidationIssue } from '@platform/validator';
 import { RenderPage } from '@platform/react-renderer';
-import { registerPlatformAdapter } from '@platform/react-platform-adapter';
-import { registerMaterialAdapters } from '@platform/react-material-adapter';
-import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
-import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
-import { registerD3Adapter } from '@platform/react-d3-adapter';
-import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import type { ComponentDefinition } from '@platform/component-registry';
 import { builtinComponentDefinitions, isPaletteComponentEnabled } from '@platform/component-registry';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
@@ -25,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { ConfigVersion } from '@/lib/demo/types';
 import { apiGet, apiPatch, apiPost } from '@/lib/demo/api-client';
 import { useRuntimeFlags } from '@/lib/use-runtime-flags';
+import { useRuntimeAdapters } from '@/lib/use-runtime-adapters';
 import {
   normalizeUiPages,
   rebindFlowSchemaToAvailablePages,
@@ -62,6 +57,9 @@ import styles from './builder.module.scss';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/components/onboarding/onboarding-provider';
 import {
+  adapterPrefixFromHint,
+} from '@/lib/runtime-adapters';
+import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
@@ -84,7 +82,7 @@ const scratchComponents: UIComponent[] = [
   {
     id: 'customerName',
     type: 'input',
-    adapterHint: 'material.input',
+    adapterHint: 'platform.textField',
     props: {},
     i18n: {
       labelKey: 'runtime.filters.customerName.label',
@@ -259,7 +257,7 @@ const previewData: Record<string, JSONValue> = {
 };
 
 const BUILTIN_COMPONENT_DEFS = builtinComponentDefinitions();
-const DEFAULT_ADAPTER_HINT = BUILTIN_COMPONENT_DEFS[0]?.adapterHint ?? 'material.input';
+const DEFAULT_ADAPTER_HINT = BUILTIN_COMPONENT_DEFS[0]?.adapterHint ?? 'platform.textField';
 
 type ArtboardPresetId =
   | 'desktop-1440'
@@ -366,14 +364,20 @@ function toTestIdSuffix(value: string) {
 
 function isDefinitionEnabledByRuntimeFlags(
   definition: ComponentDefinition,
-  input: { allowPlanned: boolean; allowExternal: boolean },
+  input: {
+    allowPlanned: boolean;
+    allowExternal: boolean;
+    enabledExternalAdapterPrefixes: Iterable<string>;
+  },
 ): boolean {
   const availability = definition.availability ?? (definition.status === 'planned' ? 'planned' : 'implemented');
   if (availability === 'planned') {
     return input.allowPlanned;
   }
   if (availability === 'external') {
-    return input.allowExternal;
+    if (!input.allowExternal) return false;
+    const enabledPrefixes = new Set(input.enabledExternalAdapterPrefixes);
+    return enabledPrefixes.has(adapterPrefixFromHint(definition.adapterHint));
   }
   return true;
 }
@@ -704,20 +708,21 @@ export default function BuilderPage() {
     versionId: versionId ?? undefined,
     packageId: loadedVersion?.packageId,
   });
+  const runtimeAdapters = useRuntimeAdapters({
+    env: 'prod',
+    versionId: versionId ?? undefined,
+    packageId: loadedVersion?.packageId,
+  });
+  const enabledAdapterPrefixes = runtimeAdapters.enabledAdapterPrefixes;
+  const enabledExternalAdapterPrefixes = runtimeAdapters.enabledExternalAdapterPrefixes;
+  const hasEnabledExternalAdapters = enabledExternalAdapterPrefixes.length > 0;
   const allowPlannedByFlag = runtimeFlags.featureFlags['builder.palette.showPlanned'] ?? true;
-  const allowExternalByFlag = runtimeFlags.featureFlags['builder.palette.externalAdapters'] ?? true;
+  const allowExternalByFlag =
+    (runtimeFlags.featureFlags['builder.palette.externalAdapters'] ?? true) &&
+    hasEnabledExternalAdapters;
   const killSwitchActive = Boolean(versionId && runtimeFlags.killSwitch.active);
   const killSwitchReason =
     runtimeFlags.killSwitch.reason ?? 'This version is disabled by an active kill switch.';
-
-  useEffect(() => {
-    registerPlatformAdapter();
-    registerMaterialAdapters();
-    registerAgGridAdapter();
-    registerHighchartsAdapter();
-    registerD3Adapter();
-    registerCompanyAdapter();
-  }, []);
 
   useEffect(() => {
     setDragReady(true);
@@ -1009,8 +1014,9 @@ export default function BuilderPage() {
       !isDefinitionEnabledByRuntimeFlags(def, {
         allowPlanned: allowPlannedByFlag,
         allowExternal: allowExternalByFlag,
+        enabledExternalAdapterPrefixes,
       }) ||
-      !isPaletteComponentEnabled(def)
+      !isPaletteComponentEnabled(def, { enabledAdapterPrefixes })
     ) {
       toast({
         variant: 'error',
@@ -1232,7 +1238,13 @@ export default function BuilderPage() {
     () =>
       registry.filter(
         (definition) => {
-          if (!isDefinitionEnabledByRuntimeFlags(definition, { allowPlanned: allowPlannedByFlag, allowExternal: allowExternalByFlag })) {
+          if (
+            !isDefinitionEnabledByRuntimeFlags(definition, {
+              allowPlanned: allowPlannedByFlag,
+              allowExternal: allowExternalByFlag,
+              enabledExternalAdapterPrefixes,
+            })
+          ) {
             return false;
           }
           if (definition.availability === 'planned') {
@@ -1241,16 +1253,16 @@ export default function BuilderPage() {
           return true;
         },
       ),
-    [allowExternalByFlag, allowPlannedByFlag, registry, showPlannedComponents],
+    [allowExternalByFlag, allowPlannedByFlag, enabledExternalAdapterPrefixes, registry, showPlannedComponents],
   );
   const supportedReplacementDefinitions = useMemo(
     () =>
       registry.filter(
         (definition) =>
           definition.availability === 'implemented' &&
-          isPaletteComponentEnabled(definition),
+          isPaletteComponentEnabled(definition, { enabledAdapterPrefixes }),
       ),
-    [registry],
+    [enabledAdapterPrefixes, registry],
   );
   const replaceTargetComponent = useMemo(
     () =>
@@ -1265,10 +1277,10 @@ export default function BuilderPage() {
     const unsupported =
       !selectedDefinition ||
       selectedDefinition.availability === 'planned' ||
-      !isPaletteComponentEnabled(selectedDefinition);
+      !isPaletteComponentEnabled(selectedDefinition, { enabledAdapterPrefixes });
     if (!unsupported) return;
     setReplaceTargetComponentId(selectedComponent.id);
-  }, [selectedComponent, selectedDefinition]);
+  }, [enabledAdapterPrefixes, selectedComponent, selectedDefinition]);
 
   const focusComponent = (componentId: string) => {
     setSelectedComponentId(componentId);
@@ -1607,8 +1619,9 @@ export default function BuilderPage() {
         !isDefinitionEnabledByRuntimeFlags(def, {
           allowPlanned: allowPlannedByFlag,
           allowExternal: allowExternalByFlag,
+          enabledExternalAdapterPrefixes,
         }) ||
-        !isPaletteComponentEnabled(def)
+        !isPaletteComponentEnabled(def, { enabledAdapterPrefixes })
       ) {
         toast({
           variant: 'error',
@@ -1976,7 +1989,11 @@ export default function BuilderPage() {
                       key={def.adapterHint}
                       def={def}
                       selected={draft.adapterHint === def.adapterHint}
-                      disabled={loading || registryLoading || !isPaletteComponentEnabled(def)}
+                      disabled={
+                        loading ||
+                        registryLoading ||
+                        !isPaletteComponentEnabled(def, { enabledAdapterPrefixes })
+                      }
                       onSelect={() => setDraft((current) => ({ ...current, adapterHint: def.adapterHint }))}
                     />
                   ))}

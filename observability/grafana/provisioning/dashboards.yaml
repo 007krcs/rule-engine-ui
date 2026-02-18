@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: RuleFlow Dashboards
+    orgId: 1
+    folder: RuleFlow
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/ruleflow

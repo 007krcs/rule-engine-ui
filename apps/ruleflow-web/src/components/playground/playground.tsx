@@ -4,17 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule } from '@platform/schema';
 import { executeStep } from '@platform/core-runtime';
 import { RenderPage } from '@platform/react-renderer';
-import { registerPlatformAdapter } from '@platform/react-platform-adapter';
-import { registerMaterialAdapters } from '@platform/react-material-adapter';
-import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
-import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
-import { registerD3Adapter } from '@platform/react-d3-adapter';
-import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 import type { ConditionExplain, ExplainOperand, RuleActionDiff, RuleRead } from '@platform/observability';
 import type { ConfigVersion, ConsoleSnapshot } from '@/lib/demo/types';
 import { apiGet } from '@/lib/demo/api-client';
 import { useRuntimeFlags } from '@/lib/use-runtime-flags';
+import { useRuntimeAdapters } from '@/lib/use-runtime-adapters';
 import { normalizeUiPages, rebindFlowSchemaToAvailablePages } from '@/lib/demo/ui-pages';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -220,6 +215,11 @@ export function Playground({
     versionId: selectedVersionId || undefined,
     packageId: version?.packageId,
   });
+  useRuntimeAdapters({
+    env: 'prod',
+    versionId: selectedVersionId || undefined,
+    packageId: version?.packageId,
+  });
   const killSwitchActive = Boolean(selectedVersionId && runtimeFlags.killSwitch.active);
   const killSwitchReason =
     runtimeFlags.killSwitch.reason ?? 'This version is disabled by an active kill switch.';
@@ -236,15 +236,6 @@ export function Playground({
 
   const traceFocusRef = useRef<HTMLDivElement | null>(null);
   const autoRunRef = useRef(false);
-
-  useEffect(() => {
-    registerPlatformAdapter();
-    registerMaterialAdapters();
-    registerAgGridAdapter();
-    registerHighchartsAdapter();
-    registerD3Adapter();
-    registerCompanyAdapter();
-  }, []);
 
   useEffect(() => {
     if (!selectedVersionId) return;

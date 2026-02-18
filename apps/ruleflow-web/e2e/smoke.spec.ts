@@ -186,7 +186,7 @@ test('builder drag-drops palette component onto canvas', async ({ page, request 
   // Wait for initial persisted schema to load (builder disables drag-drop while loading).
   await expect(page.locator('[data-testid^=\"canvas-item-\"]').first()).toBeVisible();
 
-  const paletteItem = page.getByTestId('palette-item-material-input');
+  const paletteItem = page.getByTestId('palette-item-platform-textField');
   const canvas = page.getByTestId('builder-canvas');
 
   await expect(paletteItem).toBeEnabled();
@@ -370,3 +370,4 @@ test('getting started wizard completes core walkthrough', async ({ page }) => {
   await expect(ruleDetails.getByText('COMPARE', { exact: true })).toBeVisible();
   await expect(ruleDetails.getByText('setField data.discount', { exact: true })).toBeVisible();
 });
+

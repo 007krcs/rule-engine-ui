@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.join(rootDir, 'src'),
+      '@platform/adapter-registry': path.join(rootDir, '../../packages/adapters/adapter-registry/src/index.ts'),
     },
   },
   test: {
@@ -15,4 +16,3 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
   },
 });
-

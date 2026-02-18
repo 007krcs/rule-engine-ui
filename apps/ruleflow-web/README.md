@@ -51,3 +51,11 @@ The response includes:
 - active kill switch state for the requested version/package
 
 Builder and Playground consume this endpoint through `useRuntimeFlags()` and block save/submit/execute operations when a kill switch is active.
+
+## OpenAPI Contract
+
+Enterprise API contract starter:
+
+- `apps/ruleflow-web/openapi/ruleflow-enterprise.yaml`
+
+This includes governance, builder persistence, runtime controls, and observability endpoints.

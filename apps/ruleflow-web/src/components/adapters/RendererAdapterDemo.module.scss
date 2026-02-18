@@ -1,0 +1,57 @@
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+}
+
+.preview {
+  border: 1px solid var(--pf-color-border-subtle, #d3dae8);
+  border-radius: var(--pf-radius-lg, 12px);
+  background: var(--pf-color-surface, #ffffff);
+  padding: 1rem;
+  min-height: 18rem;
+}
+
+.pre {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: var(--pf-radius-md, 10px);
+  border: 1px solid var(--pf-color-border-subtle, #d3dae8);
+  background: var(--pf-color-surface-subtle, #f8fafc);
+  font-family: var(--pf-font-family-mono, 'Cascadia Code', 'Consolas', monospace);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow: auto;
+  max-height: 16rem;
+}
+
+.logTitle {
+  margin: 0;
+  font-weight: 600;
+}
+
+.logList {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  display: grid;
+  gap: 0.35rem;
+  word-break: break-word;
+}

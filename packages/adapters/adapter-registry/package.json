@@ -1,0 +1,28 @@
+{
+  "name": "@platform/adapter-registry",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@platform/react-aggrid-adapter": "workspace:*",
+    "@platform/react-company-adapter": "workspace:*",
+    "@platform/react-d3-adapter": "workspace:*",
+    "@platform/react-highcharts-adapter": "workspace:*",
+    "@platform/react-platform-adapter": "workspace:*",
+    "@platform/react-renderer": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  }
+}

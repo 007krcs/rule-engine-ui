@@ -34,6 +34,7 @@ import { useToast } from '@/components/ui/toast';
 import { apiPost, downloadFromApi } from '@/lib/demo/api-client';
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
 import { useOnboarding } from '@/components/onboarding/onboarding-provider';
+import { useRuntimeAdapters } from '@/lib/use-runtime-adapters';
 
 const navItems = [
   { href: '/console', label: 'Admin Console', icon: LayoutDashboard },
@@ -52,6 +53,8 @@ const systemItems = [
   { href: '/console?tab=versions', label: 'Versions', icon: PackageOpen },
   { href: '/system/templates', label: 'Template Library', icon: LayoutTemplate },
   { href: '/system/theme-studio', label: 'Theme Studio', icon: Sparkles },
+  { href: '/system/adapters-vue', label: 'Vue Adapter Demo', icon: Plug },
+  { href: '/system/adapters-angular', label: 'Angular Adapter Demo', icon: Plug },
   { href: '/system/ui-kit', label: 'UI Kit', icon: Sparkles },
   { href: '/system/translations', label: 'Translations', icon: BookOpen },
   { href: '/system/layout-check', label: 'Layout Check', icon: Boxes },
@@ -69,6 +72,8 @@ function helpHrefForPathname(pathname: string): string {
   if (pathname.startsWith('/component-registry')) return '/docs/tutorial-component-registry';
   if (pathname.startsWith('/integrations')) return '/docs/tutorial-integrations';
   if (pathname.startsWith('/system/templates')) return '/docs/tutorial-template-library';
+  if (pathname.startsWith('/system/adapters-vue')) return '/docs/tutorial-integrations';
+  if (pathname.startsWith('/system/adapters-angular')) return '/docs/tutorial-integrations';
   if (pathname.startsWith('/system/theme-studio')) return '/docs';
   if (pathname.startsWith('/system/ui-kit')) return '/docs';
   if (pathname.startsWith('/samples')) return '/docs/quickstart';
@@ -98,6 +103,8 @@ function getPageTitle(pathname: string, tab?: string | null) {
   if (pathname.startsWith('/system/health')) return 'Health';
   if (pathname.startsWith('/system/templates')) return 'Template Library';
   if (pathname.startsWith('/system/theme-studio')) return 'Theme Studio';
+  if (pathname.startsWith('/system/adapters-vue')) return 'Vue Adapter Demo';
+  if (pathname.startsWith('/system/adapters-angular')) return 'Angular Adapter Demo';
   if (pathname.startsWith('/system/ui-kit')) return 'UI Kit';
   if (pathname.startsWith('/system/translations')) return 'Translations';
   if (pathname.startsWith('/system/layout-check')) return 'Layout Check';
@@ -116,6 +123,7 @@ function getScreenPreset(pathname: string): 'console' | 'builder' | 'playground'
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  useRuntimeAdapters({ env: 'prod' });
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -294,8 +302,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={cn(styles.shell, 'rf-app-shell')} data-pf-screen={screenPreset}>
-      {clientReady ? <span data-testid="client-ready" className={styles.clientReady} aria-hidden="true" /> : null}
-      <header className={cn(styles.header, 'pf-surface-panel')}>
+        {clientReady ? <span data-testid="client-ready" className={styles.clientReady} aria-hidden="true" /> : null}
+        <header className={cn(styles.header, 'pf-surface-panel')}>
         <div className={styles.headerInner}>
           <div className={styles.headerLeft}>
             <PFIconButton
@@ -391,7 +399,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <PFDialog
+        <PFDialog
         open={newConfigOpen}
         title="New Config Package"
         description="Create a new DRAFT package and start editing its UI schema."
@@ -447,9 +455,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </PFDialog>
 
-      <OnboardingWizard />
+        <OnboardingWizard />
 
-      <PFDialog
+        <PFDialog
         open={commandOpen}
         title="Command Palette"
         description="Type to filter. Shortcut: Ctrl+K"
@@ -481,7 +489,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {filteredActions.length === 0 ? <p className={styles.commandEmpty}>No matches.</p> : null}
           </div>
         </div>
-      </PFDialog>
-    </div>
+        </PFDialog>
+      </div>
   );
 }

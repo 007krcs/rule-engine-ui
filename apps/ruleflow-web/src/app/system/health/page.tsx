@@ -4,16 +4,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule, UISchema } from '@platform/schema';
 import { executeStep } from '@platform/core-runtime';
 import { RenderPage } from '@platform/react-renderer';
-import { registerPlatformAdapter } from '@platform/react-platform-adapter';
-import { registerMaterialAdapters } from '@platform/react-material-adapter';
-import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
-import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
-import { registerD3Adapter } from '@platform/react-d3-adapter';
-import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 import type { ConfigVersion, ConsoleSnapshot } from '@/lib/demo/types';
 import { apiGet, apiPost } from '@/lib/demo/api-client';
 import { normalizeUiPages, rebindFlowSchemaToAvailablePages } from '@/lib/demo/ui-pages';
+import { useRuntimeAdapters } from '@/lib/use-runtime-adapters';
 import { useToast } from '@/components/ui/toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -116,6 +111,7 @@ class ErrorBoundary extends React.Component<
 
 export default function HealthPage() {
   const { toast } = useToast();
+  const runtimeAdapters = useRuntimeAdapters({ env: 'prod' });
   const [checks, setChecks] = useState<Check[]>([
     { id: 'routes', label: 'Routes respond (200)', status: 'pending' },
     { id: 'api', label: 'Console API returns snapshot', status: 'pending' },
@@ -265,19 +261,19 @@ export default function HealthPage() {
 
     // Adapters
     try {
-      registerPlatformAdapter();
-      registerMaterialAdapters();
-      registerAgGridAdapter();
-      registerHighchartsAdapter();
-      registerD3Adapter();
-      registerCompanyAdapter();
+      await runtimeAdapters.refresh();
 
       await new Promise((r) => window.setTimeout(r, 0));
       const missing = adapterTestRef.current?.querySelectorAll('[data-missing-adapter]').length ?? 0;
       setAdapterMissingCount(missing);
+      const failedPacks = runtimeAdapters.failedAdapterPacks;
+      const failedMessage =
+        failedPacks.length > 0
+          ? failedPacks.map((pack) => `${pack.packId}: ${pack.error ?? 'load error'}`).join(', ')
+          : null;
       updateCheck('adapters', {
-        status: missing === 0 && !adapterError ? 'pass' : 'fail',
-        detail: adapterError ? adapterError : missing === 0 ? 'ok' : `${missing} missing`,
+        status: missing === 0 && !adapterError && !failedMessage ? 'pass' : 'fail',
+        detail: adapterError || failedMessage || (missing === 0 ? 'ok' : `${missing} missing`),
       });
     } catch (error) {
       updateCheck('adapters', { status: 'fail', detail: error instanceof Error ? error.message : String(error) });

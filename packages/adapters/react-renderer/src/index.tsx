@@ -44,6 +44,7 @@ export interface RendererProps {
   uiSchema: UISchema;
   data: Record<string, JSONValue>;
   context: ExecutionContext;
+  adapterRegistry?: AdapterRegistry;
   i18n?: I18nProvider;
   onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
   onAdapterEvent?: (event: UIEventName, payload: ChangeEventPayload | ClickEventPayload, component: UIComponent) => void;
@@ -68,7 +69,41 @@ export interface AdapterContext {
 
 export type AdapterRenderFn = (component: UIComponent, ctx: AdapterContext) => React.ReactElement;
 
-const registry: Array<{ prefix: string; render: AdapterRenderFn }> = [];
+type AdapterRegistryEntry = {
+  prefix: string;
+  render: AdapterRenderFn;
+};
+
+export interface AdapterRegistry {
+  register: (prefix: string, render: AdapterRenderFn) => void;
+  resolve: (adapterHint: string) => AdapterRenderFn | undefined;
+  hasPrefix: (prefix: string) => boolean;
+  listPrefixes: () => string[];
+}
+
+export function createAdapterRegistry(): AdapterRegistry {
+  const entries: AdapterRegistryEntry[] = [];
+  return {
+    register: (prefix, render) => {
+      const normalized = prefix.trim();
+      if (!normalized) {
+        throw new Error('Adapter prefix must be a non-empty string.');
+      }
+      const existing = entries.findIndex((entry) => entry.prefix === normalized);
+      if (existing >= 0) {
+        entries[existing] = { prefix: normalized, render };
+      } else {
+        entries.push({ prefix: normalized, render });
+      }
+      entries.sort((a, b) => b.prefix.length - a.prefix.length);
+    },
+    resolve: (adapterHint) => entries.find((entry) => adapterHint.startsWith(entry.prefix))?.render,
+    hasPrefix: (prefix) => entries.some((entry) => entry.prefix === prefix),
+    listPrefixes: () => entries.map((entry) => entry.prefix),
+  };
+}
+
+const defaultAdapterRegistry = createAdapterRegistry();
 const INTERACTIVE_COMPONENT_HINTS = [
   'action',
   'autocomplete',
@@ -93,9 +128,34 @@ const INTERACTIVE_COMPONENT_HINTS = [
   'toggle',
 ] as const;
 
-export function registerAdapter(prefix: string, render: AdapterRenderFn): void {
-  registry.push({ prefix, render });
-  registry.sort((a, b) => b.prefix.length - a.prefix.length);
+export function registerAdapter(
+  prefix: string,
+  render: AdapterRenderFn,
+  adapterRegistry: AdapterRegistry = defaultAdapterRegistry,
+): void {
+  adapterRegistry.register(prefix, render);
+}
+
+export function getDefaultAdapterRegistry(): AdapterRegistry {
+  return defaultAdapterRegistry;
+}
+
+export function listRegisteredAdapterPrefixes(
+  adapterRegistry: AdapterRegistry = defaultAdapterRegistry,
+): string[] {
+  return adapterRegistry.listPrefixes();
+}
+
+export function isAdapterRegistered(
+  adapterHintOrPrefix: string,
+  adapterRegistry: AdapterRegistry = defaultAdapterRegistry,
+): boolean {
+  const normalized = adapterHintOrPrefix.trim();
+  if (!normalized) return false;
+  if (normalized.endsWith('.')) {
+    return adapterRegistry.hasPrefix(normalized);
+  }
+  return Boolean(adapterRegistry.resolve(normalized));
 }
 
 export function RenderPage(props: RendererProps): React.ReactElement {
@@ -163,7 +223,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
     const ruleState = resolveComponentRuleState(component, renderData, renderContext);
     if (!ruleState.visible) return null;
 
-    const adapter = resolveAdapter(component.adapterHint);
+    const adapter = resolveAdapter(component.adapterHint, props.adapterRegistry);
     if (!adapter) {
       const rendered = renderUnavailableComponent(component, 'missing-adapter');
       const wrapped = props.componentWrapper ? props.componentWrapper(component, rendered) : rendered;
@@ -612,8 +672,12 @@ function resolveBreakpoint(device: ExecutionContext['device']): 'lg' | 'md' | 's
   return 'lg';
 }
 
-function resolveAdapter(adapterHint: string): AdapterRenderFn | undefined {
-  return registry.find((entry) => adapterHint.startsWith(entry.prefix))?.render;
+function resolveAdapter(
+  adapterHint: string,
+  adapterRegistry: AdapterRegistry | undefined,
+): AdapterRenderFn | undefined {
+  const registry = adapterRegistry ?? defaultAdapterRegistry;
+  return registry.resolve(adapterHint);
 }
 
 function renderUnavailableComponent(

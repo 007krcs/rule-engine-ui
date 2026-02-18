@@ -1,14 +1,8 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { ExecutionContext, JSONValue, UISchema } from '@platform/schema';
 import { RenderPage } from '@platform/react-renderer';
-import { registerPlatformAdapter } from '@platform/react-platform-adapter';
-import { registerMaterialAdapters } from '@platform/react-material-adapter';
-import { registerAgGridAdapter } from '@platform/react-aggrid-adapter';
-import { registerHighchartsAdapter } from '@platform/react-highcharts-adapter';
-import { registerD3Adapter } from '@platform/react-d3-adapter';
-import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import { renderAngular } from '@platform/angular-renderer';
 import { renderVue } from '@platform/vue-renderer';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
@@ -16,6 +10,7 @@ import exampleUi from '@platform/schema/examples/example.ui.json';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import styles from './integrations.module.css';
 import { cn } from '@/lib/utils';
+import { useRuntimeAdapters } from '@/lib/use-runtime-adapters';
 
 const context: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -78,14 +73,7 @@ const snippets: Array<{
 ];
 
 export default function IntegrationsPage() {
-  useEffect(() => {
-    registerPlatformAdapter();
-    registerMaterialAdapters();
-    registerAgGridAdapter();
-    registerHighchartsAdapter();
-    registerD3Adapter();
-    registerCompanyAdapter();
-  }, []);
+  useRuntimeAdapters({ env: 'prod' });
 
   const uiSchema = exampleUi as unknown as UISchema;
   const i18n = useMemo(

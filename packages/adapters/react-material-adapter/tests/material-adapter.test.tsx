@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ExecutionContext, UISchema } from '@platform/schema';
 import { createFallbackI18nProvider } from '@platform/i18n';
-import { RenderPage } from '@platform/react-renderer';
+import { createAdapterRegistry, RenderPage } from '@platform/react-renderer';
 import { registerMaterialAdapters } from '../src/index';
 
 const context: ExecutionContext = {
@@ -20,8 +20,9 @@ const context: ExecutionContext = {
 };
 
 describe('react-material-adapter', () => {
-  it('renders material input and button', () => {
-    registerMaterialAdapters();
+  it('renders material.input as MUI TextField and material.button as MUI Button', () => {
+    const adapterRegistry = createAdapterRegistry();
+    registerMaterialAdapters(adapterRegistry);
     const schema: UISchema = {
       version: '1.0.0',
       pageId: 'page',
@@ -48,10 +49,17 @@ describe('react-material-adapter', () => {
     };
 
     const html = renderToStaticMarkup(
-      <RenderPage uiSchema={schema} data={{}} context={context} i18n={createFallbackI18nProvider()} />,
+      <RenderPage
+        uiSchema={schema}
+        data={{}}
+        context={context}
+        i18n={createFallbackI18nProvider()}
+        adapterRegistry={adapterRegistry}
+      />,
     );
 
-    expect(html).toContain('input');
-    expect(html).toContain('button');
+    expect(html).toContain('MuiTextField-root');
+    expect(html).toContain('data-mui-component="material-text-field"');
+    expect(html).toContain('data-mui-component="material-button"');
   });
 });
