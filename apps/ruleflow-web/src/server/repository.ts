@@ -7,7 +7,7 @@ import exampleUi from '@platform/schema/examples/example.ui.json';
 import { getMockSession, type Role } from '@/lib/auth';
 import type { ConfigBundle, ConfigVersion, ConsoleSnapshot, GitOpsBundle, JsonDiffItem } from '@/lib/demo/types';
 import { applyUiPageUpdateToBundle, createSinglePageBundle } from '@/lib/demo/ui-pages';
-import { listRuntimeAdapterDefinitions, resolveRuntimeAdapterIds } from '@/lib/runtime-adapters';
+import { listRuntimeAdapterDefinitions, resolveRuntimeAdapterIds } from '@/lib/runtime-adapter-definitions';
 import { buildGitOpsBundlePayloadFromPostgres, normalizeGitOpsBundleForPostgres } from '@/server/gitops';
 import * as demo from '@/server/demo/repository';
 import { recordRuntimeTrace } from '@/server/metrics';

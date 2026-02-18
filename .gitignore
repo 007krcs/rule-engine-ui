@@ -13,6 +13,8 @@ build
 coverage
 .turbo
 .next
+.next_backup_*
+.next_stale_*
 out
 .vercel
 storybook-static

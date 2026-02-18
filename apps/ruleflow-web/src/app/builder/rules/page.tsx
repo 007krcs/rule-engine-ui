@@ -104,7 +104,6 @@ export default function RulesBuilderPage() {
     if (!versionId) return;
     if (versionId === lastLoadedVersionId.current) return;
     void loadFromStore(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versionId]);
 
   const updateRuleDraft = (rule: RuleDraft) => {

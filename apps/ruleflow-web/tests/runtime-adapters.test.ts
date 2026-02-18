@@ -6,21 +6,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@platform/adapter-registry', () => ({
-  listRuntimeAdapterPackDefinitions: () => [
-    { id: 'platform', prefix: 'platform.', defaultEnabled: true, external: false },
-    { id: 'material', prefix: 'material.', defaultEnabled: false, external: true },
-    { id: 'aggrid', prefix: 'aggrid.', defaultEnabled: true, external: true },
-  ],
   loadRuntimeAdapterPacks: mocks.loadRuntimeAdapterPacks,
   registerRuntimeAdapterPackDefinition: mocks.registerRuntimeAdapterPackDefinition,
-  adapterPrefixFromHint: (adapterHint: string) => {
-    const prefix = adapterHint.split('.')[0]?.trim();
-    return prefix ? `${prefix}.` : '';
-  },
-  adapterPrefixesForIds: (adapterIds: readonly string[]) =>
-    adapterIds.map((id) => `${id}.`),
-  externalAdapterPrefixesForIds: (adapterIds: readonly string[]) =>
-    adapterIds.filter((id) => id !== 'platform').map((id) => `${id}.`),
 }));
 
 import {
@@ -35,12 +22,21 @@ describe('runtime adapter loading', () => {
   });
 
   it('keeps material disabled unless explicitly enabled via runtime flags', () => {
-    expect(resolveRuntimeAdapterIds({})).toEqual(['platform', 'aggrid']);
+    expect(resolveRuntimeAdapterIds({})).toEqual([
+      'platform',
+      'aggrid',
+      'highcharts',
+      'd3',
+      'company',
+    ]);
 
     expect(resolveRuntimeAdapterIds({ 'adapter.material': true })).toEqual([
       'platform',
       'material',
       'aggrid',
+      'highcharts',
+      'd3',
+      'company',
     ]);
   });
 

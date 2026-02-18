@@ -1,51 +1,42 @@
+'use client';
+
 import {
   adapterPrefixFromHint,
   adapterPrefixesForIds,
   externalAdapterPrefixesForIds,
-  listRuntimeAdapterPackDefinitions,
-  loadRuntimeAdapterPacks,
-  registerRuntimeAdapterPackDefinition,
-  type RuntimeAdapterPackDefinition,
-  type LoadAdapterPackResult,
-} from '@platform/adapter-registry';
+  listRuntimeAdapterDefinitions,
+  registerRuntimeAdapterDefinition as registerRuntimeAdapterDefinitionInternal,
+  resolveRuntimeAdapterIds,
+  type RuntimeAdapterDefinition,
+} from '@/lib/runtime-adapter-definitions';
 
-export type RuntimeAdapterId =
-  | 'platform'
-  | 'material'
-  | 'aggrid'
-  | 'highcharts'
-  | 'd3'
-  | 'company';
-
-export type RuntimeAdapterDefinition = RuntimeAdapterPackDefinition;
-
-export type RuntimeAdapterRegistrationResult = LoadAdapterPackResult;
+export type RuntimeAdapterRegistrationResult = {
+  ok: boolean;
+  packId: string;
+  error?: string;
+};
 
 export function registerRuntimeAdapterDefinition(
   definition: RuntimeAdapterDefinition,
 ): void {
-  registerRuntimeAdapterPackDefinition(definition);
-}
-
-export function listRuntimeAdapterDefinitions(): RuntimeAdapterDefinition[] {
-  return listRuntimeAdapterPackDefinitions();
-}
-
-export function resolveRuntimeAdapterIds(
-  featureFlags: Record<string, boolean>,
-): string[] {
-  return listRuntimeAdapterPackDefinitions()
-    .filter((definition) => {
-      const flagKey = `adapter.${definition.id}`;
-      const explicit = featureFlags[flagKey];
-      return typeof explicit === 'boolean' ? explicit : definition.defaultEnabled;
-    })
-    .map((definition) => definition.id);
+  registerRuntimeAdapterDefinitionInternal(definition);
 }
 
 export async function registerRuntimeAdapters(
   adapterIds: readonly string[],
 ): Promise<RuntimeAdapterRegistrationResult[]> {
+  const { loadRuntimeAdapterPacks, registerRuntimeAdapterPackDefinition } =
+    await import('@platform/adapter-registry');
+
+  for (const definition of listRuntimeAdapterDefinitions()) {
+    registerRuntimeAdapterPackDefinition({
+      id: definition.id,
+      prefix: definition.prefix,
+      defaultEnabled: definition.defaultEnabled,
+      external: definition.external,
+    });
+  }
+
   const results = await loadRuntimeAdapterPacks(adapterIds);
   const failed = results.filter((result) => !result.ok);
   if (failed.length > 0 && process.env.NODE_ENV !== 'production') {
@@ -71,4 +62,6 @@ export {
   adapterPrefixFromHint,
   adapterPrefixesForIds,
   externalAdapterPrefixesForIds,
+  listRuntimeAdapterDefinitions,
+  resolveRuntimeAdapterIds,
 };
