@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ExecutionContext,
+  FlowSchema,
   JSONValue,
   LayoutBreakpoint,
   UIComponent,
@@ -23,6 +24,11 @@ import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } f
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { ConfigVersion } from '@/lib/demo/types';
 import { apiGet, apiPatch, apiPost } from '@/lib/demo/api-client';
+import { useRuntimeFlags } from '@/lib/use-runtime-flags';
+import {
+  normalizeUiPages,
+  rebindFlowSchemaToAvailablePages,
+} from '@/lib/demo/ui-pages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,6 +141,12 @@ type TemplateSummary = {
 type GetTemplateResponse =
   | { ok: true; template: { summary: TemplateSummary; schema: UISchema } }
   | { ok: false; error: string };
+
+type BuilderDraftState = {
+  uiSchemasById?: Record<string, UISchema>;
+  activeUiPageId?: string;
+  flowSchema?: FlowSchema | null;
+};
 
 const previewContext: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -272,6 +284,30 @@ const ARTBOARD_PRESETS: ArtboardPreset[] = [
   { id: 'mobile-375', label: 'Mobile 375 x 812', width: 375, height: 812 },
 ];
 
+function createBuilderFlowSchema(pageId: string): FlowSchema {
+  return {
+    version: '1.0.0',
+    flowId: 'builder-flow',
+    initialState: 'start',
+    states: {
+      start: {
+        uiPageId: pageId,
+        on: {},
+      },
+    },
+  };
+}
+
+function isBuilderDraftState(value: unknown): value is BuilderDraftState {
+  if (typeof value !== 'object' || value === null) return false;
+  if (isSchemaLike(value)) return false;
+  const record = value as BuilderDraftState;
+  if (record.activeUiPageId !== undefined && typeof record.activeUiPageId !== 'string') return false;
+  if (record.uiSchemasById !== undefined && (typeof record.uiSchemasById !== 'object' || record.uiSchemasById === null)) return false;
+  if (record.flowSchema !== undefined && record.flowSchema !== null && typeof record.flowSchema !== 'object') return false;
+  return true;
+}
+
 function extractComponentIdFromIssue(path: string, components: UIComponent[]): string | null {
   if (!path.startsWith('components.')) return null;
   const rest = path.slice('components.'.length);
@@ -296,8 +332,50 @@ function nextId(base: string, existing: Set<string>) {
   return `${cleaned}${n}`;
 }
 
+function normalizePageId(raw: string): string {
+  const cleaned = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned || 'page';
+}
+
+function nextPageId(base: string, existing: Set<string>): string {
+  const cleaned = normalizePageId(base);
+  if (!existing.has(cleaned)) return cleaned;
+  let n = 2;
+  while (existing.has(`${cleaned}-${n}`)) n += 1;
+  return `${cleaned}-${n}`;
+}
+
+function normalizeStateId(raw: string): string {
+  const cleaned = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned || 'state';
+}
+
 function toTestIdSuffix(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function isDefinitionEnabledByRuntimeFlags(
+  definition: ComponentDefinition,
+  input: { allowPlanned: boolean; allowExternal: boolean },
+): boolean {
+  const availability = definition.availability ?? (definition.status === 'planned' ? 'planned' : 'implemented');
+  if (availability === 'planned') {
+    return input.allowPlanned;
+  }
+  if (availability === 'external') {
+    return input.allowExternal;
+  }
+  return true;
 }
 
 function clampValue(value: number, min: number, max: number) {
@@ -490,12 +568,25 @@ export default function BuilderPage() {
   const [setupChecklistOpen, setSetupChecklistOpen] = useState(checklistFromUrl);
   const [setupChecklistState, setSetupChecklistState] = useState<Record<string, boolean>>({});
   const [templateApplying, setTemplateApplying] = useState(false);
+  const [newUiPageDraft, setNewUiPageDraft] = useState('page-2');
+  const [newFlowStateDraft, setNewFlowStateDraft] = useState('');
   const appliedTemplateRef = useRef<string | null>(null);
   const [dragReady, setDragReady] = useState(false);
   const [schema, setSchema] = useState<UISchema>(() =>
     versionId ? createSchemaFromComponents([]) : createSchemaFromComponents(scratchComponents),
   );
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() => (versionId ? null : scratchComponents[0]?.id ?? null));
+  const [uiSchemasById, setUiSchemasById] = useState<Record<string, UISchema>>(() =>
+    versionId ? {} : { [schema.pageId]: schema },
+  );
+  const [selectedUiPageId, setSelectedUiPageId] = useState<string>(() =>
+    versionId ? 'builder-preview' : schema.pageId,
+  );
+  const [flowSchemaDraft, setFlowSchemaDraft] = useState<FlowSchema | null>(() =>
+    versionId ? null : createBuilderFlowSchema(schema.pageId),
+  );
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(() =>
+    versionId ? null : scratchComponents[0]?.id ?? null,
+  );
   const [previewMode, setPreviewMode] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<ExecutionContext['device']>('desktop');
   const [previewLocale, setPreviewLocale] = useState(previewContext.locale);
@@ -543,6 +634,34 @@ export default function BuilderPage() {
       }),
     [components, schema],
   );
+  const normalizedUiPages = useMemo(
+    () =>
+      normalizeUiPages({
+        uiSchema: effectiveSchema,
+        uiSchemasById: {
+          ...uiSchemasById,
+          [selectedUiPageId]: effectiveSchema,
+        },
+        activeUiPageId: selectedUiPageId,
+        flowSchema: flowSchemaDraft,
+      }),
+    [effectiveSchema, flowSchemaDraft, selectedUiPageId, uiSchemasById],
+  );
+  const effectiveUiSchemasById = normalizedUiPages.uiSchemasById;
+  const uiPageIds = useMemo(() => Object.keys(effectiveUiSchemasById), [effectiveUiSchemasById]);
+  const effectiveFlowSchema = useMemo(
+    () =>
+      rebindFlowSchemaToAvailablePages(
+        flowSchemaDraft ?? createBuilderFlowSchema(selectedUiPageId),
+        effectiveUiSchemasById,
+        selectedUiPageId,
+      ) ?? createBuilderFlowSchema(selectedUiPageId),
+    [effectiveUiSchemasById, flowSchemaDraft, selectedUiPageId],
+  );
+  const flowStateEntries = useMemo(
+    () => Object.entries(effectiveFlowSchema.states),
+    [effectiveFlowSchema],
+  );
   const gridSpec = useMemo(() => getSchemaGridSpec(effectiveSchema), [effectiveSchema]);
   const activeGridSpec = useMemo(() => {
     if (activeBreakpoint === 'lg') {
@@ -580,6 +699,16 @@ export default function BuilderPage() {
     () => `${BUILDER_LOCAL_STORAGE_KEY}:${versionId ?? 'scratch'}`,
     [versionId],
   );
+  const runtimeFlags = useRuntimeFlags({
+    env: 'prod',
+    versionId: versionId ?? undefined,
+    packageId: loadedVersion?.packageId,
+  });
+  const allowPlannedByFlag = runtimeFlags.featureFlags['builder.palette.showPlanned'] ?? true;
+  const allowExternalByFlag = runtimeFlags.featureFlags['builder.palette.externalAdapters'] ?? true;
+  const killSwitchActive = Boolean(versionId && runtimeFlags.killSwitch.active);
+  const killSwitchReason =
+    runtimeFlags.killSwitch.reason ?? 'This version is disabled by an active kill switch.';
 
   useEffect(() => {
     registerPlatformAdapter();
@@ -672,10 +801,40 @@ export default function BuilderPage() {
 
     try {
       const parsed = JSON.parse(raw) as unknown;
-      if (!isSchemaLike(parsed)) return;
-      const normalized = normalizeSchema(parsed);
-      setSchema(normalized);
-      setSelectedComponentId((normalized.components as UIComponent[])[0]?.id ?? null);
+      if (isSchemaLike(parsed)) {
+        const normalizedLegacySchema = normalizeSchema(parsed);
+        const pageId = normalizedLegacySchema.pageId;
+        setUiSchemasById({ [pageId]: normalizedLegacySchema });
+        setSelectedUiPageId(pageId);
+        setSchema(normalizedLegacySchema);
+        setFlowSchemaDraft(createBuilderFlowSchema(pageId));
+        setSelectedComponentId((normalizedLegacySchema.components as UIComponent[])[0]?.id ?? null);
+        return;
+      }
+      if (!isBuilderDraftState(parsed)) return;
+
+      const normalizedPages = normalizeUiPages({
+        uiSchemasById: parsed.uiSchemasById,
+        activeUiPageId: parsed.activeUiPageId,
+        flowSchema: parsed.flowSchema,
+      });
+      const nextPageId =
+        normalizedPages.activeUiPageId ||
+        Object.keys(normalizedPages.uiSchemasById)[0] ||
+        createSchemaFromComponents(scratchComponents).pageId;
+      const nextSchema = normalizeSchema(
+        normalizedPages.uiSchemasById[nextPageId] ?? createSchemaFromComponents(scratchComponents),
+      );
+      const reboundFlow = rebindFlowSchemaToAvailablePages(
+        parsed.flowSchema ?? createBuilderFlowSchema(nextPageId),
+        normalizedPages.uiSchemasById,
+        nextPageId,
+      );
+      setUiSchemasById(normalizedPages.uiSchemasById);
+      setSelectedUiPageId(nextPageId);
+      setSchema(nextSchema);
+      setFlowSchemaDraft(reboundFlow ?? createBuilderFlowSchema(nextPageId));
+      setSelectedComponentId((nextSchema.components as UIComponent[])[0]?.id ?? null);
     } catch {
       // ignore bad local state
     }
@@ -683,8 +842,13 @@ export default function BuilderPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(localStorageKey, JSON.stringify(effectiveSchema));
-  }, [effectiveSchema, localStorageKey]);
+    const draftState: BuilderDraftState = {
+      uiSchemasById: effectiveUiSchemasById,
+      activeUiPageId: selectedUiPageId,
+      flowSchema: effectiveFlowSchema,
+    };
+    window.localStorage.setItem(localStorageKey, JSON.stringify(draftState));
+  }, [effectiveFlowSchema, effectiveUiSchemasById, localStorageKey, selectedUiPageId]);
 
   const validation = useMemo(() => validateUISchema(effectiveSchema), [effectiveSchema]);
 
@@ -706,12 +870,28 @@ export default function BuilderPage() {
     try {
       const response = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(versionId)}`);
       if (!response.ok) throw new Error(response.error);
-
-      const normalized = normalizeSchema(response.version.bundle.uiSchema as UISchema);
+      const normalizedPages = normalizeUiPages({
+        uiSchema: response.version.bundle.uiSchema,
+        uiSchemasById: response.version.bundle.uiSchemasById,
+        activeUiPageId: response.version.bundle.activeUiPageId,
+        flowSchema: response.version.bundle.flowSchema,
+      });
+      const nextPageId = normalizedPages.activeUiPageId;
+      const normalized = normalizeSchema(
+        normalizedPages.uiSchemasById[nextPageId] ?? createSchemaFromComponents(scratchComponents, { pageId: nextPageId }),
+      );
       const normalizedComponents = normalized.components as UIComponent[];
-
+      const reboundFlow =
+        rebindFlowSchemaToAvailablePages(
+          response.version.bundle.flowSchema,
+          normalizedPages.uiSchemasById,
+          nextPageId,
+        ) ?? createBuilderFlowSchema(nextPageId);
       setLoadedVersion(response.version);
+      setUiSchemasById(normalizedPages.uiSchemasById);
+      setSelectedUiPageId(nextPageId);
       setSchema(normalized);
+      setFlowSchemaDraft(reboundFlow);
       setSelectedComponentId(normalizedComponents[0]?.id ?? null);
       setActiveVersionId(versionId);
       toast({ variant: 'info', title: 'Loaded config', description: response.version.version });
@@ -719,7 +899,10 @@ export default function BuilderPage() {
       toast({ variant: 'error', title: 'Failed to load config', description: error instanceof Error ? error.message : String(error) });
       const fallback = createSchemaFromComponents(scratchComponents);
       setLoadedVersion(null);
+      setUiSchemasById({ [fallback.pageId]: fallback });
+      setSelectedUiPageId(fallback.pageId);
       setSchema(fallback);
+      setFlowSchemaDraft(createBuilderFlowSchema(fallback.pageId));
       setSelectedComponentId((fallback.components as UIComponent[])[0]?.id ?? null);
     } finally {
       setLoading(false);
@@ -761,8 +944,18 @@ export default function BuilderPage() {
 
         const normalized = normalizeSchema(response.template.schema as UISchema);
         const normalizedComponents = normalized.components as UIComponent[];
+        const nextPages: Record<string, UISchema> = { [normalized.pageId]: normalized };
+        const nextFlow =
+          rebindFlowSchemaToAvailablePages(
+            flowSchemaDraft ?? createBuilderFlowSchema(normalized.pageId),
+            nextPages,
+            normalized.pageId,
+          ) ?? createBuilderFlowSchema(normalized.pageId);
 
+        setUiSchemasById(nextPages);
+        setSelectedUiPageId(normalized.pageId);
         setSchema(normalized);
+        setFlowSchemaDraft(nextFlow);
         setSelectedComponentId(normalizedComponents[0]?.id ?? null);
         setTemplateSummary(response.template.summary);
         setSetupChecklistState(initialChecklistState(response.template.summary));
@@ -797,7 +990,7 @@ export default function BuilderPage() {
     return () => {
       cancelled = true;
     };
-  }, [components, loading, router, searchParams, templateApplying, templateId, toast, versionId]);
+  }, [components, flowSchemaDraft, loading, router, searchParams, templateApplying, templateId, toast, versionId]);
 
   const addComponent = () => {
     const trimmedId = draft.id.trim();
@@ -812,7 +1005,13 @@ export default function BuilderPage() {
 
     const def = registry.find((item) => item.adapterHint === draft.adapterHint) ?? registry[0];
     if (!def) return;
-    if (!isPaletteComponentEnabled(def)) {
+    if (
+      !isDefinitionEnabledByRuntimeFlags(def, {
+        allowPlanned: allowPlannedByFlag,
+        allowExternal: allowExternalByFlag,
+      }) ||
+      !isPaletteComponentEnabled(def)
+    ) {
       toast({
         variant: 'error',
         title: 'Component unavailable',
@@ -829,6 +1028,15 @@ export default function BuilderPage() {
   };
 
   const saveToStore = async () => {
+    if (killSwitchActive) {
+      toast({
+        variant: 'error',
+        title: 'Save blocked by kill switch',
+        description: killSwitchReason,
+      });
+      return;
+    }
+
     if (!validation.valid) {
       toast({ variant: 'error', title: 'Fix validation issues before saving', description: `${validation.issues.length} issue(s)` });
       return;
@@ -849,6 +1057,9 @@ export default function BuilderPage() {
         `/api/config-versions/${encodeURIComponent(versionId)}/ui-schema`,
         {
           uiSchema: effectiveSchema,
+          uiSchemasById: effectiveUiSchemasById,
+          activeUiPageId: selectedUiPageId,
+          flowSchema: effectiveFlowSchema,
         },
       );
       if (!result.ok) throw new Error(result.error);
@@ -866,6 +1077,14 @@ export default function BuilderPage() {
 
   const submitForReview = async () => {
     if (!versionId) return;
+    if (killSwitchActive) {
+      toast({
+        variant: 'error',
+        title: 'Submit blocked by kill switch',
+        description: killSwitchReason,
+      });
+      return;
+    }
     setLoading(true);
     try {
       await apiPost(`/api/config-versions/${encodeURIComponent(versionId)}/submit-review`, {
@@ -880,6 +1099,126 @@ export default function BuilderPage() {
     }
   };
 
+  const commitPages = (
+    nextPages: Record<string, UISchema>,
+    nextPageId: string,
+    flowOverride?: FlowSchema | null,
+  ) => {
+    const normalizedPages = normalizeUiPages({
+      uiSchemasById: nextPages,
+      activeUiPageId: nextPageId,
+      flowSchema: flowOverride ?? effectiveFlowSchema,
+    });
+    const resolvedPageId = normalizedPages.activeUiPageId;
+    const nextSchema = normalizeSchema(
+      normalizedPages.uiSchemasById[resolvedPageId] ??
+        createSchemaFromComponents([], { pageId: resolvedPageId }),
+    );
+    const reboundFlow =
+      rebindFlowSchemaToAvailablePages(
+        flowOverride ?? effectiveFlowSchema,
+        normalizedPages.uiSchemasById,
+        resolvedPageId,
+      ) ?? createBuilderFlowSchema(resolvedPageId);
+
+    setUiSchemasById(normalizedPages.uiSchemasById);
+    setSelectedUiPageId(resolvedPageId);
+    setSchema(nextSchema);
+    setFlowSchemaDraft(reboundFlow);
+    setSelectedComponentId((nextSchema.components as UIComponent[])[0]?.id ?? null);
+  };
+
+  const switchUiPage = (pageId: string) => {
+    if (!effectiveUiSchemasById[pageId]) return;
+    commitPages(effectiveUiSchemasById, pageId);
+  };
+
+  const addUiPage = () => {
+    const existing = new Set(uiPageIds);
+    const requested = newUiPageDraft.trim() || `page-${uiPageIds.length + 1}`;
+    const pageId = nextPageId(requested, existing);
+    const pageSchema = createSchemaFromComponents([], {
+      pageId,
+      version: effectiveSchema.version,
+      columns: activeGridSpec.columns,
+    });
+    const nextPages = {
+      ...effectiveUiSchemasById,
+      [pageId]: pageSchema,
+    };
+    commitPages(nextPages, pageId);
+    setNewUiPageDraft(`page-${Object.keys(nextPages).length + 1}`);
+    toast({ variant: 'success', title: 'Page added', description: pageId });
+  };
+
+  const duplicateUiPage = () => {
+    const source = effectiveUiSchemasById[selectedUiPageId];
+    if (!source) return;
+    const existing = new Set(uiPageIds);
+    const pageId = nextPageId(`${selectedUiPageId}-copy`, existing);
+    const duplicated = normalizeSchema({
+      ...deepCloneJson(source),
+      pageId,
+    });
+    const nextPages = {
+      ...effectiveUiSchemasById,
+      [pageId]: duplicated,
+    };
+    commitPages(nextPages, pageId);
+    toast({ variant: 'success', title: 'Page duplicated', description: `${selectedUiPageId} -> ${pageId}` });
+  };
+
+  const deleteUiPage = () => {
+    if (uiPageIds.length <= 1) {
+      toast({ variant: 'error', title: 'At least one page is required' });
+      return;
+    }
+    const nextPages = { ...effectiveUiSchemasById };
+    delete nextPages[selectedUiPageId];
+    const fallbackPageId = Object.keys(nextPages)[0];
+    if (!fallbackPageId) return;
+    commitPages(nextPages, fallbackPageId);
+    toast({ variant: 'info', title: 'Page deleted', description: selectedUiPageId });
+  };
+
+  const addFlowState = () => {
+    const existing = new Set(Object.keys(effectiveFlowSchema.states));
+    const requested = normalizeStateId(newFlowStateDraft || `state_${existing.size + 1}`);
+    let stateId = requested;
+    let index = 2;
+    while (existing.has(stateId)) {
+      stateId = `${requested}_${index}`;
+      index += 1;
+    }
+    const nextFlow: FlowSchema = {
+      ...effectiveFlowSchema,
+      states: {
+        ...effectiveFlowSchema.states,
+        [stateId]: {
+          uiPageId: selectedUiPageId,
+          on: {},
+        },
+      },
+    };
+    setFlowSchemaDraft(nextFlow);
+    setNewFlowStateDraft('');
+    toast({ variant: 'success', title: 'Flow state added', description: stateId });
+  };
+
+  const updateFlowStatePage = (stateId: string, pageId: string) => {
+    if (!effectiveFlowSchema.states[stateId]) return;
+    setFlowSchemaDraft({
+      ...effectiveFlowSchema,
+      states: {
+        ...effectiveFlowSchema.states,
+        [stateId]: {
+          ...effectiveFlowSchema.states[stateId],
+          uiPageId: pageId,
+        },
+      },
+    });
+  };
+
   const selectedComponent = selectedComponentId ? components.find((component) => component.id === selectedComponentId) ?? null : null;
   const selectedItem = selectedComponentId
     ? activeItems.find((item) => item.componentId === selectedComponentId) ?? null
@@ -892,9 +1231,17 @@ export default function BuilderPage() {
   const visiblePaletteDefinitions = useMemo(
     () =>
       registry.filter(
-        (definition) => showPlannedComponents || definition.availability !== 'planned',
+        (definition) => {
+          if (!isDefinitionEnabledByRuntimeFlags(definition, { allowPlanned: allowPlannedByFlag, allowExternal: allowExternalByFlag })) {
+            return false;
+          }
+          if (definition.availability === 'planned') {
+            return showPlannedComponents;
+          }
+          return true;
+        },
       ),
-    [registry, showPlannedComponents],
+    [allowExternalByFlag, allowPlannedByFlag, registry, showPlannedComponents],
   );
   const supportedReplacementDefinitions = useMemo(
     () =>
@@ -1049,7 +1396,7 @@ export default function BuilderPage() {
           },
         },
       });
-      });
+    });
   };
 
   const updateGridItemLayout = (
@@ -1256,7 +1603,13 @@ export default function BuilderPage() {
       const adapterHint = activeId.slice('palette:'.length);
       const def = registry.find((item) => item.adapterHint === adapterHint);
       if (!def) return;
-      if (!isPaletteComponentEnabled(def)) {
+      if (
+        !isDefinitionEnabledByRuntimeFlags(def, {
+          allowPlanned: allowPlannedByFlag,
+          allowExternal: allowExternalByFlag,
+        }) ||
+        !isPaletteComponentEnabled(def)
+      ) {
         toast({
           variant: 'error',
           title: 'Component unavailable',
@@ -1313,6 +1666,7 @@ export default function BuilderPage() {
                   <>
                     Editing <span className="rfCodeInline">{versionId}</span>
                     {loadedVersion ? ` - ${loadedVersion.status}` : null}
+                    {killSwitchActive ? ' - KILLED' : null}
                   </>
                 ) : (
                   'Scratch schema (stored in localStorage). Use New Config to persist a package.'
@@ -1347,21 +1701,38 @@ export default function BuilderPage() {
                 variant="outline"
                 size="sm"
                 onClick={submitForReview}
-                disabled={!versionId || loading || !validation.valid}
-                title={!validation.valid ? 'Fix validation issues before submitting for review' : undefined}
+                disabled={!versionId || loading || !validation.valid || killSwitchActive}
+                title={
+                  killSwitchActive
+                    ? killSwitchReason
+                    : !validation.valid
+                      ? 'Fix validation issues before submitting for review'
+                      : undefined
+                }
               >
                 Submit for review
               </Button>
               <Button
                 size="sm"
                 onClick={saveToStore}
-                disabled={loading || !validation.valid}
-                title={!validation.valid ? 'Fix validation issues to enable Save' : undefined}
+                disabled={loading || !validation.valid || killSwitchActive}
+                title={
+                  killSwitchActive
+                    ? killSwitchReason
+                    : !validation.valid
+                      ? 'Fix validation issues to enable Save'
+                      : undefined
+                }
               >
                 {loading ? 'Working...' : 'Save'}
               </Button>
             </div>
           </div>
+          {killSwitchActive ? (
+            <p className={styles.killWarning} data-testid="builder-kill-warning">
+              Runtime kill switch is active. Save and submit are disabled. {killSwitchReason}
+            </p>
+          ) : null}
         </CardHeader>
 
         <CardContent className={styles.metaGrid}>
@@ -1373,11 +1744,18 @@ export default function BuilderPage() {
             />
           </div>
           <div>
-            <label className="rfFieldLabel">Page Id</label>
-            <Input
-              value={effectiveSchema.pageId}
-              onChange={(event) => setSchema((current) => ({ ...current, pageId: event.target.value }))}
-            />
+            <label className="rfFieldLabel">UI Page</label>
+            <Select
+              value={selectedUiPageId}
+              onChange={(event) => switchUiPage(event.target.value)}
+              data-testid="builder-page-switcher"
+            >
+              {uiPageIds.map((pageId) => (
+                <option key={pageId} value={pageId}>
+                  {pageId}
+                </option>
+              ))}
+            </Select>
           </div>
           <div>
             <label className="rfFieldLabel">Columns ({activeBreakpoint.toUpperCase()})</label>
@@ -1465,6 +1843,66 @@ export default function BuilderPage() {
               data-testid="builder-locale-input"
             />
           </div>
+          <div>
+            <label className="rfFieldLabel">Page Actions</label>
+            <div className={styles.pageActionsRow}>
+              <Input
+                value={newUiPageDraft}
+                onChange={(event) => setNewUiPageDraft(event.target.value)}
+                aria-label="New page id"
+                data-testid="builder-new-page-id"
+              />
+              <Button type="button" size="sm" onClick={addUiPage} data-testid="builder-page-add">
+                Add page
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={duplicateUiPage} data-testid="builder-page-duplicate">
+                Duplicate
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={deleteUiPage}
+                disabled={uiPageIds.length <= 1}
+                data-testid="builder-page-delete"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+          <div className={styles.metaSpanAll}>
+            <label className="rfFieldLabel">Flow State to Page Binding</label>
+            <div className={styles.flowStateGrid} data-testid="builder-flow-state-bindings">
+              {flowStateEntries.map(([stateId, state]) => (
+                <div key={stateId} className={styles.flowStateRow}>
+                  <span className={styles.flowStateName}>{stateId}</span>
+                  <Select
+                    value={uiPageIds.includes(state.uiPageId) ? state.uiPageId : selectedUiPageId}
+                    onChange={(event) => updateFlowStatePage(stateId, event.target.value)}
+                    data-testid={`builder-flow-state-page-${toTestIdSuffix(stateId)}`}
+                  >
+                    {uiPageIds.map((pageId) => (
+                      <option key={`${stateId}-${pageId}`} value={pageId}>
+                        {pageId}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ))}
+              <div className={styles.flowStateCreateRow}>
+                <Input
+                  value={newFlowStateDraft}
+                  onChange={(event) => setNewFlowStateDraft(event.target.value)}
+                  placeholder="new_state_id"
+                  aria-label="New flow state id"
+                  data-testid="builder-flow-state-new-id"
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addFlowState} data-testid="builder-flow-state-add">
+                  Add state
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -1523,10 +1961,16 @@ export default function BuilderPage() {
                       type="checkbox"
                       checked={showPlannedComponents}
                       onChange={(event) => setShowPlannedComponents(Boolean(event.target.checked))}
+                      disabled={!allowPlannedByFlag}
                       data-testid="builder-toggle-show-planned"
                     />
-                    <span>Show planned components</span>
+                    <span>{allowPlannedByFlag ? 'Show planned components' : 'Planned components disabled by runtime flag'}</span>
                   </label>
+                  {!allowExternalByFlag ? (
+                    <p className={styles.canvasHint} data-testid="builder-external-palette-disabled">
+                      External adapter components are hidden by runtime flag.
+                    </p>
+                  ) : null}
                   {visiblePaletteDefinitions.map((def) => (
                     <PaletteItem
                       key={def.adapterHint}
@@ -1899,7 +2343,14 @@ export default function BuilderPage() {
                   issues={validation.issues}
                   resolveComponentId={(path) => extractComponentIdFromIssue(path, components)}
                   onFocusComponentId={focusComponent}
-                  onSchemaChange={(nextSchema) => setSchema(normalizeSchema(nextSchema))}
+                  onSchemaChange={(nextSchema) =>
+                    setSchema(
+                      normalizeSchema({
+                        ...nextSchema,
+                        pageId: selectedUiPageId,
+                      }),
+                    )
+                  }
                 />
               </div>
             }

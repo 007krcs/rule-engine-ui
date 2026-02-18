@@ -17,7 +17,9 @@ export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED';
 export type AuditSeverity = 'info' | 'warning' | 'error';
 
 export type ConfigBundle = {
-  uiSchema: UISchema;
+  uiSchema?: UISchema;
+  uiSchemasById?: Record<string, UISchema>;
+  activeUiPageId?: string;
   flowSchema: FlowSchema;
   rules: RuleSet;
   apiMappingsById: Record<string, ApiMapping>;

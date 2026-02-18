@@ -30,6 +30,17 @@
   color: var(--rf-muted);
 }
 
+.killWarning {
+  margin: var(--rf-space-3) 0 0;
+  padding: 10px 12px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid color-mix(in srgb, var(--rf-warning) 45%, var(--rf-border));
+  background: color-mix(in srgb, var(--rf-warning) 10%, var(--rf-surface));
+  color: color-mix(in srgb, var(--rf-warning) 80%, var(--rf-fg));
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .actions {
   display: inline-flex;
   flex-wrap: wrap;
@@ -44,6 +55,44 @@
 
 .metaGrid input {
   margin-top: 6px;
+}
+
+.metaSpanAll {
+  grid-column: 1 / -1;
+}
+
+.pageActionsRow {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: var(--rf-space-2);
+  align-items: center;
+}
+
+.flowStateGrid {
+  margin-top: 6px;
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.flowStateRow {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(0, 280px);
+  gap: var(--rf-space-2);
+  align-items: center;
+}
+
+.flowStateName {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--rf-fg);
+}
+
+.flowStateCreateRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--rf-space-2);
+  align-items: center;
 }
 
 .builderShell {
@@ -377,6 +426,14 @@
 
   .canvasControlsRow {
     grid-template-columns: 1fr;
+  }
+
+  .pageActionsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flowStateRow {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .zoomControls {

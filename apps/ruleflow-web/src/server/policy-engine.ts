@@ -1,23 +1,9 @@
 import type { RuleSet } from '@platform/schema';
 import { hasRole, type Role, type Session } from '@/lib/auth';
-import type { ConfigBundle } from '@/lib/demo/types';
+import { clearOpaDecisionCacheForTests, evaluateOpaPolicy, OpaClientError } from '@/server/policy/opa-client';
+import type { PolicyCheckStage, PolicyError, PolicyEvaluationInput } from '@/server/policy/types';
 
-export type PolicyCheckStage = 'save' | 'submit-for-review' | 'approve' | 'promote';
-
-export type PolicyError = {
-  policyKey: string;
-  code: string;
-  message: string;
-  stage: PolicyCheckStage;
-  hint: string;
-};
-
-export interface PolicyEvaluationInput {
-  stage: PolicyCheckStage;
-  session: Session;
-  currentBundle?: ConfigBundle;
-  nextBundle?: ConfigBundle;
-}
+export type { PolicyCheckStage, PolicyError, PolicyEvaluationInput } from '@/server/policy/types';
 
 export interface PolicyDefinition {
   key: string;
@@ -128,7 +114,9 @@ const builtinPolicies: PolicyDefinition[] = [
 const policyEngine = new PolicyEngine(builtinPolicies);
 
 export async function evaluatePolicies(input: PolicyEvaluationInput): Promise<PolicyError[]> {
-  return await policyEngine.evaluate(input);
+  const errors = await policyEngine.evaluate(input);
+  errors.push(...(await evaluateExternalPolicies(input)));
+  return errors;
 }
 
 export function registerPolicy(policy: PolicyDefinition): void {
@@ -141,6 +129,7 @@ export function unregisterPolicy(policyKey: string): void {
 
 export function clearRegisteredPoliciesForTests(): void {
   policyEngine.clearPlugins();
+  clearOpaDecisionCacheForTests();
 }
 
 export function listPolicies(): PolicyDefinition[] {
@@ -148,11 +137,12 @@ export function listPolicies(): PolicyDefinition[] {
 }
 
 export function requireRole(
-  input: { session: Session },
+  input: { session: Session } | { roles: readonly Role[] },
   role: Role,
   stage: PolicyCheckStage,
 ): PolicyError[] {
-  if (hasRole(input.session, role)) return [];
+  const allowed = 'session' in input ? hasRole(input.session, role) : input.roles.includes(role);
+  if (allowed) return [];
   return [
     {
       policyKey: `rbac.${role.toLowerCase()}_required`,
@@ -176,4 +166,51 @@ function detectEuInterestRateMutation(ruleSet: RuleSet): string | null {
     }
   }
   return null;
+}
+
+async function evaluateExternalPolicies(input: PolicyEvaluationInput): Promise<PolicyError[]> {
+  try {
+    const decision = await evaluateOpaPolicy(input);
+    if (!decision || decision.allow) {
+      return [];
+    }
+
+    const primaryMessage = decision.messages[0] ?? 'External OPA policy denied this operation.';
+    const rest = decision.messages.slice(1);
+
+    return [
+      {
+        policyKey: 'policy.external.opa',
+        code: 'opa_denied',
+        stage: input.stage,
+        message: primaryMessage,
+        hint:
+          rest.length > 0
+            ? rest.join(' | ')
+            : 'Ask your policy administrator to update the OPA rule set for this stage.',
+      },
+    ];
+  } catch (error) {
+    if (error instanceof OpaClientError) {
+      return [
+        {
+          policyKey: 'policy.external.opa',
+          code: error.code,
+          stage: input.stage,
+          message: error.message,
+          hint: 'Check OPA_URL, OPA_PACKAGE, OPA_TIMEOUT_MS, and OPA service health.',
+        },
+      ];
+    }
+
+    return [
+      {
+        policyKey: 'policy.external.opa',
+        code: 'opa_error',
+        stage: input.stage,
+        message: `OPA policy evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
+        hint: 'Check external policy service connectivity and response payload.',
+      },
+    ];
+  }
 }

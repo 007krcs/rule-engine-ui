@@ -1,11 +1,20 @@
 import { submitForReview } from '@/server/repository';
-import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
+import { noStoreJson, requirePolicy, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request, { params }: { params: Promise<{ versionId: string }> }) {
   return withApiErrorHandling(async () => {
     const { versionId } = await params;
+    const blocked = await requirePolicy({
+      stage: 'submit-for-review',
+      requiredRole: 'Author',
+      metadata: { route: 'config-versions.submit-review', versionId },
+    });
+    if (blocked) {
+      return blocked;
+    }
+
     const body = (await request.json().catch(() => null)) as null | { scope?: string; risk?: string };
     const scope = body?.scope?.trim();
     const risk = body?.risk;
@@ -19,7 +28,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ver
 
     const result = await submitForReview({ versionId, scope, risk });
     if (!result.ok) {
-      const status = result.error === 'Version not found' ? 404 : result.error === 'policy_failed' ? 403 : 400;
+      const status =
+        result.error === 'Version not found'
+          ? 404
+          : result.error === 'policy_failed'
+            ? 403
+            : result.error === 'version_killed'
+              ? 409
+              : 400;
       return noStoreJson(result, status);
     }
     return noStoreJson(result);

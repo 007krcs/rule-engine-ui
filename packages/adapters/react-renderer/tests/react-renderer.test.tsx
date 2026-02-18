@@ -59,8 +59,8 @@ describe('react-renderer', () => {
       components: [
         {
           id: 'bad',
-          type: 'card',
-          adapterHint: 'test.card',
+          type: 'button',
+          adapterHint: 'test.button',
           accessibility: {
             ariaLabelKey: '',
             keyboardNav: false,
@@ -75,6 +75,141 @@ describe('react-renderer', () => {
         <RenderPage uiSchema={schema} data={{}} context={context} i18n={createFallbackI18nProvider()} />,
       ),
     ).toThrow('ariaLabelKey is required');
+  });
+
+  it('allows non-interactive components without tabbable accessibility metadata', () => {
+    registerAdapter('non-interactive.', (component) => <div>{component.id}</div>);
+
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'non-interactive',
+      layout: { id: 'root', type: 'section', componentIds: ['divider'] },
+      components: [
+        {
+          id: 'divider',
+          type: 'divider',
+          adapterHint: 'non-interactive.divider',
+          accessibility: {
+            ariaLabelKey: '',
+            keyboardNav: false,
+          },
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(
+      <RenderPage uiSchema={schema} data={{}} context={context} i18n={createFallbackI18nProvider()} />,
+    );
+    expect(html).toContain('divider');
+  });
+
+  it('orders tabbable components by accessibility focusOrder', () => {
+    registerAdapter('focus-order.', (component) => <button type="button">{component.id}</button>);
+
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'focus-order',
+      layout: { id: 'root', type: 'section', componentIds: ['second', 'first'] },
+      components: [
+        {
+          id: 'second',
+          type: 'button',
+          adapterHint: 'focus-order.button',
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.customerName.aria',
+            keyboardNav: true,
+            focusOrder: 2,
+          },
+        },
+        {
+          id: 'first',
+          type: 'button',
+          adapterHint: 'focus-order.button',
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.orderTotal.aria',
+            keyboardNav: true,
+            focusOrder: 1,
+          },
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(
+      <RenderPage uiSchema={schema} data={{}} context={context} i18n={createFallbackI18nProvider()} />,
+    );
+    expect(html.indexOf('first')).toBeLessThan(html.indexOf('second'));
+  });
+
+  it('applies responsive hidden/span rules for breakpoint rendering', () => {
+    registerAdapter('responsive.', (component) => <div>{component.id}</div>);
+
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'responsive',
+      layoutType: 'grid',
+      layout: { id: 'root', type: 'grid', columns: 12, componentIds: ['hiddenOnMobile', 'wideOnDesktop'] },
+      grid: {
+        columns: 12,
+        rowHeight: 56,
+        gap: 12,
+      },
+      items: [
+        { id: 'hiddenOnMobile', componentId: 'hiddenOnMobile', x: 0, y: 0, w: 4, h: 2 },
+        { id: 'wideOnDesktop', componentId: 'wideOnDesktop', x: 4, y: 0, w: 2, h: 2 },
+      ],
+      components: [
+        {
+          id: 'hiddenOnMobile',
+          type: 'input',
+          adapterHint: 'responsive.input',
+          responsive: {
+            breakpoints: {
+              sm: { hidden: true },
+            },
+          },
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.customerName.aria',
+            keyboardNav: true,
+            focusOrder: 1,
+          },
+        },
+        {
+          id: 'wideOnDesktop',
+          type: 'input',
+          adapterHint: 'responsive.input',
+          responsive: {
+            breakpoints: {
+              lg: { span: 6 },
+            },
+          },
+          accessibility: {
+            ariaLabelKey: 'runtime.filters.orderTotal.aria',
+            keyboardNav: true,
+            focusOrder: 2,
+          },
+        },
+      ],
+    };
+
+    const mobileHtml = renderToStaticMarkup(
+      <RenderPage
+        uiSchema={schema}
+        data={{}}
+        context={{ ...context, device: 'mobile' }}
+        i18n={createFallbackI18nProvider()}
+      />,
+    );
+    expect(mobileHtml).not.toContain('hiddenOnMobile');
+
+    const desktopHtml = renderToStaticMarkup(
+      <RenderPage
+        uiSchema={schema}
+        data={{}}
+        context={{ ...context, device: 'desktop' }}
+        i18n={createFallbackI18nProvider()}
+      />,
+    );
+    expect(desktopHtml).toContain('span 6');
   });
 
   it('wires event handlers for adapters', () => {

@@ -440,7 +440,8 @@ export default function ConsolePage() {
                 <div className={styles.stack}>
                   {versions.map((version) => {
                     const pkgName = packageNameById.get(version.packageId) ?? version.packageId;
-                    const canPromote = version.status === 'APPROVED' && canPublish;
+                    const isKilled = Boolean(version.isKilled);
+                    const canPromote = version.status === 'APPROVED' && canPublish && !isKilled;
                     const canSubmitReview = version.status === 'DRAFT' && canAuthor;
                     return (
                       <div key={version.id} data-testid={`version-row-${version.id}`} className={styles.versionRow}>
@@ -453,6 +454,7 @@ export default function ConsolePage() {
                           </div>
                           <div className={styles.actionsRow}>
                             <Badge variant={statusVariant[version.status]}>{version.status}</Badge>
+                            {isKilled ? <Badge variant="warning">KILLED</Badge> : null}
                             <Button
                               variant="outline"
                               size="sm"
@@ -471,7 +473,13 @@ export default function ConsolePage() {
                               size="sm"
                               onClick={() => promote(version.id)}
                               disabled={!canPromote || busyKey === `promote:${version.id}`}
-                              title={canPromote ? undefined : `Cannot promote a ${version.status} version`}
+                              title={
+                                canPromote
+                                  ? undefined
+                                  : isKilled
+                                    ? version.killReason ?? 'Kill switch is active for this version'
+                                    : `Cannot promote a ${version.status} version`
+                              }
                             >
                               {busyKey === `promote:${version.id}` ? 'Promoting...' : 'Promote'}
                             </Button>
@@ -705,6 +713,7 @@ export default function ConsolePage() {
                     className="rfVisuallyHidden"
                     type="file"
                     accept="application/json"
+                    aria-label="Import GitOps package JSON"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) void importGitOps(file);

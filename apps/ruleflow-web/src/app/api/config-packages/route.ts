@@ -1,11 +1,20 @@
 import { createConfigPackage } from '@/server/repository';
 import { sampleTemplateById, type SampleTemplateId } from '@/lib/samples';
-import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
+import { noStoreJson, requirePolicy, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   return withApiErrorHandling(async () => {
+    const blocked = await requirePolicy({
+      stage: 'save',
+      requiredRole: 'Author',
+      metadata: { route: 'config-packages.create' },
+    });
+    if (blocked) {
+      return blocked;
+    }
+
     const body = (await request.json().catch(() => null)) as null | {
       name?: string;
       description?: string;

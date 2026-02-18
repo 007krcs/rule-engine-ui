@@ -1,6 +1,6 @@
 import type { ComponentRegistryManifest, RegistryScope } from '@platform/component-registry';
 import { getComponentRegistrySnapshot, registerComponentRegistryManifest } from '@/server/repository';
-import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
+import { noStoreJson, requirePolicy, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
@@ -15,6 +15,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withApiErrorHandling(async () => {
+    const blocked = await requirePolicy({
+      stage: 'promote',
+      requiredRole: 'Publisher',
+      metadata: { route: 'component-registry.register' },
+    });
+    if (blocked) {
+      return blocked;
+    }
+
     const body = (await request.json().catch(() => null)) as null | {
       scope?: RegistryScope;
       tenantId?: string;

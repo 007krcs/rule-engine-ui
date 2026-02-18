@@ -1,0 +1,171 @@
+.panel {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-muted);
+}
+
+.block {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+  padding: var(--rf-space-3);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--rf-muted);
+}
+
+.helper {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.fieldGrid {
+  display: grid;
+  gap: var(--rf-space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fieldGridTriple {
+  display: grid;
+  gap: var(--rf-space-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.conditionCard {
+  border: 1px solid color-mix(in srgb, var(--rf-border) 80%, transparent);
+  border-radius: var(--rf-radius-md);
+  padding: var(--rf-space-2);
+  background: var(--rf-surface);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.conditionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-2);
+}
+
+.conditionTitle {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rf-fg);
+}
+
+.conditionHeaderControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.conditionChildren {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.nodeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.compareGrid {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.operand {
+  display: grid;
+  gap: 6px;
+}
+
+.pathGrid {
+  display: grid;
+  gap: var(--rf-space-2);
+  grid-template-columns: 140px minmax(0, 1fr);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.fieldLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rf-muted);
+}
+
+.actionsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.actionList {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.actionCard {
+  border: 1px solid color-mix(in srgb, var(--rf-border) 80%, transparent);
+  border-radius: var(--rf-radius-md);
+  padding: var(--rf-space-2);
+  background: var(--rf-surface);
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.actionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rf-space-2);
+}
+
+.draggable {
+  cursor: grab;
+}
+
+.draggable:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 1100px) {
+  .fieldGrid,
+  .fieldGridTriple {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pathGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -21,6 +21,7 @@ Postgres-backed persistence layer for RuleFlow enterprise workflows.
 - `0001_enterprise_core.sql`: base schema.
 - `0002_tenant_rls.sql`: baseline tenant RLS policies.
 - `0002_rls_and_guards.sql`: fail-closed hardening (strict tenant guard function, restrictive policies, privilege revokes).
+- `0003_ui_pages.sql`: normalizes `config_versions.bundle` to include `uiSchemasById` and `activeUiPageId` for multi-page UI schemas.
 - Migration runner behavior: numeric prefix order first; if two files share a prefix, lexicographically later file is applied last as a patch layer.
 
 ## Local dev

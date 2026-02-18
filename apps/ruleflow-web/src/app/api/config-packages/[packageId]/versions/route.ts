@@ -1,5 +1,5 @@
 import { createConfigVersion } from '@/server/repository';
-import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
+import { noStoreJson, requirePolicy, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
@@ -9,6 +9,15 @@ export async function POST(
 ) {
   return withApiErrorHandling(async () => {
     const { packageId } = await params;
+    const blocked = await requirePolicy({
+      stage: 'save',
+      requiredRole: 'Author',
+      metadata: { route: 'config-versions.create', packageId },
+    });
+    if (blocked) {
+      return blocked;
+    }
+
     const body = (await request.json().catch(() => null)) as null | {
       fromVersionId?: string;
     };

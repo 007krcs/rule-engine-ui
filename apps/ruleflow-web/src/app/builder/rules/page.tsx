@@ -2,57 +2,45 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { Rule, RuleSet } from '@platform/schema';
+import type { RuleSet } from '@platform/schema';
 import { validateRulesSchema } from '@platform/validator';
 import type { ConfigVersion } from '@/lib/demo/types';
 import { apiGet, apiPatch } from '@/lib/demo/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
-import styles from './rules.module.css';
 import { useOnboarding } from '@/components/onboarding/onboarding-provider';
+import { RuleListPanel } from '@/components/rules/RuleListPanel';
+import { RuleEditorPanel } from '@/components/rules/RuleEditorPanel';
+import { ExplainPreviewPanel } from '@/components/rules/ExplainPreviewPanel';
+import {
+  cloneRuleDraft,
+  createDefaultRuleDraft,
+  draftsToRuleSet,
+  type RuleDraft,
+  rulesToDrafts,
+} from '@/components/rules/rule-visual-model';
+import styles from './rules.module.scss';
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
 
-function safeJsonParse(text: string): { ok: true; value: unknown } | { ok: false; error: string } {
-  try {
-    return { ok: true, value: JSON.parse(text) as unknown };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-function nextRuleId(existing: Set<string>, base = 'ONBOARDING_RULE') {
-  if (!existing.has(base)) return base;
+function nextRuleId(existing: Set<string>, base: string): string {
+  const cleaned = base.trim() || 'RULE';
+  if (!existing.has(cleaned)) return cleaned;
   let n = 2;
-  while (existing.has(`${base}_${n}`)) n += 1;
-  return `${base}_${n}`;
+  while (existing.has(`${cleaned}_${n}`)) n += 1;
+  return `${cleaned}_${n}`;
 }
 
-function addBeginnerRule(rules: RuleSet): RuleSet {
-  const existing = new Set((rules.rules ?? []).map((r) => r.ruleId));
-  const ruleId = nextRuleId(existing);
-
-  const nextRule: Rule = {
-    ruleId,
-    description: 'Beginner rule: set a flag so you can see it in Explain mode.',
-    priority: 150,
-    when: {
-      op: 'eq',
-      left: { path: 'context.country' },
-      right: { value: 'US' },
-    },
-    actions: [
-      { type: 'setField', path: 'data.beginnerRuleApplied', value: true },
-      { type: 'emitEvent', event: 'beginnerRuleApplied', payload: { ruleId } },
-    ],
-  };
-
-  return {
-    ...rules,
-    rules: [nextRule, ...(rules.rules ?? [])],
-  };
+function reorderByIds<T extends { id: string }>(items: T[], fromId: string, toId: string): T[] {
+  const fromIndex = items.findIndex((item) => item.id === fromId);
+  const toIndex = items.findIndex((item) => item.id === toId);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return items;
+  const next = [...items];
+  const [moved] = next.splice(fromIndex, 1);
+  if (!moved) return items;
+  next.splice(toIndex, 0, moved);
+  return next;
 }
 
 export default function RulesBuilderPage() {
@@ -63,20 +51,28 @@ export default function RulesBuilderPage() {
 
   const [loading, setLoading] = useState(false);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
-  const [rulesText, setRulesText] = useState('');
+  const [ruleDrafts, setRuleDrafts] = useState<RuleDraft[]>([]);
+  const [selectedRuleDraftId, setSelectedRuleDraftId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
   const [dirty, setDirty] = useState(false);
   const lastLoadedVersionId = useRef<string | null>(null);
 
-  const parsed = useMemo(() => safeJsonParse(rulesText), [rulesText]);
-  const validation = useMemo(() => {
-    if (!parsed.ok) return { valid: false, issues: [{ path: 'rules', message: parsed.error, severity: 'error' as const }] };
-    return validateRulesSchema(parsed.value as RuleSet);
-  }, [parsed]);
+  const selectedRule = useMemo(
+    () => ruleDrafts.find((rule) => rule.id === selectedRuleDraftId) ?? null,
+    [ruleDrafts, selectedRuleDraftId],
+  );
+
+  const compiledRuleSet = useMemo(() => {
+    const version = loadedVersion?.bundle.rules.version ?? '1.0.0';
+    return draftsToRuleSet(version, ruleDrafts);
+  }, [loadedVersion?.bundle.rules.version, ruleDrafts]);
+
+  const validation = useMemo(() => validateRulesSchema(compiledRuleSet), [compiledRuleSet]);
 
   const loadFromStore = async (force?: boolean) => {
     if (!versionId) return;
     if (!force && dirty) {
-      toast({ variant: 'info', title: 'Unsaved changes', description: 'Format/Save or Reload with force.' });
+      toast({ variant: 'info', title: 'Unsaved changes', description: 'Save or use Reload to discard local edits.' });
       return;
     }
 
@@ -84,15 +80,20 @@ export default function RulesBuilderPage() {
     try {
       const response = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(versionId)}`);
       if (!response.ok) throw new Error(response.error);
+      const drafts = rulesToDrafts(response.version.bundle.rules);
+
       setLoadedVersion(response.version);
-      setRulesText(JSON.stringify(response.version.bundle.rules, null, 2));
+      setRuleDrafts(drafts);
+      setSelectedRuleDraftId(drafts[0]?.id ?? null);
+      setSearchText('');
       setDirty(false);
       lastLoadedVersionId.current = versionId;
       toast({ variant: 'info', title: 'Loaded rules', description: response.version.version });
     } catch (error) {
       toast({ variant: 'error', title: 'Failed to load rules', description: error instanceof Error ? error.message : String(error) });
       setLoadedVersion(null);
-      setRulesText('');
+      setRuleDrafts([]);
+      setSelectedRuleDraftId(null);
       setDirty(false);
     } finally {
       setLoading(false);
@@ -103,35 +104,50 @@ export default function RulesBuilderPage() {
     if (!versionId) return;
     if (versionId === lastLoadedVersionId.current) return;
     void loadFromStore(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versionId]);
 
-  const format = () => {
-    if (!parsed.ok) {
-      toast({ variant: 'error', title: 'Cannot format invalid JSON', description: parsed.error });
-      return;
-    }
-    setRulesText(JSON.stringify(parsed.value, null, 2));
+  const updateRuleDraft = (rule: RuleDraft) => {
+    setRuleDrafts((current) =>
+      current.map((candidate) => (candidate.id === rule.id ? rule : candidate)),
+    );
     setDirty(true);
   };
 
-  const insertBeginnerRule = () => {
-    if (!parsed.ok) {
-      toast({ variant: 'error', title: 'Fix JSON first', description: parsed.error });
-      return;
-    }
-    const next = addBeginnerRule(parsed.value as RuleSet);
-    setRulesText(JSON.stringify(next, null, 2));
+  const addRuleDraft = () => {
+    const existing = new Set(ruleDrafts.map((rule) => rule.ruleId));
+    const next = createDefaultRuleDraft();
+    next.ruleId = nextRuleId(existing, next.ruleId);
+    setRuleDrafts((current) => [next, ...current]);
+    setSelectedRuleDraftId(next.id);
     setDirty(true);
-    toast({ variant: 'success', title: 'Inserted a starter rule', description: 'Save to persist it.' });
+  };
+
+  const duplicateRuleDraft = (ruleId: string) => {
+    const source = ruleDrafts.find((rule) => rule.id === ruleId);
+    if (!source) return;
+    const existing = new Set(ruleDrafts.map((rule) => rule.ruleId));
+    const duplicated = cloneRuleDraft(source);
+    duplicated.ruleId = nextRuleId(existing, duplicated.ruleId);
+    setRuleDrafts((current) => [duplicated, ...current]);
+    setSelectedRuleDraftId(duplicated.id);
+    setDirty(true);
+  };
+
+  const deleteRuleDraft = (ruleId: string) => {
+    setRuleDrafts((current) => {
+      const next = current.filter((rule) => rule.id !== ruleId);
+      if (selectedRuleDraftId === ruleId) {
+        setSelectedRuleDraftId(next[0]?.id ?? null);
+      }
+      return next;
+    });
+    setDirty(true);
   };
 
   const save = async () => {
     if (!versionId) {
-      toast({ variant: 'error', title: 'No versionId', description: 'Clone a sample first (or create a New Config).' });
-      return;
-    }
-    if (!parsed.ok) {
-      toast({ variant: 'error', title: 'Invalid JSON', description: parsed.error });
+      toast({ variant: 'error', title: 'No version selected', description: 'Open this page with ?versionId=...' });
       return;
     }
     if (!validation.valid) {
@@ -143,9 +159,7 @@ export default function RulesBuilderPage() {
     try {
       const result = await apiPatch<{ ok: true } | { ok: false; error: string }>(
         `/api/config-versions/${encodeURIComponent(versionId)}/rules`,
-        {
-          rules: parsed.value,
-        },
+        { rules: compiledRuleSet as RuleSet },
       );
       if (!result.ok) throw new Error(result.error);
       toast({ variant: 'success', title: 'Saved rule set' });
@@ -165,12 +179,11 @@ export default function RulesBuilderPage() {
       {!versionId ? (
         <Card className={styles.hintCard}>
           <CardHeader>
-            <CardTitle>Start with a sample</CardTitle>
+            <CardTitle>Start with a config version</CardTitle>
           </CardHeader>
           <CardContent>
             <p className={styles.hintText}>
-              Rules are stored per config version. Clone a sample project first, then come back here with a{' '}
-              <span className="rfCodeInline">versionId</span>.
+              Rules are saved per version. Open this page with <span className="rfCodeInline">?versionId=...</span> to begin.
             </p>
           </CardContent>
         </Card>
@@ -180,7 +193,7 @@ export default function RulesBuilderPage() {
         <CardHeader>
           <div className={styles.headerRow}>
             <div>
-              <CardTitle>Rules Builder</CardTitle>
+              <CardTitle>Visual Rules Editor</CardTitle>
               <p className={styles.subtext}>
                 {versionId ? (
                   <>
@@ -188,7 +201,7 @@ export default function RulesBuilderPage() {
                     {loadedVersion ? ` - ${loadedVersion.status}` : null}
                   </>
                 ) : (
-                  'Open this page with ?versionId=...'
+                  'Open with ?versionId=...'
                 )}
               </p>
             </div>
@@ -196,82 +209,78 @@ export default function RulesBuilderPage() {
               <Button variant="outline" size="sm" onClick={() => void loadFromStore(true)} disabled={!versionId || loading}>
                 Reload
               </Button>
-              <Button variant="outline" size="sm" onClick={format} disabled={!versionId || loading || !parsed.ok}>
-                Format
-              </Button>
-              <Button variant="outline" size="sm" onClick={insertBeginnerRule} disabled={!versionId || loading}>
-                Add starter rule
-              </Button>
-              <Button size="sm" onClick={() => void save()} disabled={!versionId || loading || !validation.valid || !dirty}>
+              <Button
+                size="sm"
+                onClick={() => void save()}
+                disabled={!versionId || loading || !validation.valid || !dirty}
+                data-testid="rules-save-button"
+              >
                 {loading ? 'Working...' : 'Save'}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className={styles.grid2}>
-          <div className={styles.field}>
-            <label className="rfFieldLabel" htmlFor="ruleset-json">
-              RuleSet JSON
-            </label>
-            <Textarea
-              id="ruleset-json"
-              className={styles.textarea}
-              value={rulesText}
-              placeholder={versionId ? 'Loading...' : 'Clone a sample config to begin.'}
-              onChange={(event) => {
-                setRulesText(event.target.value);
-                setDirty(true);
-              }}
-              disabled={!versionId || loading}
-            />
-            <p className="rfHelperText">
-              Tip: click <strong>Add starter rule</strong>, then <strong>Save</strong>, then go to Playground and hit{' '}
-              <strong>Submit</strong> to see Explain mode.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gap: 12 }}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Validation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p style={{ margin: 0, color: validation.valid ? 'var(--rf-success)' : 'var(--rf-muted)', fontSize: 13 }}>
-                  {validation.valid ? 'Valid RuleSet' : `${validation.issues.length} issue(s)`}
+        <CardContent className={styles.validationBar}>
+          <p className={styles.validationText}>
+            {validation.valid ? `Valid ruleset (${compiledRuleSet.rules.length} rules)` : `${validation.issues.length} validation issue(s)`}
+          </p>
+          {!validation.valid ? (
+            <div className={styles.issues}>
+              {validation.issues.slice(0, 5).map((issue) => (
+                <p key={`${issue.path}-${issue.message}`} className={styles.issueLine}>
+                  <span className={styles.issuePath}>{issue.path || 'root'}</span>: {issue.message}
                 </p>
-                {!validation.valid ? (
-                  <div style={{ height: 10 }} />
-                ) : (
-                  <p className="rfHelperText" style={{ marginTop: 10 }}>
-                    Save is enabled once you make changes and the JSON validates.
-                  </p>
-                )}
-                {!validation.valid ? (
-                  <div className={styles.issuesBox} role="status" aria-live="polite">
-                    {validation.issues.slice(0, 6).map((issue) => (
-                      <p key={`${issue.path}-${issue.message}`} className={styles.issueLine}>
-                        <span className={styles.issuePath}>{issue.path || 'root'}</span>: {issue.message}
-                      </p>
-                    ))}
-                    {validation.issues.length > 6 ? <p className={styles.issueLine}>...</p> : null}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Next</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="rfHelperText" style={{ marginTop: 0 }}>
-                  After saving rules, open Playground and run Submit. Then toggle Explain mode to see which rules matched and why.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
+
+      <div className={styles.workspace}>
+        <Card className={styles.leftPane}>
+          <CardContent className={styles.scrollPane}>
+            <RuleListPanel
+              rules={ruleDrafts}
+              selectedRuleId={selectedRuleDraftId}
+              searchText={searchText}
+              onSearchTextChange={setSearchText}
+              onSelectRule={setSelectedRuleDraftId}
+              onAddRule={addRuleDraft}
+              onDuplicateRule={duplicateRuleDraft}
+              onDeleteRule={deleteRuleDraft}
+              onReorderRules={(fromRuleId, toRuleId) => {
+                setRuleDrafts((current) => reorderByIds(current, fromRuleId, toRuleId));
+                setDirty(true);
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className={styles.centerPane}>
+          <CardContent className={styles.scrollPane}>
+            <RuleEditorPanel
+              rule={selectedRule}
+              onRuleChange={(nextRule) => {
+                updateRuleDraft(nextRule);
+                if (selectedRuleDraftId !== nextRule.id) setSelectedRuleDraftId(nextRule.id);
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className={styles.rightPane}>
+          <CardContent className={styles.scrollPane}>
+            <ExplainPreviewPanel ruleSet={compiledRuleSet} />
+
+            <details className={styles.advancedJson}>
+              <summary>Advanced JSON (read-only)</summary>
+              <pre className={styles.jsonPreview} data-testid="rules-json-preview">
+                {JSON.stringify(compiledRuleSet, null, 2)}
+              </pre>
+            </details>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

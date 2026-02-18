@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm -r --filter @platform/ui-kit --filter @platform/observability --filter @platform/validator --filter @platform/react-renderer --filter @platform/react-platform-adapter --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter build",
-    "prebuild": "pnpm -r --filter @platform/ui-kit --filter @platform/schema --filter @platform/component-registry --filter @platform/i18n --filter @platform/observability --filter @platform/validator --filter @platform/core-runtime --filter @platform/react-renderer --filter @platform/react-platform-adapter --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter --filter @platform/angular-renderer --filter @platform/vue-renderer build",
+    "predev": "pnpm -r --filter @platform/ui-kit --filter @platform/observability --filter @platform/validator --filter @platform/api-orchestrator --filter @platform/react-renderer --filter @platform/react-platform-adapter --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter build",
+    "prebuild": "pnpm -r --filter @platform/ui-kit --filter @platform/schema --filter @platform/component-registry --filter @platform/i18n --filter @platform/observability --filter @platform/validator --filter @platform/api-orchestrator --filter @platform/core-runtime --filter @platform/react-renderer --filter @platform/react-platform-adapter --filter @platform/react-material-adapter --filter @platform/react-aggrid-adapter --filter @platform/react-highcharts-adapter --filter @platform/react-d3-adapter --filter @platform/react-company-adapter --filter @platform/angular-renderer --filter @platform/vue-renderer build",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -20,6 +20,7 @@
     "@mdx-js/react": "^3.0.1",
     "@next/mdx": "^15.1.0",
     "@platform/angular-renderer": "workspace:*",
+    "@platform/api-orchestrator": "workspace:*",
     "@platform/core-runtime": "workspace:*",
     "@platform/component-registry": "workspace:*",
     "@platform/i18n": "workspace:*",

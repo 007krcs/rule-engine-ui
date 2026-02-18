@@ -1,5 +1,5 @@
 import { rollbackVersion } from '@/server/repository';
-import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
+import { noStoreJson, requirePolicy, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
@@ -9,11 +9,22 @@ export async function POST(
 ) {
   return withApiErrorHandling(async () => {
     const { versionId } = await params;
+    const blocked = await requirePolicy({
+      stage: 'promote',
+      requiredRole: 'Publisher',
+      metadata: { route: 'config-versions.rollback', versionId },
+    });
+    if (blocked) {
+      return blocked;
+    }
+
     const result = await rollbackVersion({ versionId });
     if (!result.ok) {
       const status =
         result.error === 'policy_failed'
           ? 403
+          : result.error === 'version_killed'
+            ? 409
           : result.error === 'Version not found'
             ? 404
             : 400;

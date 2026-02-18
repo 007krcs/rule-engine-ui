@@ -1,5 +1,5 @@
 import { getBranding, upsertBranding } from '@/server/repository';
-import { noStoreJson, withApiErrorHandling } from '@/app/api/_shared';
+import { noStoreJson, requirePolicy, withApiErrorHandling } from '@/app/api/_shared';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +12,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   return withApiErrorHandling(async () => {
+    const blocked = await requirePolicy({
+      stage: 'promote',
+      requiredRole: 'Publisher',
+      metadata: { route: 'branding.upsert' },
+    });
+    if (blocked) {
+      return blocked;
+    }
+
     const body = (await request.json().catch(() => null)) as null | {
       logoUrl?: string;
       mode?: 'light' | 'dark' | 'system';

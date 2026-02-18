@@ -60,6 +60,8 @@ const systemItems = [
 ];
 
 function helpHrefForPathname(pathname: string): string {
+  if (pathname.startsWith('/builder/flow')) return '/docs/tutorial-flow-editor';
+  if (pathname.startsWith('/builder/api-mappings')) return '/docs/schemas';
   if (pathname.startsWith('/builder/rules')) return '/docs/tutorial-rules';
   if (pathname.startsWith('/builder')) return '/docs/tutorial-builder';
   if (pathname.startsWith('/playground')) return '/docs/tutorial-playground';
@@ -81,6 +83,8 @@ function getPageTitle(pathname: string, tab?: string | null) {
   if (pathname.startsWith('/samples')) return 'Samples';
   if (pathname.startsWith('/component-registry')) return 'Component Registry';
   if (pathname.startsWith('/integrations')) return 'Integration Hub';
+  if (pathname.startsWith('/builder/flow')) return 'Flow Builder';
+  if (pathname.startsWith('/builder/api-mappings')) return 'API Mapping Builder';
   if (pathname.startsWith('/builder')) return 'Builder';
   if (pathname.startsWith('/playground')) return 'Playground';
 
@@ -268,6 +272,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       { id: 'getting-started', label: 'Getting Started Wizard', onRun: () => onboarding.open() },
       { id: 'new-config', label: 'New Config', onRun: () => setNewConfigOpen(true) },
       { id: 'open-builder', label: 'Open Builder', onRun: () => router.push(withActive('/builder')) },
+      { id: 'open-flow-builder', label: 'Open Flow Builder', onRun: () => router.push(withActive('/builder/flow')) },
+      { id: 'open-api-mappings-builder', label: 'Open API Mapping Builder', onRun: () => router.push(withActive('/builder/api-mappings')) },
       { id: 'open-rules', label: 'Open Rules Builder', onRun: () => router.push(withActive('/builder/rules')) },
       { id: 'open-playground', label: 'Open Playground', onRun: () => router.push(withActive('/playground')) },
       { id: 'open-console', label: 'Open Console', onRun: () => router.push('/console') },

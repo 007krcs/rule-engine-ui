@@ -1,0 +1,125 @@
+.page {
+  display: grid;
+  gap: var(--rf-space-4);
+}
+
+.hintCard {
+  border-color: color-mix(in srgb, var(--rf-primary) 28%, var(--rf-border));
+}
+
+.hintText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-muted);
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--rf-space-3);
+}
+
+.subtext {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--rf-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.validationBar {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.validationText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rf-fg);
+}
+
+.issues {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  background: color-mix(in srgb, var(--rf-surface-2) 70%, transparent);
+  padding: var(--rf-space-2);
+}
+
+.issueLine {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+
+.issuePath {
+  font-family: var(--rf-font-mono);
+  color: var(--rf-fg);
+}
+
+.workspace {
+  display: grid;
+  gap: var(--rf-space-3);
+  grid-template-columns: 320px minmax(0, 1fr) 420px;
+  min-height: calc(100vh - 260px);
+}
+
+.leftPane,
+.centerPane,
+.rightPane {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.scrollPane {
+  min-height: 0;
+  overflow: auto;
+}
+
+.advancedJson {
+  margin-top: var(--rf-space-3);
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  background: color-mix(in srgb, var(--rf-surface-2) 65%, transparent);
+  padding: var(--rf-space-2);
+}
+
+.advancedJson summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--rf-muted);
+}
+
+.jsonPreview {
+  margin: var(--rf-space-2) 0 0;
+  padding: var(--rf-space-2);
+  border-radius: var(--rf-radius-sm);
+  background: var(--rf-surface);
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: var(--rf-font-mono);
+  max-height: 300px;
+  overflow: auto;
+}
+
+@media (max-width: 1400px) {
+  .workspace {
+    grid-template-columns: 280px minmax(0, 1fr) 360px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

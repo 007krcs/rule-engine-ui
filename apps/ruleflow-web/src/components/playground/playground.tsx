@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule, UISchema } from '@platform/schema';
+import type { ApiMapping, ExecutionContext, FlowSchema, JSONValue, Rule } from '@platform/schema';
 import { executeStep } from '@platform/core-runtime';
 import { RenderPage } from '@platform/react-renderer';
 import { registerPlatformAdapter } from '@platform/react-platform-adapter';
@@ -14,6 +14,8 @@ import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } f
 import type { ConditionExplain, ExplainOperand, RuleActionDiff, RuleRead } from '@platform/observability';
 import type { ConfigVersion, ConsoleSnapshot } from '@/lib/demo/types';
 import { apiGet } from '@/lib/demo/api-client';
+import { useRuntimeFlags } from '@/lib/use-runtime-flags';
+import { normalizeUiPages, rebindFlowSchemaToAvailablePages } from '@/lib/demo/ui-pages';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,14 +51,6 @@ const initialData: Record<string, JSONValue> = {
   revenueSeries: [],
   customViz: [],
 };
-
-function buildUiSchemasById(flow: FlowSchema, uiSchema: UISchema): Record<string, UISchema> {
-  const map: Record<string, UISchema> = {};
-  for (const state of Object.values(flow.states)) {
-    map[state.uiPageId] = uiSchema;
-  }
-  return map;
-}
 
 async function demoFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -221,6 +215,24 @@ export function Playground({
   const [context, setContext] = useState<ExecutionContext>(initialContext);
   const [data, setData] = useState<Record<string, JSONValue>>(initialData);
   const [trace, setTrace] = useState<RuntimeTrace | null>(null);
+  const runtimeFlags = useRuntimeFlags({
+    env: 'prod',
+    versionId: selectedVersionId || undefined,
+    packageId: version?.packageId,
+  });
+  const killSwitchActive = Boolean(selectedVersionId && runtimeFlags.killSwitch.active);
+  const killSwitchReason =
+    runtimeFlags.killSwitch.reason ?? 'This version is disabled by an active kill switch.';
+  const effectiveContext = useMemo<ExecutionContext>(
+    () => ({
+      ...context,
+      featureFlags: {
+        ...context.featureFlags,
+        ...runtimeFlags.featureFlags,
+      },
+    }),
+    [context, runtimeFlags.featureFlags],
+  );
 
   const traceFocusRef = useRef<HTMLDivElement | null>(null);
   const autoRunRef = useRef(false);
@@ -267,17 +279,32 @@ export function Playground({
     setActiveVersionId(selectedVersionId);
   }, [activeVersionId, selectedVersionId, setActiveVersionId]);
 
-  const flow: FlowSchema | null = version?.bundle.flowSchema ?? null;
-  const uiSchema: UISchema | null = version?.bundle.uiSchema ?? null;
+  const flowRaw: FlowSchema | null = version?.bundle.flowSchema ?? null;
   const rules: Rule[] = version?.bundle.rules.rules ?? [];
   const apiMappingsById: Record<string, ApiMapping> = version?.bundle.apiMappingsById ?? {};
 
-  const uiSchemasById = useMemo(() => {
-    if (!flow || !uiSchema) return {};
-    return buildUiSchemasById(flow, uiSchema);
-  }, [flow, uiSchema]);
+  const normalizedUiPages = useMemo(
+    () =>
+      normalizeUiPages({
+        uiSchema: version?.bundle.uiSchema,
+        uiSchemasById: version?.bundle.uiSchemasById,
+        activeUiPageId: version?.bundle.activeUiPageId,
+        flowSchema: flowRaw,
+      }),
+    [flowRaw, version?.bundle.activeUiPageId, version?.bundle.uiSchema, version?.bundle.uiSchemasById],
+  );
+  const uiSchemasById = normalizedUiPages.uiSchemasById;
+  const flow = useMemo(
+    () =>
+      rebindFlowSchemaToAvailablePages(
+        flowRaw,
+        uiSchemasById,
+        normalizedUiPages.activeUiPageId,
+      ),
+    [flowRaw, normalizedUiPages.activeUiPageId, uiSchemasById],
+  );
 
-  const baseLocale = context.locale.split('-')[0] ?? context.locale;
+  const baseLocale = effectiveContext.locale.split('-')[0] ?? effectiveContext.locale;
   const i18n = useMemo(
     () =>
       createProviderFromBundles({
@@ -290,14 +317,27 @@ export function Playground({
   );
 
   const currentState = flow ? flow.states[stateId] : null;
-  const currentUiSchema = currentState && uiSchema ? uiSchemasById[currentState.uiPageId] ?? uiSchema : uiSchema;
+  const currentUiSchema = currentState
+    ? uiSchemasById[currentState.uiPageId] ??
+      uiSchemasById[normalizedUiPages.activeUiPageId] ??
+      Object.values(uiSchemasById)[0] ??
+      null
+    : uiSchemasById[normalizedUiPages.activeUiPageId] ?? Object.values(uiSchemasById)[0] ?? null;
 
   const runEvent = async (event: string) => {
     if (!flow || !currentUiSchema) return;
+    if (killSwitchActive) {
+      toast({
+        variant: 'error',
+        title: 'Execution blocked by kill switch',
+        description: killSwitchReason,
+      });
+      return;
+    }
     setBusy(true);
     try {
       let runtimeStateId = stateId;
-      let runtimeContext = context;
+      let runtimeContext = effectiveContext;
       let runtimeData = data;
 
       if (event === 'submit') {
@@ -318,6 +358,7 @@ export function Playground({
             event: 'next',
             context: runtimeContext,
             data: runtimeData,
+            killSwitch: { active: killSwitchActive, reason: killSwitchReason },
             fetchFn: demoFetch,
           });
 
@@ -338,10 +379,17 @@ export function Playground({
         event,
         context: runtimeContext,
         data: runtimeData,
+        killSwitch: { active: killSwitchActive, reason: killSwitchReason },
         fetchFn: demoFetch,
       });
       setStateId(result.nextStateId);
-      setContext(result.updatedContext);
+      setContext({
+        ...result.updatedContext,
+        featureFlags: {
+          ...result.updatedContext.featureFlags,
+          ...runtimeFlags.featureFlags,
+        },
+      });
       setData(result.updatedData as Record<string, JSONValue>);
       setTrace(result.trace);
 
@@ -396,7 +444,13 @@ export function Playground({
   const reset = () => {
     if (!flow) return;
     setStateId(flow.initialState);
-    setContext(initialContext);
+    setContext({
+      ...initialContext,
+      featureFlags: {
+        ...initialContext.featureFlags,
+        ...runtimeFlags.featureFlags,
+      },
+    });
     setData(initialData);
     setTrace(null);
   };
@@ -452,26 +506,32 @@ export function Playground({
             </div>
           </div>
 
+          {killSwitchActive ? (
+            <p className={styles.error} data-testid="playground-kill-warning">
+              Execution blocked by kill switch. {killSwitchReason}
+            </p>
+          ) : null}
+
           <div className={styles.actions}>
             <Button size="sm" variant="outline" onClick={reset} disabled={busy}>
               Reset
             </Button>
-            <Button size="sm" onClick={() => runEvent('back')} disabled={busy || !flow}>
+            <Button size="sm" onClick={() => runEvent('back')} disabled={busy || !flow || killSwitchActive}>
               Back
             </Button>
-            <Button size="sm" onClick={() => runEvent('next')} disabled={busy || !flow}>
+            <Button size="sm" onClick={() => runEvent('next')} disabled={busy || !flow || killSwitchActive}>
               Next
             </Button>
-            <Button size="sm" onClick={() => runEvent('submit')} disabled={busy || !flow}>
+            <Button size="sm" onClick={() => runEvent('submit')} disabled={busy || !flow || killSwitchActive}>
               Submit
             </Button>
           </div>
 
           <div className={styles.stateBox}>
-            <p className={styles.stateRow}>
+            <p className={styles.stateRow} data-testid="playground-current-state">
               <span className={styles.stateKey}>State:</span> {stateId}
             </p>
-            <p className={styles.stateRow}>
+            <p className={styles.stateRow} data-testid="playground-current-event">
               <span className={styles.stateKey}>Event:</span> {trace?.flow.event ?? '-'}
             </p>
           </div>
@@ -489,7 +549,7 @@ export function Playground({
             <RenderPage
               uiSchema={currentUiSchema}
               data={data}
-              context={context}
+              context={effectiveContext}
               i18n={i18n}
               mode="controlled"
               onDataChange={setData}

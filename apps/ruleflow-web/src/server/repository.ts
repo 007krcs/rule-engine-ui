@@ -6,6 +6,7 @@ import exampleRules from '@platform/schema/examples/example.rules.json';
 import exampleUi from '@platform/schema/examples/example.ui.json';
 import { getMockSession, type Role } from '@/lib/auth';
 import type { ConfigBundle, ConfigVersion, ConsoleSnapshot, GitOpsBundle, JsonDiffItem } from '@/lib/demo/types';
+import { applyUiPageUpdateToBundle, createSinglePageBundle } from '@/lib/demo/ui-pages';
 import { buildGitOpsBundlePayloadFromPostgres, normalizeGitOpsBundleForPostgres } from '@/server/gitops';
 import * as demo from '@/server/demo/repository';
 import { recordRuntimeTrace } from '@/server/metrics';
@@ -22,6 +23,17 @@ import {
 type ProviderMode = 'demo' | 'postgres';
 type PostgresRepositoryConstructor = {
   create(input: { connectionString?: string; runMigrationsOnBoot?: boolean }): Promise<PostgresTenantRepository>;
+};
+
+type RuntimeKillSource = {
+  scope: KillScope | 'VERSION';
+  reason?: string;
+};
+
+type RuntimeKillState = {
+  active: boolean;
+  reason?: string;
+  sources: RuntimeKillSource[];
 };
 
 let postgresRepoPromise: Promise<PostgresTenantRepository> | null = null;
@@ -76,11 +88,22 @@ function policyFailure(errors: PolicyError[]) {
   };
 }
 
+function versionKilledFailure(reason?: string) {
+  return {
+    ok: false as const,
+    error: 'version_killed',
+    message: reason
+      ? `Version is disabled by an active kill switch (${reason})`
+      : 'Version is disabled by an active kill switch',
+  };
+}
+
 async function evaluatePolicyStage(input: {
   stage: PolicyCheckStage;
   requiredRole?: Role;
   currentBundle?: ConfigBundle;
   nextBundle?: ConfigBundle;
+  metadata?: Record<string, unknown>;
 }) {
   const session = getMockSession();
   const errors: PolicyError[] = [];
@@ -91,13 +114,118 @@ async function evaluatePolicyStage(input: {
   errors.push(
     ...(await evaluatePolicies({
       stage: input.stage,
-      session,
+      tenantId: session.tenantId,
+      userId: session.user.id,
+      roles: session.roles,
       currentBundle: input.currentBundle,
       nextBundle: input.nextBundle,
+      metadata: input.metadata,
     })),
   );
 
   return errors;
+}
+
+function toFeatureFlagMap(
+  flags: ReadonlyArray<{
+    key: string;
+    enabled: boolean;
+  }>,
+): Record<string, boolean> {
+  const map: Record<string, boolean> = {};
+  for (const flag of flags) {
+    map[flag.key] = flag.enabled;
+  }
+  return map;
+}
+
+function killSwitchMatchesVersion(
+  killSwitch: {
+    scope: KillScope;
+    active: boolean;
+    versionId?: string;
+    packageId?: string;
+    reason?: string;
+  },
+  input: { versionId?: string; packageId?: string },
+): boolean {
+  if (!killSwitch.active) return false;
+  if (killSwitch.scope === 'TENANT') return true;
+  if (killSwitch.scope === 'VERSION') return Boolean(input.versionId && killSwitch.versionId === input.versionId);
+  if (killSwitch.scope === 'RULESET') return Boolean(input.packageId && killSwitch.packageId === input.packageId);
+  return false;
+}
+
+function summarizeKillState(
+  activeSwitches: ReadonlyArray<{
+    scope: KillScope;
+    reason?: string;
+  }>,
+  versionKill?: { active: boolean; reason?: string },
+): RuntimeKillState {
+  const sources: RuntimeKillSource[] = activeSwitches.map((killSwitch) => ({
+    scope: killSwitch.scope,
+    reason: killSwitch.reason,
+  }));
+  if (versionKill?.active) {
+    sources.push({
+      scope: 'VERSION',
+      reason: versionKill.reason,
+    });
+  }
+  const reason =
+    sources.find((source) => typeof source.reason === 'string' && source.reason.trim().length > 0)?.reason ??
+    undefined;
+  return {
+    active: sources.length > 0,
+    reason,
+    sources,
+  };
+}
+
+async function resolveRuntimeKillState(input: {
+  versionId?: string;
+  packageId?: string;
+}): Promise<RuntimeKillState> {
+  if (providerMode() !== 'postgres') {
+    return {
+      active: false,
+      sources: [],
+    };
+  }
+
+  const session = toRepoSession();
+  const repo = await getPostgresRepo();
+  const killSwitches = await repo.listKillSwitches({ tenantId: session.tenantId });
+  const activeSwitches = killSwitches.filter((killSwitch) =>
+    killSwitchMatchesVersion(killSwitch, input),
+  );
+
+  let versionKill: { active: boolean; reason?: string } | undefined;
+  if (input.versionId) {
+    const version = await repo.getConfigVersion(session.tenantId, input.versionId);
+    if (version?.isKilled) {
+      versionKill = {
+        active: true,
+        reason: version.killReason,
+      };
+    }
+  }
+
+  return summarizeKillState(activeSwitches, versionKill);
+}
+
+async function assertVersionNotKilled(input: {
+  versionId: string;
+  packageId?: string;
+  knownReason?: string;
+}): Promise<null | ReturnType<typeof versionKilledFailure>> {
+  const killState = await resolveRuntimeKillState({
+    versionId: input.versionId,
+    packageId: input.packageId,
+  });
+  if (!killState.active) return null;
+  return versionKilledFailure(killState.reason ?? input.knownReason);
 }
 
 function slugId(raw: string): string {
@@ -148,13 +276,24 @@ function jsonDiff(before: unknown, after: unknown, path = 'root'): JsonDiffItem[
 }
 
 function defaultBundle(): ConfigBundle {
+  const uiSchema = JSON.parse(JSON.stringify(exampleUi)) as ConfigBundle['uiSchema'];
+  const flowSchema = JSON.parse(JSON.stringify(exampleFlow)) as ConfigBundle['flowSchema'];
+  const rules = JSON.parse(JSON.stringify(exampleRules)) as ConfigBundle['rules'];
+  const apiMappingsById = {
+    submitOrder: JSON.parse(JSON.stringify(exampleApi)) as ConfigBundle['apiMappingsById'][string],
+  };
+
+  if (!uiSchema) {
+    throw new Error('example ui schema is missing');
+  }
+
   return {
-    uiSchema: JSON.parse(JSON.stringify(exampleUi)) as ConfigBundle['uiSchema'],
-    flowSchema: JSON.parse(JSON.stringify(exampleFlow)) as ConfigBundle['flowSchema'],
-    rules: JSON.parse(JSON.stringify(exampleRules)) as ConfigBundle['rules'],
-    apiMappingsById: {
-      submitOrder: JSON.parse(JSON.stringify(exampleApi)) as ConfigBundle['apiMappingsById'][string],
-    },
+    ...createSinglePageBundle({
+      uiSchema,
+      flowSchema,
+      rules,
+      apiMappingsById,
+    }),
   };
 }
 
@@ -215,6 +354,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
             updatedAt: version.updatedAt,
             updatedBy: version.updatedBy,
             bundle: version.bundle as ConfigBundle,
+            isKilled: version.isKilled,
+            killReason: version.killReason,
           })),
       })),
       versions: snapshot.versions.map((version) => ({
@@ -227,6 +368,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
         updatedAt: version.updatedAt,
         updatedBy: version.updatedBy,
         bundle: version.bundle as ConfigBundle,
+        isKilled: version.isKilled,
+        killReason: version.killReason,
       })),
       approvals: snapshot.approvals.map((approval) => ({
         id: approval.id,
@@ -266,9 +409,6 @@ export async function getConfigVersion(versionId: string): Promise<ConfigVersion
       versionId: version.id,
       packageId: version.packageId,
     });
-    if (disabled) {
-      return null;
-    }
     return {
       id: version.id,
       packageId: version.packageId,
@@ -279,6 +419,8 @@ export async function getConfigVersion(versionId: string): Promise<ConfigVersion
       updatedAt: version.updatedAt,
       updatedBy: version.updatedBy,
       bundle: version.bundle as ConfigBundle,
+      isKilled: disabled || version.isKilled,
+      killReason: version.killReason,
     };
   }
   return await demo.getConfigVersion(versionId);
@@ -343,13 +485,45 @@ export async function createConfigVersion(input: { packageId: string; fromVersio
   return { ok: false as const, error: 'Create version requires Postgres provider' };
 }
 
-export async function updateUiSchema(input: { versionId: string; uiSchema: ConfigBundle['uiSchema'] }) {
+export async function updateUiSchema(input: {
+  versionId: string;
+  uiSchema?: ConfigBundle['uiSchema'];
+  uiSchemasById?: ConfigBundle['uiSchemasById'];
+  activeUiPageId?: ConfigBundle['activeUiPageId'];
+  flowSchema?: ConfigBundle['flowSchema'];
+}) {
+  const hasUiUpdate =
+    Boolean(input.uiSchema) ||
+    (Boolean(input.uiSchemasById) && Object.keys(input.uiSchemasById ?? {}).length > 0);
+  if (!hasUiUpdate) {
+    return { ok: false as const, error: 'uiSchema or uiSchemasById is required' };
+  }
+
   const baseVersion = await getConfigVersion(input.versionId);
+  if (!baseVersion) {
+    return { ok: false as const, error: 'Version not found' };
+  }
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: baseVersion.packageId,
+    knownReason: baseVersion.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
+  const nextBundle = baseVersion
+    ? applyUiPageUpdateToBundle(baseVersion.bundle, {
+        uiSchema: input.uiSchema,
+        uiSchemasById: input.uiSchemasById,
+        activeUiPageId: input.activeUiPageId,
+        flowSchema: input.flowSchema,
+      })
+    : undefined;
   const checks = await evaluatePolicyStage({
     stage: 'save',
     requiredRole: 'Author',
     currentBundle: baseVersion?.bundle,
-    nextBundle: baseVersion ? { ...baseVersion.bundle, uiSchema: input.uiSchema } : undefined,
+    nextBundle,
   });
   if (checks.length > 0) return policyFailure(checks);
 
@@ -359,7 +533,13 @@ export async function updateUiSchema(input: { versionId: string; uiSchema: Confi
       session: toRepoSession(),
       versionId: input.versionId,
       action: 'Updated UI schema',
-      mutate: (bundle) => ({ ...bundle, uiSchema: input.uiSchema }),
+      mutate: (bundle) =>
+        applyUiPageUpdateToBundle(bundle as ConfigBundle, {
+          uiSchema: input.uiSchema,
+          uiSchemasById: input.uiSchemasById,
+          activeUiPageId: input.activeUiPageId,
+          flowSchema: input.flowSchema,
+        }) as unknown as JsonRecord,
     });
   }
   return await demo.updateUiSchema(input);
@@ -367,11 +547,22 @@ export async function updateUiSchema(input: { versionId: string; uiSchema: Confi
 
 export async function updateRules(input: { versionId: string; rules: ConfigBundle['rules'] }) {
   const baseVersion = await getConfigVersion(input.versionId);
+  if (!baseVersion) {
+    return { ok: false as const, error: 'Version not found' };
+  }
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: baseVersion.packageId,
+    knownReason: baseVersion.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
   const checks = await evaluatePolicyStage({
     stage: 'save',
     requiredRole: 'Author',
-    currentBundle: baseVersion?.bundle,
-    nextBundle: baseVersion ? { ...baseVersion.bundle, rules: input.rules } : undefined,
+    currentBundle: baseVersion.bundle,
+    nextBundle: { ...baseVersion.bundle, rules: input.rules },
   });
   if (checks.length > 0) return policyFailure(checks);
 
@@ -387,9 +578,89 @@ export async function updateRules(input: { versionId: string; rules: ConfigBundl
   return await demo.updateRules(input);
 }
 
+export async function updateFlowSchema(input: {
+  versionId: string;
+  flowSchema: ConfigBundle['flowSchema'];
+}) {
+  const baseVersion = await getConfigVersion(input.versionId);
+  if (!baseVersion) {
+    return { ok: false as const, error: 'Version not found' };
+  }
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: baseVersion.packageId,
+    knownReason: baseVersion.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
+  const checks = await evaluatePolicyStage({
+    stage: 'save',
+    requiredRole: 'Author',
+    currentBundle: baseVersion.bundle,
+    nextBundle: { ...baseVersion.bundle, flowSchema: input.flowSchema },
+  });
+  if (checks.length > 0) return policyFailure(checks);
+
+  if (providerMode() === 'postgres') {
+    const repo = await getPostgresRepo();
+    return await repo.updateVersionBundle({
+      session: toRepoSession(),
+      versionId: input.versionId,
+      action: 'Updated flow schema',
+      mutate: (bundle) => ({ ...bundle, flowSchema: input.flowSchema }),
+    });
+  }
+  return await demo.updateFlowSchema(input);
+}
+
+export async function updateApiMappings(input: {
+  versionId: string;
+  apiMappingsById: ConfigBundle['apiMappingsById'];
+}) {
+  const baseVersion = await getConfigVersion(input.versionId);
+  if (!baseVersion) {
+    return { ok: false as const, error: 'Version not found' };
+  }
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: baseVersion.packageId,
+    knownReason: baseVersion.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
+  const checks = await evaluatePolicyStage({
+    stage: 'save',
+    requiredRole: 'Author',
+    currentBundle: baseVersion.bundle,
+    nextBundle: { ...baseVersion.bundle, apiMappingsById: input.apiMappingsById },
+  });
+  if (checks.length > 0) return policyFailure(checks);
+
+  if (providerMode() === 'postgres') {
+    const repo = await getPostgresRepo();
+    return await repo.updateVersionBundle({
+      session: toRepoSession(),
+      versionId: input.versionId,
+      action: 'Updated API mappings',
+      mutate: (bundle) => ({ ...bundle, apiMappingsById: input.apiMappingsById }),
+    });
+  }
+  return await demo.updateApiMappings(input);
+}
+
 export async function submitForReview(input: { versionId: string; scope: string; risk: RiskLevel }) {
   const version = await getConfigVersion(input.versionId);
   if (!version) return { ok: false as const, error: 'Version not found' };
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: version.packageId,
+    knownReason: version.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
   const checks = await evaluatePolicyStage({
     stage: 'submit-for-review',
     requiredRole: 'Author',
@@ -436,6 +707,14 @@ export async function requestChanges(input: { approvalId: string; notes?: string
 export async function promoteVersion(input: { versionId: string }) {
   const version = await getConfigVersion(input.versionId);
   if (!version) return { ok: false as const, error: 'Version not found' };
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: version.packageId,
+    knownReason: version.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
 
   const checks = await evaluatePolicyStage({
     stage: 'promote',
@@ -454,6 +733,14 @@ export async function promoteVersion(input: { versionId: string }) {
 export async function rollbackVersion(input: { versionId: string }) {
   const version = await getConfigVersion(input.versionId);
   if (!version) return { ok: false as const, error: 'Version not found' };
+  const killBlocked = await assertVersionNotKilled({
+    versionId: input.versionId,
+    packageId: version.packageId,
+    knownReason: version.killReason,
+  });
+  if (killBlocked) {
+    return killBlocked;
+  }
 
   const checks = await evaluatePolicyStage({
     stage: 'promote',
@@ -482,8 +769,18 @@ export async function diffVersion(input: { versionId: string; againstVersionId?:
     const before = result.before.bundle as ConfigBundle;
     const after = result.after.bundle as ConfigBundle;
     const rawDiff = jsonDiff(before, after);
+    const beforeUi = JSON.stringify({
+      uiSchemasById: before.uiSchemasById ?? null,
+      activeUiPageId: before.activeUiPageId ?? null,
+      uiSchema: before.uiSchema ?? null,
+    });
+    const afterUi = JSON.stringify({
+      uiSchemasById: after.uiSchemasById ?? null,
+      activeUiPageId: after.activeUiPageId ?? null,
+      uiSchema: after.uiSchema ?? null,
+    });
     const semantic = {
-      uiChanged: JSON.stringify(before.uiSchema) !== JSON.stringify(after.uiSchema),
+      uiChanged: beforeUi !== afterUi,
       flowChanged: JSON.stringify(before.flowSchema) !== JSON.stringify(after.flowSchema),
       rulesChanged: JSON.stringify(before.rules) !== JSON.stringify(after.rules),
       apiChanged: JSON.stringify(before.apiMappingsById) !== JSON.stringify(after.apiMappingsById),
@@ -529,6 +826,9 @@ export async function exportGitOpsBundle(): Promise<GitOpsBundle> {
 }
 
 export async function importGitOpsBundle(input: { bundle: GitOpsBundle }) {
+  const checks = await evaluatePolicyStage({ stage: 'promote', requiredRole: 'Publisher' });
+  if (checks.length > 0) return policyFailure(checks);
+
   if (providerMode() === 'postgres') {
     const session = toRepoSession();
     const repo = await getPostgresRepo();
@@ -569,6 +869,30 @@ export async function listKillSwitches() {
     return { ok: true as const, killSwitches: await repo.listKillSwitches({ tenantId: toRepoSession().tenantId }) };
   }
   return { ok: true as const, killSwitches: [] };
+}
+
+export async function getRuntimeFlags(input?: {
+  env?: string;
+  versionId?: string;
+  packageId?: string;
+}) {
+  const env = input?.env?.trim() || 'prod';
+  const tenantId = toRepoSession().tenantId;
+  const featureFlagResult = await listFeatureFlags({ env });
+  const featureFlags = toFeatureFlagMap(featureFlagResult.flags);
+
+  const killSwitch = await resolveRuntimeKillState({
+    versionId: input?.versionId,
+    packageId: input?.packageId,
+  });
+
+  return {
+    ok: true as const,
+    tenantId,
+    env,
+    featureFlags,
+    killSwitch,
+  };
 }
 
 export async function upsertKillSwitch(input: {

@@ -31,6 +31,7 @@ import type {
   JsonDiffItem,
   RiskLevel,
 } from '@/lib/demo/types';
+import { applyUiPageUpdateToBundle, createSinglePageBundle, normalizeUiPages } from '@/lib/demo/ui-pages';
 import { getMockSession } from '@/lib/auth';
 import type { SampleTemplateId } from '@/lib/samples';
 import exampleUi from '@platform/schema/examples/example.ui.json';
@@ -315,14 +316,14 @@ function seedBundle(variant: 'active' | 'review' | 'deprecated'): ConfigBundle {
     uiSchema.version = '0.9.9';
   }
 
-  return {
+  return createSinglePageBundle({
     uiSchema,
     flowSchema,
     rules,
     apiMappingsById: {
       submitOrder: apiMapping,
     },
-  };
+  });
 }
 
 function seedBundleForTemplate(templateId: SampleTemplateId): ConfigBundle {
@@ -336,6 +337,7 @@ function seedBundleForTemplate(templateId: SampleTemplateId): ConfigBundle {
     versionSuffix: string;
   }) => {
     const ui = bundle.uiSchema;
+    if (!ui) return;
     const existingIds = new Set(ui.components.map((c) => c.id));
 
     const currencyId = ensureUniqueId(params.amountComponentId, existingIds);
@@ -747,12 +749,19 @@ function collectRequiredTranslationRefs(state: StoreState): TranslationRef[] {
 
   for (const pkg of state.packages) {
     for (const version of pkg.versions) {
-      const schema = version.bundle.uiSchema;
-      for (const component of schema.components) {
-        add(component.i18n?.labelKey);
-        add(component.i18n?.helperTextKey);
-        add(component.i18n?.placeholderKey);
-        add(component.accessibility?.ariaLabelKey);
+      const pages = normalizeUiPages({
+        uiSchema: version.bundle.uiSchema,
+        uiSchemasById: version.bundle.uiSchemasById,
+        activeUiPageId: version.bundle.activeUiPageId,
+        flowSchema: version.bundle.flowSchema,
+      }).uiSchemasById;
+      for (const schema of Object.values(pages)) {
+        for (const component of schema.components) {
+          add(component.i18n?.labelKey);
+          add(component.i18n?.helperTextKey);
+          add(component.i18n?.placeholderKey);
+          add(component.accessibility?.ariaLabelKey);
+        }
       }
     }
   }
@@ -852,21 +861,56 @@ function validateConfigBundle(
   options?: { requireI18nCoverage?: boolean },
 ): { ok: true } | { ok: false; issues: ValidationIssue[] } {
   const issues: ValidationIssue[] = [];
-
-  issues.push(...validateUISchema(bundle.uiSchema).issues);
+  const normalizedPages = normalizeUiPages({
+    uiSchema: bundle.uiSchema,
+    uiSchemasById: bundle.uiSchemasById,
+    activeUiPageId: bundle.activeUiPageId,
+    flowSchema: bundle.flowSchema,
+  });
+  const pageIds = new Set(Object.keys(normalizedPages.uiSchemasById));
+  for (const [pageId, pageSchema] of Object.entries(normalizedPages.uiSchemasById)) {
+    issues.push(...validateUISchema(pageSchema).issues);
+    if (pageSchema.pageId !== pageId) {
+      issues.push({
+        path: `uiSchemasById.${pageId}.pageId`,
+        message: `pageId must match key "${pageId}"`,
+        severity: 'error',
+      });
+    }
+  }
   issues.push(...validateFlowSchema(bundle.flowSchema).issues);
   issues.push(...validateRulesSchema(bundle.rules).issues);
   for (const mapping of Object.values(bundle.apiMappingsById ?? {})) {
     issues.push(...validateApiMapping(mapping).issues);
   }
 
+  for (const [stateId, state] of Object.entries(bundle.flowSchema.states)) {
+    if (pageIds.size === 0) {
+      issues.push({
+        path: `flowSchema.states.${stateId}.uiPageId`,
+        message: 'At least one ui page schema is required',
+        severity: 'error',
+      });
+      continue;
+    }
+    if (!pageIds.has(state.uiPageId)) {
+      issues.push({
+        path: `flowSchema.states.${stateId}.uiPageId`,
+        message: `Unknown ui page "${state.uiPageId}"`,
+        severity: 'error',
+      });
+    }
+  }
+
   if (options?.requireI18nCoverage) {
-    const i18nCoverage = validateI18nCoverage(bundle.uiSchema, {
-      locales: ['en'],
-      bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
-      defaultNamespace: 'runtime',
-    });
-    issues.push(...i18nCoverage.issues);
+    for (const pageSchema of Object.values(normalizedPages.uiSchemasById)) {
+      const i18nCoverage = validateI18nCoverage(pageSchema, {
+        locales: ['en'],
+        bundles: [...PLATFORM_BUNDLES, ...EXAMPLE_TENANT_BUNDLES],
+        defaultNamespace: 'runtime',
+      });
+      issues.push(...i18nCoverage.issues);
+    }
   }
 
   const deduped = new Map<string, ValidationIssue>();
@@ -957,7 +1001,20 @@ export async function createConfigPackage(input: {
   return { packageId, versionId };
 }
 
-export async function updateUiSchema(input: { versionId: string; uiSchema: ConfigBundle['uiSchema'] }) {
+export async function updateUiSchema(input: {
+  versionId: string;
+  uiSchema?: ConfigBundle['uiSchema'];
+  uiSchemasById?: ConfigBundle['uiSchemasById'];
+  activeUiPageId?: ConfigBundle['activeUiPageId'];
+  flowSchema?: ConfigBundle['flowSchema'];
+}) {
+  const hasUiUpdate =
+    Boolean(input.uiSchema) ||
+    (Boolean(input.uiSchemasById) && Object.keys(input.uiSchemasById ?? {}).length > 0);
+  if (!hasUiUpdate) {
+    return { ok: false as const, error: 'uiSchema or uiSchemasById is required' };
+  }
+
   const session = getMockSession();
   const state = await loadState();
 
@@ -967,9 +1024,15 @@ export async function updateUiSchema(input: { versionId: string; uiSchema: Confi
     if (!version) return pkg;
 
     updated = true;
+    const updatedBundle = applyUiPageUpdateToBundle(version.bundle, {
+      uiSchema: input.uiSchema,
+      uiSchemasById: input.uiSchemasById,
+      activeUiPageId: input.activeUiPageId,
+      flowSchema: input.flowSchema,
+    });
     return updateVersionInPackage(pkg, input.versionId, (v) => ({
       ...v,
-      bundle: { ...v.bundle, uiSchema: input.uiSchema },
+      bundle: updatedBundle,
       updatedAt: nowIso(),
       updatedBy: session.user.name,
     }));
@@ -1012,6 +1075,71 @@ export async function updateRules(input: { versionId: string; rules: ConfigBundl
   next = addAudit(next, {
     actor: session.user.name,
     action: 'Updated rule set',
+    target: `${input.versionId}`,
+    severity: 'info',
+  });
+  await persistState(next);
+  return { ok: true as const };
+}
+
+export async function updateFlowSchema(input: { versionId: string; flowSchema: ConfigBundle['flowSchema'] }) {
+  const session = getMockSession();
+  const state = await loadState();
+
+  let updated = false;
+  const nextPackages = state.packages.map((pkg) => {
+    const version = pkg.versions.find((v) => v.id === input.versionId);
+    if (!version) return pkg;
+
+    updated = true;
+    return updateVersionInPackage(pkg, input.versionId, (v) => ({
+      ...v,
+      bundle: { ...v.bundle, flowSchema: input.flowSchema },
+      updatedAt: nowIso(),
+      updatedBy: session.user.name,
+    }));
+  });
+
+  if (!updated) return { ok: false as const, error: 'Version not found' };
+
+  let next: StoreState = { ...state, packages: nextPackages };
+  next = addAudit(next, {
+    actor: session.user.name,
+    action: 'Updated flow schema',
+    target: `${input.versionId}`,
+    severity: 'info',
+  });
+  await persistState(next);
+  return { ok: true as const };
+}
+
+export async function updateApiMappings(input: {
+  versionId: string;
+  apiMappingsById: ConfigBundle['apiMappingsById'];
+}) {
+  const session = getMockSession();
+  const state = await loadState();
+
+  let updated = false;
+  const nextPackages = state.packages.map((pkg) => {
+    const version = pkg.versions.find((v) => v.id === input.versionId);
+    if (!version) return pkg;
+
+    updated = true;
+    return updateVersionInPackage(pkg, input.versionId, (v) => ({
+      ...v,
+      bundle: { ...v.bundle, apiMappingsById: input.apiMappingsById },
+      updatedAt: nowIso(),
+      updatedBy: session.user.name,
+    }));
+  });
+
+  if (!updated) return { ok: false as const, error: 'Version not found' };
+
+  let next: StoreState = { ...state, packages: nextPackages };
+  next = addAudit(next, {
+    actor: session.user.name,
+    action: 'Updated API mappings',
     target: `${input.versionId}`,
     severity: 'info',
   });

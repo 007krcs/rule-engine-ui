@@ -13,6 +13,7 @@ import { registerCompanyAdapter } from '@platform/react-company-adapter';
 import { createProviderFromBundles, EXAMPLE_TENANT_BUNDLES, PLATFORM_BUNDLES } from '@platform/i18n';
 import type { ConfigVersion, ConsoleSnapshot } from '@/lib/demo/types';
 import { apiGet, apiPost } from '@/lib/demo/api-client';
+import { normalizeUiPages, rebindFlowSchemaToAvailablePages } from '@/lib/demo/ui-pages';
 import { useToast } from '@/components/ui/toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -292,9 +293,20 @@ export default function HealthPage() {
       const resp = await apiGet<GetVersionResponse>(`/api/config-versions/${encodeURIComponent(active.id)}`);
       if (!resp.ok) throw new Error(resp.error);
 
-      const flow: FlowSchema = resp.version.bundle.flowSchema;
-      const uiSchema: UISchema = resp.version.bundle.uiSchema;
-      const uiSchemasById = Object.fromEntries(Object.values(flow.states).map((s) => [s.uiPageId, uiSchema])) as Record<string, UISchema>;
+      const flowRaw: FlowSchema = resp.version.bundle.flowSchema;
+      const normalizedUiPages = normalizeUiPages({
+        uiSchema: resp.version.bundle.uiSchema,
+        uiSchemasById: resp.version.bundle.uiSchemasById,
+        activeUiPageId: resp.version.bundle.activeUiPageId,
+        flowSchema: flowRaw,
+      });
+      const flow = rebindFlowSchemaToAvailablePages(
+        flowRaw,
+        normalizedUiPages.uiSchemasById,
+        normalizedUiPages.activeUiPageId,
+      );
+      if (!flow) throw new Error('Flow schema is missing');
+      const uiSchemasById = normalizedUiPages.uiSchemasById;
       const rules: Rule[] = resp.version.bundle.rules.rules;
       const apiMappingsById: Record<string, ApiMapping> = resp.version.bundle.apiMappingsById ?? {};
 

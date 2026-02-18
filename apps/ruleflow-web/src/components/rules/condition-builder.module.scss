@@ -1,0 +1,81 @@
+.conditionCard {
+  border: 1px solid var(--rf-border);
+  border-radius: var(--rf-radius-md);
+  background: color-mix(in srgb, var(--rf-surface-2) 60%, transparent);
+  padding: var(--rf-space-3);
+  display: grid;
+  gap: var(--rf-space-3);
+}
+
+.conditionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.conditionTitle {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rf-muted);
+  font-weight: 850;
+}
+
+.conditionHeaderControls {
+  display: flex;
+  align-items: center;
+  gap: var(--rf-space-2);
+}
+
+.conditionChildren {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.nodeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-2);
+}
+
+.draggable {
+  cursor: grab;
+}
+
+.compareGrid {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.fieldLabel {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rf-muted);
+  font-weight: 850;
+}
+
+.operand {
+  display: grid;
+  gap: var(--rf-space-2);
+}
+
+.pathGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
+  gap: var(--rf-space-2);
+}
+
+@media (max-width: 900px) {
+  .pathGrid {
+    grid-template-columns: 1fr;
+  }
+}

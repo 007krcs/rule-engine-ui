@@ -69,6 +69,29 @@ export interface AdapterContext {
 export type AdapterRenderFn = (component: UIComponent, ctx: AdapterContext) => React.ReactElement;
 
 const registry: Array<{ prefix: string; render: AdapterRenderFn }> = [];
+const INTERACTIVE_COMPONENT_HINTS = [
+  'action',
+  'autocomplete',
+  'button',
+  'checkbox',
+  'date',
+  'field',
+  'input',
+  'link',
+  'menu',
+  'pagination',
+  'picker',
+  'radio',
+  'select',
+  'slider',
+  'stepper',
+  'submit',
+  'switch',
+  'tab',
+  'textarea',
+  'time',
+  'toggle',
+] as const;
 
 export function registerAdapter(prefix: string, render: AdapterRenderFn): void {
   registry.push({ prefix, render });
@@ -112,6 +135,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
 
   let renderData = currentData;
   let renderContext = currentContext;
+  const getActiveBreakpoint = (): 'lg' | 'md' | 'sm' => resolveBreakpoint(renderContext.device);
 
   const renderComponent = (
     componentId: string,
@@ -128,6 +152,9 @@ export function RenderPage(props: RendererProps): React.ReactElement {
 
     const component = mergeComponent(sourceComponent, itemOverride);
     assertAccessibility(component);
+    if (isResponsiveHidden(component, getActiveBreakpoint(), renderContext.device)) {
+      return null;
+    }
 
     const setValueResult = applySetValueRule(component, renderData, renderContext);
     renderData = setValueResult.data;
@@ -182,9 +209,17 @@ export function RenderPage(props: RendererProps): React.ReactElement {
 
   const renderLayout = (node: UISchema['layout']): React.ReactElement => {
     if (props.uiSchema.layoutType === 'grid' && Array.isArray(props.uiSchema.items) && props.uiSchema.items.length > 0) {
-      const breakpoint = resolveBreakpoint(renderContext.device);
-      const spec = resolveGridSpecForBreakpoint(props.uiSchema, breakpoint);
-      const items = resolveGridItemsForBreakpoint(props.uiSchema, breakpoint);
+      const activeBreakpoint = getActiveBreakpoint();
+      const spec = resolveGridSpecForBreakpoint(props.uiSchema, activeBreakpoint);
+      const items = resolveGridItemsForBreakpoint(props.uiSchema, activeBreakpoint);
+      const responsiveItems = applyResponsiveGridOverrides(
+        items,
+        componentMap,
+        activeBreakpoint,
+        renderContext.device,
+        spec.columns,
+      );
+      const orderedItems = sortGridItemsByFocus(responsiveItems, componentMap);
 
       return (
         <div
@@ -196,7 +231,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
             gridAutoRows: `${spec.rowHeight}px`,
           }}
         >
-          {items.map((item) => (
+          {orderedItems.map((item) => (
             <div
               key={item.id}
               style={{
@@ -224,7 +259,18 @@ export function RenderPage(props: RendererProps): React.ReactElement {
                 typeof node.columns === 'number' && node.columns > 0 ? `repeat(${node.columns}, minmax(0, 1fr))` : undefined,
             }}
           >
-            {node.componentIds?.map((componentId) => renderComponent(componentId))}
+            {sortComponentIdsByFocus(node.componentIds, componentMap).map((componentId) => {
+              const component = componentMap.get(componentId);
+              const span = resolveResponsiveSpan(component, getActiveBreakpoint(), renderContext.device);
+              const rendered = renderComponent(componentId);
+              if (!rendered) return null;
+              if (!span) return rendered;
+              return (
+                <div key={`${componentId}:responsive-span`} style={{ gridColumn: `span ${span}` }}>
+                  {rendered}
+                </div>
+              );
+            })}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -233,7 +279,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       case 'stack':
         return (
           <div data-layout="stack" style={{ display: 'flex', flexDirection: node.direction === 'horizontal' ? 'row' : 'column', gap: 12 }}>
-            {node.componentIds?.map((componentId) => renderComponent(componentId))}
+            {sortComponentIdsByFocus(node.componentIds, componentMap).map((componentId) => renderComponent(componentId))}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -254,7 +300,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
         return (
           <section data-layout="section">
             {node.title && <h2>{node.title}</h2>}
-            {node.componentIds?.map((componentId) => renderComponent(componentId))}
+            {sortComponentIdsByFocus(node.componentIds, componentMap).map((componentId) => renderComponent(componentId))}
             {node.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -267,7 +313,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
         };
         return (
           <div data-layout="unknown">
-            {fallback.componentIds?.map((componentId) => renderComponent(componentId))}
+            {sortComponentIdsByFocus(fallback.componentIds, componentMap).map((componentId) => renderComponent(componentId))}
             {fallback.children?.map((child) => (
               <div key={child.id}>{renderLayout(child)}</div>
             ))}
@@ -439,6 +485,127 @@ function sortGridItems(items: UIGridItem[]): UIGridItem[] {
   });
 }
 
+function applyResponsiveGridOverrides(
+  items: UIGridItem[],
+  componentMap: Map<string, UIComponent>,
+  breakpoint: 'lg' | 'md' | 'sm',
+  device: ExecutionContext['device'],
+  maxColumns: number,
+): UIGridItem[] {
+  return items
+    .map((item) => {
+      const component = componentMap.get(item.componentId);
+      if (component && isResponsiveHidden(component, breakpoint, device)) {
+        return null;
+      }
+      const span = resolveResponsiveSpan(component, breakpoint, device);
+      if (!span) {
+        return item;
+      }
+      const safeSpan = Math.max(1, Math.min(maxColumns, span));
+      const maxX = Math.max(0, maxColumns - safeSpan);
+      return {
+        ...item,
+        w: safeSpan,
+        x: Math.max(0, Math.min(maxX, Math.trunc(Number(item.x) || 0))),
+      };
+    })
+    .filter((item): item is UIGridItem => item !== null);
+}
+
+function sortGridItemsByFocus(items: UIGridItem[], componentMap: Map<string, UIComponent>): UIGridItem[] {
+  return [...items].sort((left, right) => {
+    const leftOrder = resolveComponentFocusOrder(componentMap.get(left.componentId));
+    const rightOrder = resolveComponentFocusOrder(componentMap.get(right.componentId));
+    const leftHasOrder = leftOrder !== null;
+    const rightHasOrder = rightOrder !== null;
+    if (leftHasOrder && rightHasOrder && leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    if (leftHasOrder !== rightHasOrder) {
+      return leftHasOrder ? -1 : 1;
+    }
+    const yDiff = (Number(left.y) || 0) - (Number(right.y) || 0);
+    if (yDiff !== 0) return yDiff;
+    const xDiff = (Number(left.x) || 0) - (Number(right.x) || 0);
+    if (xDiff !== 0) return xDiff;
+    return left.componentId.localeCompare(right.componentId);
+  });
+}
+
+function sortComponentIdsByFocus(
+  componentIds: string[] | undefined,
+  componentMap: Map<string, UIComponent>,
+): string[] {
+  if (!componentIds || componentIds.length < 2) return componentIds ?? [];
+  return [...componentIds].sort((left, right) => {
+    const leftOrder = resolveComponentFocusOrder(componentMap.get(left));
+    const rightOrder = resolveComponentFocusOrder(componentMap.get(right));
+    const leftHasOrder = leftOrder !== null;
+    const rightHasOrder = rightOrder !== null;
+    if (leftHasOrder && rightHasOrder && leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    if (leftHasOrder !== rightHasOrder) {
+      return leftHasOrder ? -1 : 1;
+    }
+    return 0;
+  });
+}
+
+function resolveResponsiveBreakpoints(
+  component: UIComponent,
+): NonNullable<NonNullable<UIComponent['responsive']>['breakpoints']> | null {
+  const breakpoints = component.responsive?.breakpoints;
+  if (!breakpoints) return null;
+  return breakpoints;
+}
+
+function resolveResponsiveValue(
+  component: UIComponent | undefined,
+  breakpoint: 'lg' | 'md' | 'sm',
+  device: ExecutionContext['device'],
+):
+  | {
+      columns?: number;
+      span?: number;
+      hidden?: boolean;
+    }
+  | null {
+  if (!component) return null;
+  const breakpoints = resolveResponsiveBreakpoints(component);
+  if (!breakpoints) return null;
+
+  const alias = breakpoint === 'lg' ? 'desktop' : breakpoint === 'md' ? 'tablet' : 'mobile';
+  const keys = [breakpoint, breakpoint.toUpperCase(), device, device.toUpperCase(), alias, alias.toUpperCase()];
+  for (const key of keys) {
+    const value = breakpoints[key];
+    if (value) return value;
+  }
+  return null;
+}
+
+function resolveResponsiveSpan(
+  component: UIComponent | undefined,
+  breakpoint: 'lg' | 'md' | 'sm',
+  device: ExecutionContext['device'],
+): number | null {
+  const responsiveValue = resolveResponsiveValue(component, breakpoint, device);
+  if (!responsiveValue) return null;
+  const raw = responsiveValue.span ?? responsiveValue.columns;
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+  return Math.max(1, Math.trunc(raw));
+}
+
+function isResponsiveHidden(
+  component: UIComponent | undefined,
+  breakpoint: 'lg' | 'md' | 'sm',
+  device: ExecutionContext['device'],
+): boolean {
+  const responsiveValue = resolveResponsiveValue(component, breakpoint, device);
+  return Boolean(responsiveValue?.hidden);
+}
+
 function resolveBreakpoint(device: ExecutionContext['device']): 'lg' | 'md' | 'sm' {
   if (device === 'mobile') return 'sm';
   if (device === 'tablet') return 'md';
@@ -491,16 +658,39 @@ function assertAccessibility(component: UIComponent): void {
   if (!accessibility) {
     throw new Error(`Accessibility metadata is required for component ${component.id}`);
   }
-  if (!accessibility.ariaLabelKey || accessibility.ariaLabelKey.trim().length === 0) {
+  if (isInteractiveComponent(component) && (!accessibility.ariaLabelKey || accessibility.ariaLabelKey.trim().length === 0)) {
     throw new Error(`ariaLabelKey is required for component ${component.id}`);
   }
-  if (accessibility.keyboardNav !== true) {
+  if (isInteractiveComponent(component) && accessibility.keyboardNav !== true) {
     throw new Error(`keyboardNav must be true for component ${component.id}`);
   }
   const focusOrder = accessibility.focusOrder;
-  if (typeof focusOrder !== 'number' || !Number.isInteger(focusOrder) || focusOrder < 1) {
+  if (isTabbableComponent(component) && (typeof focusOrder !== 'number' || !Number.isInteger(focusOrder) || focusOrder < 1)) {
     throw new Error(`focusOrder must be an integer >= 1 for component ${component.id}`);
   }
+}
+
+function isInteractiveComponent(component: UIComponent): boolean {
+  const type = String(component.type ?? '').toLowerCase();
+  const adapterHint = String(component.adapterHint ?? '').toLowerCase();
+  const hasHandlers = Boolean(
+    component.events?.onChange?.length ||
+      component.events?.onClick?.length ||
+      component.events?.onSubmit?.length,
+  );
+  if (hasHandlers) return true;
+  return INTERACTIVE_COMPONENT_HINTS.some((hint) => type.includes(hint) || adapterHint.includes(hint));
+}
+
+function isTabbableComponent(component: UIComponent): boolean {
+  return isInteractiveComponent(component);
+}
+
+function resolveComponentFocusOrder(component: UIComponent | undefined): number | null {
+  if (!component || !isTabbableComponent(component)) return null;
+  const focusOrder = component.accessibility?.focusOrder;
+  if (typeof focusOrder !== 'number' || !Number.isInteger(focusOrder) || focusOrder < 1) return null;
+  return focusOrder;
 }
 
 function buildEvents(

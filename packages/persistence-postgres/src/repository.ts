@@ -275,6 +275,7 @@ export class PostgresTenantRepository {
   }): Promise<{ packageId: string; versionId: string }> {
     const { session } = input;
     await this.ensureSession(session);
+    const normalizedBundle = normalizeBundleUiPages(input.bundle);
 
     await this.withTenantTransaction(session.tenantId, async (client) => {
       await client.query(
@@ -289,7 +290,14 @@ export class PostgresTenantRepository {
           INSERT INTO config_versions (id, tenant_id, package_id, version, status, bundle, created_by)
           VALUES ($1, $2, $3, $4, 'DRAFT', $5::jsonb, $6)
         `,
-        [input.versionId, session.tenantId, input.packageId, input.versionLabel, JSON.stringify(input.bundle), session.userName],
+        [
+          input.versionId,
+          session.tenantId,
+          input.packageId,
+          input.versionLabel,
+          JSON.stringify(normalizedBundle),
+          session.userName,
+        ],
       );
       await this.insertAudit(client, {
         tenantId: session.tenantId,
@@ -318,6 +326,7 @@ export class PostgresTenantRepository {
   }): Promise<{ versionId: string }> {
     const { session } = input;
     await this.ensureSession(session);
+    const normalizedBundle = normalizeBundleUiPages(input.bundle);
 
     await this.withTenantTransaction(session.tenantId, async (client) => {
       await client.query(
@@ -325,7 +334,14 @@ export class PostgresTenantRepository {
           INSERT INTO config_versions (id, tenant_id, package_id, version, status, bundle, created_by)
           VALUES ($1, $2, $3, $4, 'DRAFT', $5::jsonb, $6)
         `,
-        [input.versionId, session.tenantId, input.packageId, input.versionLabel, JSON.stringify(input.bundle), session.userName],
+        [
+          input.versionId,
+          session.tenantId,
+          input.packageId,
+          input.versionLabel,
+          JSON.stringify(normalizedBundle),
+          session.userName,
+        ],
       );
       await this.insertAudit(client, {
         tenantId: session.tenantId,
@@ -365,7 +381,7 @@ export class PostgresTenantRepository {
           error: `Cannot edit version in status ${current.status}. Only DRAFT versions can be edited.`,
         };
       }
-      const nextBundle = input.mutate(current.bundle);
+      const nextBundle = normalizeBundleUiPages(input.mutate(current.bundle));
       await client.query(
         `
           UPDATE config_versions
@@ -880,7 +896,7 @@ export class PostgresTenantRepository {
             version.packageId,
             version.version,
             version.status,
-            JSON.stringify(version.bundle),
+            JSON.stringify(normalizeBundleUiPages(version.bundle)),
             version.createdBy,
             version.createdAt,
             version.updatedBy ?? null,
@@ -1164,6 +1180,46 @@ function toRecord(value: unknown): JsonRecord {
   return isRecord(value) ? (value as JsonRecord) : {};
 }
 
+function normalizeBundleUiPages(bundle: JsonRecord): JsonRecord {
+  const next: JsonRecord = { ...bundle };
+  const uiSchemasRaw = toRecord(next.uiSchemasById);
+  const normalizedById: JsonRecord = {};
+
+  for (const [rawKey, rawSchema] of Object.entries(uiSchemasRaw)) {
+    if (!isRecord(rawSchema)) continue;
+    const pageIdRaw = typeof rawSchema.pageId === 'string' ? rawSchema.pageId.trim() : '';
+    const pageId = pageIdRaw || rawKey;
+    normalizedById[pageId] = {
+      ...rawSchema,
+      pageId,
+    };
+  }
+
+  if (Object.keys(normalizedById).length === 0) {
+    const legacyUiSchema = toRecord(next.uiSchema);
+    if (Object.keys(legacyUiSchema).length > 0) {
+      const pageIdRaw = typeof legacyUiSchema.pageId === 'string' ? legacyUiSchema.pageId.trim() : '';
+      const pageId = pageIdRaw || 'builder-preview';
+      normalizedById[pageId] = {
+        ...legacyUiSchema,
+        pageId,
+      };
+    }
+  }
+
+  const pageIds = Object.keys(normalizedById);
+  if (pageIds.length === 0) return next;
+
+  const activeRaw = typeof next.activeUiPageId === 'string' ? next.activeUiPageId.trim() : '';
+  const active = activeRaw && normalizedById[activeRaw] ? activeRaw : pageIds[0]!;
+
+  next.uiSchemasById = normalizedById;
+  next.activeUiPageId = active;
+  next.uiSchema = toRecord(normalizedById[active]);
+
+  return next;
+}
+
 function mapPackage(row: PackageRow): RepoConfigPackage {
   return {
     id: row.id,
@@ -1183,7 +1239,7 @@ function mapVersion(row: VersionRow): RepoConfigVersion {
     packageId: row.package_id,
     version: row.version,
     status: row.status,
-    bundle: toRecord(row.bundle),
+    bundle: normalizeBundleUiPages(toRecord(row.bundle)),
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedBy: row.updated_by ?? undefined,

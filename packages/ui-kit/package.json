@@ -38,6 +38,9 @@
     "test": "vitest run --pool=threads"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "jsdom": "^27.2.0",
     "sass": "^1.86.0"
   },
   "peerDependencies": {

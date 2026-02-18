@@ -27,6 +27,10 @@ export interface ExecuteStepInput {
   logTraces?: boolean;
   traceLogger?: (trace: RuntimeTrace) => void;
   ruleTraceLogger?: (trace: RulesTrace) => void;
+  killSwitch?: {
+    active: boolean;
+    reason?: string;
+  };
 }
 
 export interface ExecuteStepResult {
@@ -55,6 +59,11 @@ export async function executeStep(input: ExecuteStepInput): Promise<ExecuteStepR
     for (const mapping of Object.values(input.apiMappingsById)) {
       assertApiMapping(mapping);
     }
+  }
+
+  if (input.killSwitch?.active) {
+    const reason = input.killSwitch.reason?.trim();
+    throw new Error(reason ? `Execution blocked by kill switch: ${reason}` : 'Execution blocked by kill switch');
   }
 
   const flowResult = transition({

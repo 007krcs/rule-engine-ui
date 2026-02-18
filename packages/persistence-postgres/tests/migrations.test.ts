@@ -78,4 +78,13 @@ describe('postgres migrations', () => {
       expect(migration).toContain('AS RESTRICTIVE');
     }
   });
+
+  it('normalizes version bundles to multi-page uiSchemasById', async () => {
+    const migration = await readMigration('0003_ui_pages.sql');
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION app_normalize_ui_pages_bundle');
+    expect(migration).toContain('UPDATE config_versions');
+    expect(migration).toContain("jsonb_set(bundle, '{uiSchemasById}'");
+    expect(migration).toContain("jsonb_set(bundle, '{activeUiPageId}'");
+    expect(migration).toContain('DROP FUNCTION app_normalize_ui_pages_bundle(JSONB)');
+  });
 });

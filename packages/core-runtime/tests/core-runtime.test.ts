@@ -176,4 +176,23 @@ describe('core-runtime', () => {
     expect(traceSeen).toBe(true);
     expect(result.trace.flow.reason).toBe('ok');
   });
+
+  it('blocks execution when kill switch is active', async () => {
+    await expect(
+      executeStep({
+        flow,
+        uiSchemasById,
+        rules,
+        apiMappingsById: { submitOrder: apiMapping },
+        stateId: 'start',
+        event: 'submit',
+        context,
+        data: {},
+        killSwitch: {
+          active: true,
+          reason: 'Emergency stop',
+        },
+      }),
+    ).rejects.toThrow('Execution blocked by kill switch: Emergency stop');
+  });
 });
