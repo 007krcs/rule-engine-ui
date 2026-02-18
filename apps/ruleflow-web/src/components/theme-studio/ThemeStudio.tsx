@@ -74,8 +74,13 @@ export function ThemeStudio() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const draftRef = useRef<ThemeConfig>(draft);
   const initializedRef = useRef(false);
   const repositoryRef = useRef<ThemeConfigRepository | null>(null);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   useEffect(() => {
     if (initializedRef.current || typeof window === 'undefined') return;
@@ -86,7 +91,7 @@ export function ThemeStudio() {
 
     void repository.load().then((stored) => {
       const seed = stored ?? fromRuntimeTheme(toThemeRuntime(theme));
-      applyThemeConfig(seed, setTheme, setDraft);
+      applyThemeConfig(seed, setTheme, setDraft, draftRef);
       setImportValue(exportThemeConfig(seed));
       syncFavicon(seed.brand.faviconUrl);
     });
@@ -99,11 +104,10 @@ export function ThemeStudio() {
   const isImportDirty = useMemo(() => importValue.trim().length > 0, [importValue]);
 
   const updateDraft = (updater: (current: ThemeConfig) => ThemeConfig): void => {
-    setDraft((current) => {
-      const next = updater(cloneThemeConfig(current));
-      applyThemeConfig(next, setTheme);
-      return next;
-    });
+    const next = updater(cloneThemeConfig(draftRef.current));
+    draftRef.current = next;
+    setDraft(next);
+    setTheme(toRuntimeTheme(next));
   };
 
   const onLogoUpload = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -146,7 +150,7 @@ export function ThemeStudio() {
         return;
       }
 
-      applyThemeConfig(result.value, setTheme, setDraft);
+      applyThemeConfig(result.value, setTheme, setDraft, draftRef);
       setImportValue(exportThemeConfig(result.value));
       toast({ variant: 'success', title: 'Tenant theme saved locally' });
     } finally {
@@ -180,7 +184,7 @@ export function ThemeStudio() {
       return;
     }
 
-    applyThemeConfig(result.value, setTheme, setDraft);
+    applyThemeConfig(result.value, setTheme, setDraft, draftRef);
     toast({ variant: 'success', title: 'Theme JSON imported' });
   };
 
@@ -544,8 +548,12 @@ function applyThemeConfig(
   config: ThemeConfig,
   setTheme: (theme: Partial<PlatformTheme>) => void,
   setDraft?: (config: ThemeConfig) => void,
+  draftRef?: { current: ThemeConfig },
 ): void {
   setTheme(toRuntimeTheme(config));
+  if (draftRef) {
+    draftRef.current = config;
+  }
   setDraft?.(config);
 }
 
