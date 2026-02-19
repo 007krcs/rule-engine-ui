@@ -20,7 +20,7 @@ const context: ExecutionContext = {
 };
 
 describe('react-material-adapter', () => {
-  it('renders material.input as MUI TextField and material.button as MUI Button', () => {
+  it('renders material.input and material.button using first-party primitives', () => {
     const adapterRegistry = createAdapterRegistry();
     registerMaterialAdapters(adapterRegistry);
     const schema: UISchema = {
@@ -58,8 +58,7 @@ describe('react-material-adapter', () => {
       />,
     );
 
-    expect(html).toContain('MuiTextField-root');
-    expect(html).toContain('data-mui-component="material-text-field"');
-    expect(html).toContain('data-mui-component="material-button"');
+    expect(html).toContain('data-adapter="material-input"');
+    expect(html).toContain('data-adapter="material-button"');
   });
 });

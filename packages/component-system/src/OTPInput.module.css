@@ -1,0 +1,49 @@
+.field {
+  display: grid;
+  gap: var(--rf-spacing-2, 8px);
+}
+
+.label {
+  color: var(--rf-color-text, #13283d);
+  font-size: var(--rf-font-size-sm, 0.8125rem);
+  font-weight: 600;
+}
+
+.inputRow {
+  display: flex;
+  gap: var(--rf-spacing-2, 8px);
+  flex-wrap: wrap;
+}
+
+.digitInput {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--rf-radius-sm, 6px);
+  border: 1px solid var(--rf-color-border, #c6d2e1);
+  background: var(--rf-color-surface, #ffffff);
+  color: var(--rf-color-text, #13283d);
+  text-align: center;
+  font-size: var(--rf-font-size-md, 0.9375rem);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.digitInput:focus-visible {
+  outline: 2px solid var(--rf-color-focus, #0f62fe);
+  outline-offset: 2px;
+  border-color: var(--rf-color-focus, #0f62fe);
+}
+
+.digitInput:disabled {
+  background: #f0f4fa;
+  cursor: not-allowed;
+}
+
+.message {
+  margin: 0;
+  font-size: var(--rf-font-size-sm, 0.8125rem);
+  color: var(--rf-color-text-muted, #4f6680);
+}
+
+.messageError {
+  color: var(--rf-color-danger, #d92929);
+}

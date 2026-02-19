@@ -9,11 +9,14 @@ import {
   findLayoutNodeById,
   updateLayoutNode,
   type ColumnNode,
+  type JSONValue,
   type LayoutTreeNode,
   type RowNode,
   type SectionNode,
+  type UIComponent,
   type UISchema,
 } from '@platform/schema';
+import type { ComponentContract } from '@platform/component-contract';
 import type { DropTarget, PaletteDragItem } from '../utils/DragDropManager';
 
 const GRID_COLUMN_MAX = 12;
@@ -23,6 +26,10 @@ export interface DropOperationResult {
   schema: UISchema;
   selectedNodeId: string | null;
   changed: boolean;
+}
+
+export interface ApplyPaletteDropOptions {
+  getComponentContract?: (componentType: string) => ComponentContract | undefined;
 }
 
 export interface LayoutIndex {
@@ -116,6 +123,7 @@ export function applyPaletteDrop(
   item: PaletteDragItem,
   target: DropTarget,
   selectedNodeId: string | null,
+  options: ApplyPaletteDropOptions = {},
 ): DropOperationResult {
   const sections = schema.sections ?? [];
   const index = buildLayoutIndex(sections);
@@ -162,7 +170,7 @@ export function applyPaletteDrop(
   if (!columnId) {
     return { schema, selectedNodeId, changed: false };
   }
-  return addComponentToColumn(schema, columnId, item.type, item.displayName);
+  return addComponentToColumn(schema, columnId, item.type, item.displayName, options.getComponentContract?.(item.type));
 }
 
 export function updateLayoutNodeProperties(
@@ -218,6 +226,7 @@ function addComponentToColumn(
   columnId: string,
   componentType: string,
   displayName: string,
+  contract?: ComponentContract,
 ): DropOperationResult {
   const sections = schema.sections ?? [];
   const existingComponentIds = new Set((schema.components ?? []).map((component) => component.id));
@@ -228,7 +237,16 @@ function addComponentToColumn(
   });
 
   const nextSections = appendChildToColumn(sections, columnId, componentNode);
-  const nextComponents = [...schema.components, createDefaultUIComponent(componentId, componentType)];
+  const baseComponent = createDefaultUIComponent(componentId, componentType);
+  const defaultProps = (contract?.defaultProps ?? {}) as Record<string, JSONValue>;
+  const nextComponents = [
+    ...schema.components,
+    {
+      ...baseComponent,
+      adapterHint: contract?.adapterHint ?? baseComponent.adapterHint,
+      props: { ...(baseComponent.props ?? {}), ...defaultProps },
+    },
+  ];
 
   return {
     schema: {
@@ -238,6 +256,37 @@ function addComponentToColumn(
     },
     selectedNodeId: componentNode.id,
     changed: true,
+  };
+}
+
+export function getComponentById(schema: UISchema, componentId: string): UIComponent | undefined {
+  return schema.components.find((component) => component.id === componentId);
+}
+
+export function updateComponentProps(
+  schema: UISchema,
+  componentId: string,
+  patch: Record<string, JSONValue | undefined>,
+): UISchema {
+  const nextComponents = schema.components.map((component) => {
+    if (component.id !== componentId) return component;
+    const nextProps: Record<string, JSONValue> = { ...(component.props ?? {}) };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) {
+        delete nextProps[key];
+      } else {
+        nextProps[key] = value;
+      }
+    }
+    return {
+      ...component,
+      props: nextProps,
+    };
+  });
+
+  return {
+    ...schema,
+    components: nextComponents,
   };
 }
 

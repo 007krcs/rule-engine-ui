@@ -6,8 +6,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'component-system',
-      include: ['tests/**/*.test.ts'],
-      environment: 'node',
+      include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+      environment: 'jsdom',
     },
   }),
 );

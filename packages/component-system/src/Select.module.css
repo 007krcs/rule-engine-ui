@@ -20,6 +20,7 @@
   background: var(--rf-color-surface, #ffffff);
   color: var(--rf-color-text, #13283d);
   border-radius: var(--rf-radius-sm, 6px);
+  cursor: pointer;
   padding-left: var(--rf-spacing-3, 12px);
   padding-right: calc(var(--rf-spacing-5, 20px) + 14px);
   transition: border-color 120ms ease;

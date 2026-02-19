@@ -1,19 +1,59 @@
 import {
-  createTheme,
-  type PaletteMode,
-  type Theme,
-  type ThemeOptions,
-} from '@mui/material/styles';
-import {
   deriveColorScale,
   getDesignTokensForMode,
   type PlatformTheme,
 } from '@platform/ui-kit';
 
+export type PaletteMode = 'light' | 'dark';
+
+export interface ThemePaletteColor {
+  main: string;
+  light?: string;
+  dark?: string;
+  contrastText?: string;
+}
+
+export interface ThemePalette {
+  mode: PaletteMode;
+  primary: ThemePaletteColor;
+  secondary: ThemePaletteColor;
+  success: ThemePaletteColor;
+  warning: ThemePaletteColor;
+  error: ThemePaletteColor;
+  background: {
+    default: string;
+    paper: string;
+  };
+  text: {
+    primary: string;
+    secondary: string;
+  };
+  divider: string;
+}
+
+export interface ThemeOptions {
+  spacing: number;
+  shape: {
+    borderRadius: number;
+  };
+  palette: ThemePalette;
+  typography: Record<string, unknown>;
+  components: Record<string, unknown>;
+}
+
+export type Theme = Omit<ThemeOptions, 'spacing'> & {
+  spacing: (factor: number) => string;
+};
+
 export function createMuiThemeFromPlatformTheme(
   platformTheme: PlatformTheme,
 ): Theme {
-  return createTheme(platformThemeToMuiThemeOptions(platformTheme));
+  const options = platformThemeToMuiThemeOptions(platformTheme);
+  const spacingBase = options.spacing ?? 8;
+  return {
+    ...options,
+    spacing: (factor: number) => `${Math.round(spacingBase * factor)}px`,
+  };
 }
 
 export function platformThemeToMuiThemeOptions(
@@ -96,7 +136,7 @@ export function platformThemeToMuiThemeOptions(
       },
     },
     components: {
-      MuiPaper: {
+      Paper: {
         styleOverrides: {
           root: {
             backgroundImage: 'none',
@@ -104,7 +144,7 @@ export function platformThemeToMuiThemeOptions(
           },
         },
       },
-      MuiButton: {
+      Button: {
         styleOverrides: {
           root: {
             borderRadius: Math.round(px(tokens.radii.sm, 6) * radiusScale),
@@ -116,12 +156,12 @@ export function platformThemeToMuiThemeOptions(
           },
         },
       },
-      MuiTextField: {
+      TextField: {
         defaultProps: {
           variant: 'outlined',
         },
       },
-      MuiOutlinedInput: {
+      OutlinedInput: {
         styleOverrides: {
           root: {
             borderRadius: Math.round(px(tokens.radii.sm, 6) * radiusScale),
@@ -151,4 +191,3 @@ function px(raw: string, fallback: number): number {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
-

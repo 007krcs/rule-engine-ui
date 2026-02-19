@@ -2,11 +2,15 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from 'react';
+import { Button, Checkbox, Input, Select } from '@platform/component-system';
+import type { ComponentContract, ComponentPropDefinition } from '@platform/component-contract';
 import {
   serializeApplicationBundle,
   type ApplicationBundleStatus,
   type FlowTransitionEdge,
   type LayoutTreeNode,
+  type JSONValue,
+  type UIComponent,
   type UISchema,
 } from '@platform/schema';
 import type { BuilderWorkspaceSummary } from '../lib/builder-modules';
@@ -22,7 +26,14 @@ import {
   updateBuilderTransition,
   type BuilderFlowState,
 } from '../lib/flow-engine';
-import { applyPaletteDrop, createInitialBuilderSchema, getLayoutNode, updateLayoutNodeProperties } from '../lib/layout-engine';
+import {
+  applyPaletteDrop,
+  createInitialBuilderSchema,
+  getComponentById,
+  getLayoutNode,
+  updateComponentProps,
+  updateLayoutNodeProperties,
+} from '../lib/layout-engine';
 import { Canvas } from './Canvas';
 import { FlowEditor } from './FlowEditor';
 import {
@@ -47,12 +58,14 @@ export interface BuilderPaletteEntry {
 export interface BuilderShellProps {
   summary: BuilderWorkspaceSummary;
   paletteEntries: BuilderPaletteEntry[];
+  componentContracts: ComponentContract[];
   initialFlowState?: BuilderFlowState;
 }
 
 export function BuilderShell({
   summary,
   paletteEntries,
+  componentContracts,
   initialFlowState = createInitialBuilderFlowState(),
 }: BuilderShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(true);
@@ -130,6 +143,21 @@ export function BuilderShell({
     [activeSchema, selectedLayoutNodeId],
   );
 
+  const contractByType = useMemo(
+    () => new Map(componentContracts.map((contract) => [contract.type, contract])),
+    [componentContracts],
+  );
+
+  const selectedComponent = useMemo(() => {
+    if (!selectedLayoutNode || selectedLayoutNode.kind !== 'component') return null;
+    return getComponentById(activeSchema, selectedLayoutNode.componentId) ?? null;
+  }, [activeSchema, selectedLayoutNode]);
+
+  const selectedComponentContract = useMemo(() => {
+    if (!selectedComponent) return null;
+    return contractByType.get(selectedComponent.type) ?? null;
+  }, [contractByType, selectedComponent]);
+
   const selectedFlowScreen = useMemo(() => {
     const lookupId = selectedFlowScreenId ?? activeScreen?.id ?? null;
     if (!lookupId) return null;
@@ -200,7 +228,9 @@ export function BuilderShell({
     if (!activeScreen) return;
     const currentSchema = schemasByScreenId[activeScreen.id] ?? createInitialBuilderSchema(activeScreen.uiPageId);
     const selectedNodeId = selectedLayoutNodeByScreen[activeScreen.id] ?? currentSchema.sections?.[0]?.id ?? null;
-    const result = applyPaletteDrop(currentSchema, item, target, selectedNodeId);
+    const result = applyPaletteDrop(currentSchema, item, target, selectedNodeId, {
+      getComponentContract: (type) => contractByType.get(type),
+    });
 
     setSchemasByScreenId((current) => ({ ...current, [activeScreen.id]: result.schema }));
     if (result.changed) {
@@ -271,6 +301,15 @@ export function BuilderShell({
     if (!activeScreen || !selectedLayoutNodeId) return;
     const currentSchema = schemasByScreenId[activeScreen.id] ?? createInitialBuilderSchema(activeScreen.uiPageId);
     const nextSchema = updateLayoutNodeProperties(currentSchema, selectedLayoutNodeId, patch);
+    setSchemasByScreenId((current) => ({ ...current, [activeScreen.id]: nextSchema }));
+  };
+
+  const updateSelectedComponentProp = (propKey: string, value: JSONValue | undefined) => {
+    if (!activeScreen || !selectedComponent) return;
+    const currentSchema = schemasByScreenId[activeScreen.id] ?? createInitialBuilderSchema(activeScreen.uiPageId);
+    const nextSchema = updateComponentProps(currentSchema, selectedComponent.id, {
+      [propKey]: value,
+    });
     setSchemasByScreenId((current) => ({ ...current, [activeScreen.id]: nextSchema }));
   };
 
@@ -358,35 +397,38 @@ export function BuilderShell({
               Flow
             </button>
           </div>
-          <button
+          <Button
             type="button"
-            className={styles.toggleButton}
+            variant="secondary"
+            size="sm"
             onClick={() => setPaletteOpen((current) => !current)}
             aria-controls="builder-palette"
             aria-expanded={paletteOpen}
           >
             {paletteOpen ? 'Hide Left Panel' : 'Show Left Panel'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={styles.toggleButton}
+            variant="secondary"
+            size="sm"
             onClick={() => setInspectorOpen((current) => !current)}
             aria-controls="builder-inspector"
             aria-expanded={inspectorOpen}
           >
             {inspectorOpen ? 'Hide Inspector' : 'Show Inspector'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={styles.toggleButton}
+            variant="secondary"
+            size="sm"
             onClick={() => setEditMode((current) => !current)}
             aria-pressed={!editMode}
           >
             {editMode ? 'Switch To Preview' : 'Switch To Edit'}
-          </button>
-          <button type="button" className={styles.toggleButton} onClick={handleExportBundle}>
+          </Button>
+          <Button type="button" variant="primary" size="sm" onClick={handleExportBundle}>
             Export Bundle JSON
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -416,15 +458,16 @@ export function BuilderShell({
             ))}
           </ul>
           <div className={styles.addRow}>
-            <input
+            <Input
               value={newScreenTitle}
               onChange={(event) => setNewScreenTitle(event.target.value)}
               placeholder="New screen title"
               aria-label="New screen title"
+              size="sm"
             />
-            <button type="button" className={styles.insertButton} onClick={handleAddScreen}>
+            <Button type="button" variant="primary" size="sm" onClick={handleAddScreen}>
               Add Screen
-            </button>
+            </Button>
           </div>
           {builderMode === 'layout' ? (
             <>
@@ -443,14 +486,15 @@ export function BuilderShell({
                         <span>{entry.displayName}</span>
                         <small>{entry.category}</small>
                       </button>
-                      <button
+                      <Button
                         type="button"
-                        className={styles.insertButton}
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handlePaletteItemInsert(entry)}
                         aria-label={`Insert ${entry.displayName} at canvas root`}
                       >
                         Insert
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 ))}
@@ -525,25 +569,27 @@ export function BuilderShell({
             <h3>Bundle Metadata</h3>
             <div className={styles.fieldGroup}>
               <div className={styles.field}>
-                <label htmlFor="bundle-config-id">Config ID</label>
-                <input
+                <Input
                   id="bundle-config-id"
+                  label="Config ID"
                   value={bundleConfigId}
                   onChange={(event) => setBundleConfigId(event.target.value)}
+                  size="sm"
                 />
               </div>
               <div className={styles.field}>
-                <label htmlFor="bundle-tenant-id">Tenant ID</label>
-                <input
+                <Input
                   id="bundle-tenant-id"
+                  label="Tenant ID"
                   value={bundleTenantId}
                   onChange={(event) => setBundleTenantId(event.target.value)}
+                  size="sm"
                 />
               </div>
               <div className={styles.field}>
-                <label htmlFor="bundle-version">Bundle Version</label>
-                <input
+                <Input
                   id="bundle-version"
+                  label="Bundle Version"
                   type="number"
                   min={1}
                   value={bundleVersion}
@@ -551,58 +597,81 @@ export function BuilderShell({
                     const parsed = Number.parseInt(event.target.value, 10);
                     setBundleVersion(Number.isFinite(parsed) && parsed > 0 ? parsed : 1);
                   }}
+                  size="sm"
                 />
               </div>
               <div className={styles.field}>
-                <label htmlFor="bundle-status">Status</label>
-                <select
+                <Select
                   id="bundle-status"
+                  label="Status"
                   value={bundleStatus}
                   onChange={(event) => setBundleStatus(event.target.value as ApplicationBundleStatus)}
-                >
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="PUBLISHED">PUBLISHED</option>
-                  <option value="ARCHIVED">ARCHIVED</option>
-                </select>
+                  size="sm"
+                  options={[
+                    { value: 'DRAFT', label: 'DRAFT' },
+                    { value: 'PUBLISHED', label: 'PUBLISHED' },
+                    { value: 'ARCHIVED', label: 'ARCHIVED' },
+                  ]}
+                />
               </div>
             </div>
           </div>
 
           {builderMode === 'layout' ? (
-            <div className={styles.propertyPanel}>
-              <h3>Layout Node Properties</h3>
-              {selectedLayoutNode ? (
-                <LayoutPropertyFields
-                  node={selectedLayoutNode}
-                  onTextFieldChange={handleLayoutTextFieldChange}
-                  onNumberFieldChange={handleLayoutNumberFieldChange}
-                />
-              ) : (
-                <p className={styles.emptyNotice}>Select a section, row, column, or component node.</p>
-              )}
-            </div>
+            <>
+              <div className={styles.propertyPanel}>
+                <h3>Layout Node Properties</h3>
+                {selectedLayoutNode ? (
+                  <LayoutPropertyFields
+                    node={selectedLayoutNode}
+                    onTextFieldChange={handleLayoutTextFieldChange}
+                    onNumberFieldChange={handleLayoutNumberFieldChange}
+                  />
+                ) : (
+                  <p className={styles.emptyNotice}>Select a section, row, column, or component node.</p>
+                )}
+              </div>
+              {selectedLayoutNode?.kind === 'component' ? (
+                <div className={styles.propertyPanel}>
+                  <h3>Component Properties</h3>
+                  {selectedComponent && selectedComponentContract ? (
+                    <ComponentPropFields
+                      component={selectedComponent}
+                      contract={selectedComponentContract}
+                      onPropChange={updateSelectedComponentProp}
+                    />
+                  ) : (
+                    <p className={styles.emptyNotice}>No contract registered for this component type.</p>
+                  )}
+                </div>
+              ) : null}
+            </>
           ) : (
             <>
               <div className={styles.propertyPanel}>
                 <h3>Screen Properties</h3>
                 {selectedFlowScreen ? (
                   <div className={styles.fieldGroup}>
-                    <div className={styles.field}><label>Screen ID</label><input value={selectedFlowScreen.id} readOnly /></div>
                     <div className={styles.field}>
-                      <label htmlFor="screen-title">Screen Title</label>
-                      <input
+                      <Input label="Screen ID" value={selectedFlowScreen.id} readOnly size="sm" />
+                    </div>
+                    <div className={styles.field}>
+                      <Input
                         key={`screen-title-${selectedFlowScreen.id}`}
                         id="screen-title"
+                        label="Screen Title"
                         defaultValue={selectedFlowScreen.title}
+                        size="sm"
                         onBlur={(event) => setFlowGraph((current) => renameBuilderScreen(current, selectedFlowScreen.id, event.target.value))}
                       />
                     </div>
                     <div className={styles.field}>
-                      <label htmlFor="screen-page">UI Page ID</label>
-                      <input
+                      <Input
                         key={`screen-page-${selectedFlowScreen.id}`}
                         id="screen-page"
+                        label="UI Page ID"
                         defaultValue={selectedFlowScreen.uiPageId}
+                        size="sm"
                         onBlur={(event) => {
                           const result = rebindBuilderScreenPage(flowGraph, schemasByScreenId, selectedFlowScreen.id, event.target.value);
                           setFlowGraph(result.flow);
@@ -611,8 +680,23 @@ export function BuilderShell({
                       />
                     </div>
                     <div className={styles.inlineActions}>
-                      <button type="button" className={styles.insertButton} onClick={() => setFlowGraph((current) => ({ ...current, initialScreenId: selectedFlowScreen.id }))}>Set As Initial</button>
-                      <button type="button" className={styles.deleteButton} onClick={handleRemoveSelectedScreen} disabled={flowGraph.screens.length <= 1}>Remove Screen</button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setFlowGraph((current) => ({ ...current, initialScreenId: selectedFlowScreen.id }))}
+                      >
+                        Set As Initial
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        onClick={handleRemoveSelectedScreen}
+                        disabled={flowGraph.screens.length <= 1}
+                      >
+                        Remove Screen
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -623,20 +707,47 @@ export function BuilderShell({
                 <h3>Add Transition (Accessible)</h3>
                 <div className={styles.fieldGroup}>
                   <div className={styles.field}>
-                    <label htmlFor="transition-from">From</label>
-                    <select id="transition-from" value={transitionDraft.from} onChange={(event) => setTransitionDraft((current) => ({ ...current, from: event.target.value }))}>
-                      {flowGraph.screens.map((screen) => <option key={screen.id} value={screen.id}>{screen.title}</option>)}
-                    </select>
+                    <Select
+                      id="transition-from"
+                      label="From"
+                      value={transitionDraft.from}
+                      size="sm"
+                      onChange={(event) => setTransitionDraft((current) => ({ ...current, from: event.target.value }))}
+                      options={flowGraph.screens.map((screen) => ({ value: screen.id, label: screen.title }))}
+                    />
                   </div>
                   <div className={styles.field}>
-                    <label htmlFor="transition-to">To</label>
-                    <select id="transition-to" value={transitionDraft.to} onChange={(event) => setTransitionDraft((current) => ({ ...current, to: event.target.value }))}>
-                      {flowGraph.screens.map((screen) => <option key={screen.id} value={screen.id}>{screen.title}</option>)}
-                    </select>
+                    <Select
+                      id="transition-to"
+                      label="To"
+                      value={transitionDraft.to}
+                      size="sm"
+                      onChange={(event) => setTransitionDraft((current) => ({ ...current, to: event.target.value }))}
+                      options={flowGraph.screens.map((screen) => ({ value: screen.id, label: screen.title }))}
+                    />
                   </div>
-                  <div className={styles.field}><label htmlFor="transition-event">Event</label><input id="transition-event" value={transitionDraft.onEvent} onChange={(event) => setTransitionDraft((current) => ({ ...current, onEvent: event.target.value }))} /></div>
-                  <div className={styles.field}><label htmlFor="transition-condition">Condition</label><input id="transition-condition" value={transitionDraft.condition} onChange={(event) => setTransitionDraft((current) => ({ ...current, condition: event.target.value }))} placeholder="rule:EligibilityPassed" /></div>
-                  <button type="button" className={styles.insertButton} onClick={handleAddTransitionFromForm}>Add Transition</button>
+                  <div className={styles.field}>
+                    <Input
+                      id="transition-event"
+                      label="Event"
+                      value={transitionDraft.onEvent}
+                      size="sm"
+                      onChange={(event) => setTransitionDraft((current) => ({ ...current, onEvent: event.target.value }))}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <Input
+                      id="transition-condition"
+                      label="Condition"
+                      value={transitionDraft.condition}
+                      size="sm"
+                      placeholder="rule:EligibilityPassed"
+                      onChange={(event) => setTransitionDraft((current) => ({ ...current, condition: event.target.value }))}
+                    />
+                  </div>
+                  <Button type="button" variant="primary" size="sm" onClick={handleAddTransitionFromForm}>
+                    Add Transition
+                  </Button>
                 </div>
               </div>
 
@@ -666,11 +777,52 @@ export function BuilderShell({
                 <h3>Selected Transition</h3>
                 {selectedTransition ? (
                   <div className={styles.fieldGroup}>
-                    <div className={styles.field}><label>From</label><select value={selectedTransition.from} onChange={(event) => handleTransitionPatch(selectedTransition.id, { from: event.target.value })}>{flowGraph.screens.map((screen) => <option key={screen.id} value={screen.id}>{screen.title}</option>)}</select></div>
-                    <div className={styles.field}><label>To</label><select value={selectedTransition.to} onChange={(event) => handleTransitionPatch(selectedTransition.id, { to: event.target.value })}>{flowGraph.screens.map((screen) => <option key={screen.id} value={screen.id}>{screen.title}</option>)}</select></div>
-                    <div className={styles.field}><label>Event</label><input value={selectedTransition.onEvent} onChange={(event) => handleTransitionPatch(selectedTransition.id, { onEvent: event.target.value })} /></div>
-                    <div className={styles.field}><label>Condition</label><input value={typeof selectedTransition.condition === 'string' ? selectedTransition.condition : ''} onChange={(event) => handleTransitionPatch(selectedTransition.id, { condition: event.target.value })} placeholder="rule:EligibilityPassed" /></div>
-                    <button type="button" className={styles.deleteButton} onClick={() => { setFlowGraph((current) => deleteBuilderTransition(current, selectedTransition.id)); setSelectedTransitionId(null); }}>Remove Transition</button>
+                    <div className={styles.field}>
+                      <Select
+                        label="From"
+                        value={selectedTransition.from}
+                        size="sm"
+                        onChange={(event) => handleTransitionPatch(selectedTransition.id, { from: event.target.value })}
+                        options={flowGraph.screens.map((screen) => ({ value: screen.id, label: screen.title }))}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <Select
+                        label="To"
+                        value={selectedTransition.to}
+                        size="sm"
+                        onChange={(event) => handleTransitionPatch(selectedTransition.id, { to: event.target.value })}
+                        options={flowGraph.screens.map((screen) => ({ value: screen.id, label: screen.title }))}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <Input
+                        label="Event"
+                        value={selectedTransition.onEvent}
+                        size="sm"
+                        onChange={(event) => handleTransitionPatch(selectedTransition.id, { onEvent: event.target.value })}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <Input
+                        label="Condition"
+                        value={typeof selectedTransition.condition === 'string' ? selectedTransition.condition : ''}
+                        size="sm"
+                        placeholder="rule:EligibilityPassed"
+                        onChange={(event) => handleTransitionPatch(selectedTransition.id, { condition: event.target.value })}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setFlowGraph((current) => deleteBuilderTransition(current, selectedTransition.id));
+                        setSelectedTransitionId(null);
+                      }}
+                    >
+                      Remove Transition
+                    </Button>
                   </div>
                 ) : (
                   <p className={styles.emptyNotice}>Select a transition edge to edit event and condition.</p>
@@ -698,12 +850,179 @@ interface LayoutPropertyFieldsProps {
 function LayoutPropertyFields({ node, onTextFieldChange, onNumberFieldChange }: LayoutPropertyFieldsProps) {
   return (
     <div className={styles.fieldGroup}>
-      <div className={styles.field}><label>Node Type</label><input value={node.kind} readOnly /></div>
-      <div className={styles.field}><label>Label</label><input value={node.label ?? ''} onChange={onTextFieldChange('label')} /></div>
-      <div className={styles.field}><label>Class Name</label><input value={node.className ?? ''} onChange={onTextFieldChange('className')} /></div>
-      {node.kind === 'section' ? <div className={styles.field}><label>Section Title</label><input value={node.title ?? ''} onChange={onTextFieldChange('title')} /></div> : null}
-      {node.kind === 'column' ? <div className={styles.field}><label>Column Span (1-12)</label><input type="number" min={1} max={12} value={node.span ?? ''} onChange={onNumberFieldChange('span')} /></div> : null}
-      {node.kind === 'component' ? <div className={styles.field}><label>Component Span (1-12)</label><input type="number" min={1} max={12} value={node.componentSpan ?? ''} onChange={onNumberFieldChange('componentSpan')} /></div> : null}
+      <div className={styles.field}>
+        <Input label="Node Type" value={node.kind} readOnly size="sm" />
+      </div>
+      <div className={styles.field}>
+        <Input label="Label" value={node.label ?? ''} onChange={onTextFieldChange('label')} size="sm" />
+      </div>
+      <div className={styles.field}>
+        <Input
+          label="Class Name"
+          value={node.className ?? ''}
+          onChange={onTextFieldChange('className')}
+          size="sm"
+        />
+      </div>
+      {node.kind === 'section' ? (
+        <div className={styles.field}>
+          <Input label="Section Title" value={node.title ?? ''} onChange={onTextFieldChange('title')} size="sm" />
+        </div>
+      ) : null}
+      {node.kind === 'column' ? (
+        <div className={styles.field}>
+          <Input
+            label="Column Span (1-12)"
+            type="number"
+            min={1}
+            max={12}
+            value={node.span ?? ''}
+            onChange={onNumberFieldChange('span')}
+            size="sm"
+          />
+        </div>
+      ) : null}
+      {node.kind === 'component' ? (
+        <div className={styles.field}>
+          <Input
+            label="Component Span (1-12)"
+            type="number"
+            min={1}
+            max={12}
+            value={node.componentSpan ?? ''}
+            onChange={onNumberFieldChange('componentSpan')}
+            size="sm"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface ComponentPropFieldsProps {
+  component: UIComponent;
+  contract: ComponentContract;
+  onPropChange: (propKey: string, value: JSONValue | undefined) => void;
+}
+
+function ComponentPropFields({ component, contract, onPropChange }: ComponentPropFieldsProps) {
+  const entries = Object.entries(contract.props ?? {});
+  if (entries.length === 0) {
+    return <p className={styles.emptyNotice}>This component has no configurable properties.</p>;
+  }
+
+  const sortedEntries = entries.sort((left, right) => {
+    const leftLabel = left[1]?.label ?? left[0];
+    const rightLabel = right[1]?.label ?? right[0];
+    return leftLabel.localeCompare(rightLabel);
+  });
+
+  return (
+    <div className={styles.fieldGroup}>
+      {sortedEntries.map(([propKey, definition]) => (
+        <ComponentPropField
+          key={propKey}
+          propKey={propKey}
+          definition={definition}
+          component={component}
+          onPropChange={onPropChange}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface ComponentPropFieldProps {
+  propKey: string;
+  definition: ComponentPropDefinition;
+  component: UIComponent;
+  onPropChange: (propKey: string, value: JSONValue | undefined) => void;
+}
+
+function ComponentPropField({ propKey, definition, component, onPropChange }: ComponentPropFieldProps) {
+  const rawValue = component.props?.[propKey] ?? definition.defaultValue;
+  const editable = definition.editable !== false;
+
+  if (definition.kind === 'boolean') {
+    return (
+      <div className={styles.field}>
+        <Checkbox
+          label={definition.label}
+          helperText={definition.description}
+          checked={Boolean(rawValue)}
+          onChange={(event) => onPropChange(propKey, event.target.checked)}
+          disabled={!editable}
+        />
+      </div>
+    );
+  }
+
+  if (definition.kind === 'enum') {
+    const value = typeof rawValue === 'string' ? rawValue : '';
+    return (
+      <div className={styles.field}>
+        <Select
+          label={definition.label}
+          helperText={definition.description}
+          value={value}
+          size="sm"
+          disabled={!editable}
+          placeholder={definition.required ? undefined : 'Select option'}
+          options={definition.options}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            onPropChange(propKey, nextValue === '' ? undefined : nextValue);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (definition.kind === 'number') {
+    const numericValue =
+      typeof rawValue === 'number' && Number.isFinite(rawValue)
+        ? rawValue
+        : rawValue === undefined || rawValue === null
+          ? ''
+          : Number(rawValue);
+    return (
+      <div className={styles.field}>
+        <Input
+          label={definition.label}
+          helperText={definition.description}
+          type="number"
+          value={Number.isFinite(numericValue as number) ? (numericValue as number) : ''}
+          min={definition.min}
+          max={definition.max}
+          step={definition.step}
+          size="sm"
+          disabled={!editable}
+          onChange={(event) => {
+            const nextRaw = event.target.value;
+            if (nextRaw === '') {
+              onPropChange(propKey, undefined);
+              return;
+            }
+            const parsed = Number(nextRaw);
+            onPropChange(propKey, Number.isFinite(parsed) ? parsed : undefined);
+          }}
+        />
+      </div>
+    );
+  }
+
+  const stringValue = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+  return (
+    <div className={styles.field}>
+      <Input
+        label={definition.label}
+        helperText={definition.description}
+        placeholder={definition.kind === 'string' ? definition.placeholder : undefined}
+        value={stringValue}
+        size="sm"
+        disabled={!editable}
+        onChange={(event) => onPropChange(propKey, event.target.value)}
+      />
     </div>
   );
 }

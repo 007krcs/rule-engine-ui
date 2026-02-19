@@ -11,10 +11,10 @@ describe('plugin-sdk', () => {
         target.registerComponent({
           type: 'action.button',
           displayName: 'Action Button',
-          category: 'action',
+          category: 'Action',
+          props: {},
           bindings: [],
           events: [{ name: 'click' }],
-          propsSchema: {},
         });
 
         target.registerRule({

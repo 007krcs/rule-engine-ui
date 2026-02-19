@@ -10,6 +10,7 @@
   --rf-color-warning: #d98324;
   --rf-color-success: #1f9d60;
   --rf-color-focus: #0f62fe;
+  --rf-color-overlay: rgba(16, 36, 63, 0.6);
   --rf-radius-sm: 6px;
   --rf-radius-md: 10px;
   --rf-radius-lg: 14px;
@@ -24,6 +25,9 @@
   --rf-font-size-lg: 1.05rem;
   --rf-shadow-sm: 0 1px 2px rgba(16, 36, 63, 0.08);
   --rf-shadow-md: 0 8px 24px rgba(16, 36, 63, 0.22);
+  --rf-shadow-lg: 0 24px 60px rgba(16, 36, 63, 0.32);
+  --rf-z-modal: 1100;
+  --rf-z-toast: 1200;
 
   font-family: var(--rf-font-family);
   color: var(--rf-color-text);

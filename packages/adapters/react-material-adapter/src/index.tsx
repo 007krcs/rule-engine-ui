@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, Input, Select, type SelectOption } from '@platform/component-system';
 import type { JSONValue, UIComponent } from '@platform/schema';
 import type { AdapterContext, AdapterRegistry } from '@platform/react-renderer';
 import { getDefaultAdapterRegistry, registerAdapter } from '@platform/react-renderer';
@@ -76,13 +76,12 @@ function renderMaterialInput(
         ? 'Use YYYY-MM-DD.'
         : 'Use YYYY-MM-DDThh:mm.'
       : '';
-  const variant = toTextFieldVariant(component.props?.variant);
   const size = toControlSize(component.props?.size);
   const disabled = Boolean(component.props?.disabled);
   const options = toOptions(component.props?.options);
   const selectMode = Boolean(component.props?.select) || options.length > 0;
 
-  const handleChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+  const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
     if (!ctx.events.onChange) return;
     let nextValue: JSONValue = event.target.value;
     if (inputType === 'number') {
@@ -94,36 +93,45 @@ function renderMaterialInput(
     ctx.events.onChange(nextValue, bindingPath);
   };
 
+  const handleSelectChange: React.ChangeEventHandler<HTMLSelectElement> = (event) => {
+    if (!ctx.events.onChange) return;
+    ctx.events.onChange(event.target.value, bindingPath);
+  };
+
+  if (selectMode) {
+    return (
+      <Select
+        aria-label={ariaLabel}
+        data-adapter="material-select"
+        label={label}
+        placeholder={placeholder || undefined}
+        helperText={!isInvalid ? helperText : undefined}
+        error={isInvalid ? validationMessage : undefined}
+        size={size}
+        disabled={disabled}
+        required={required}
+        value={inputValue === null || inputValue === undefined ? '' : String(inputValue)}
+        onChange={handleSelectChange}
+        options={options}
+      />
+    );
+  }
+
   return (
-    <TextField
-      variant={variant}
-      size={size}
-      fullWidth={Boolean(component.props?.fullWidth ?? true)}
+    <Input
+      aria-label={ariaLabel}
+      data-adapter="material-input"
       label={label}
       placeholder={placeholder}
-      helperText={validationMessage || helperText}
-      required={required}
+      helperText={!isInvalid ? helperText : undefined}
+      error={isInvalid ? validationMessage : undefined}
+      size={size}
       disabled={disabled}
-      error={isInvalid}
-      type={selectMode ? undefined : inputType}
+      required={required}
+      type={inputType}
       value={inputValue as string | number}
-      onChange={handleChange}
-      select={selectMode}
-      slotProps={{
-        htmlInput: {
-          'aria-label': ariaLabel,
-          'data-mui-component': 'material-text-field',
-        },
-      }}
-    >
-      {selectMode
-        ? options.map((option) => (
-            <MenuItem key={option.value} value={option.value} disabled={option.disabled}>
-              {option.label}
-            </MenuItem>
-          ))
-        : null}
-    </TextField>
+      onChange={handleInputChange}
+    />
   );
 }
 
@@ -135,15 +143,17 @@ function renderMaterialButton(
   const label = component.i18n?.labelKey
     ? ctx.i18n.t(component.i18n.labelKey)
     : String(component.props?.label ?? 'Button');
+  const baseVariant = toButtonVariant(component.props?.variant);
+  const variant = toVariantFromColor(component.props?.color, baseVariant);
 
   return (
     <Button
-      variant={toMuiButtonVariant(component.props?.variant)}
-      color={toMuiButtonColor(component.props?.color)}
+      variant={variant}
       size={toControlSize(component.props?.size)}
       disabled={Boolean(component.props?.disabled)}
+      loading={Boolean(component.props?.loading)}
       aria-label={ariaLabel}
-      data-mui-component="material-button"
+      data-adapter="material-button"
       onClick={() => ctx.events.onClick?.({ componentId: component.id })}
     >
       {label}
@@ -162,46 +172,32 @@ function isValidDateInput(value: string, inputType: string): boolean {
   return true;
 }
 
-function toTextFieldVariant(value: unknown): 'filled' | 'outlined' | 'standard' {
-  if (value === 'filled' || value === 'outlined' || value === 'standard') return value;
-  if (value === 'ghost') return 'standard';
-  return 'outlined';
+function toControlSize(value: unknown): 'sm' | 'md' | 'lg' {
+  if (value === 'sm' || value === 'small') return 'sm';
+  if (value === 'lg' || value === 'large') return 'lg';
+  return 'md';
 }
 
-function toControlSize(value: unknown): 'small' | 'medium' {
-  return value === 'sm' || value === 'small' ? 'small' : 'medium';
-}
-
-function toMuiButtonVariant(value: unknown): 'text' | 'outlined' | 'contained' {
-  if (value === 'outlined' || value === 'text' || value === 'contained') return value;
-  if (value === 'outline') return 'outlined';
-  if (value === 'ghost') return 'text';
-  return 'contained';
-}
-
-function toMuiButtonColor(
-  value: unknown,
-): 'inherit' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning' {
-  if (
-    value === 'inherit' ||
-    value === 'primary' ||
-    value === 'secondary' ||
-    value === 'success' ||
-    value === 'error' ||
-    value === 'info' ||
-    value === 'warning'
-  ) {
-    return value;
-  }
+function toButtonVariant(value: unknown): 'primary' | 'secondary' | 'ghost' | 'danger' {
+  if (value === 'outlined' || value === 'outline' || value === 'secondary') return 'secondary';
+  if (value === 'text' || value === 'ghost') return 'ghost';
+  if (value === 'danger') return 'danger';
   return 'primary';
 }
 
-function toOptions(
-  raw: unknown,
-): Array<{ value: string; label: string; disabled?: boolean }> {
+function toVariantFromColor(
+  value: unknown,
+  fallback: 'primary' | 'secondary' | 'ghost' | 'danger',
+): 'primary' | 'secondary' | 'ghost' | 'danger' {
+  if (value === 'error' || value === 'danger') return 'danger';
+  if (value === 'secondary') return 'secondary';
+  return fallback;
+}
+
+function toOptions(raw: unknown): SelectOption[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map<{ value: string; label: string; disabled?: boolean } | null>((value) => {
+    .map<SelectOption | null>((value) => {
       if (!value || typeof value !== 'object') return null;
       const item = value as { value?: unknown; label?: unknown; labelKey?: unknown; disabled?: unknown };
       if (typeof item.value !== 'string') return null;
@@ -217,5 +213,5 @@ function toOptions(
         disabled: item.disabled === true ? true : undefined,
       };
     })
-    .filter((item): item is { value: string; label: string; disabled?: boolean } => item !== null);
+    .filter((item): item is SelectOption => item !== null);
 }

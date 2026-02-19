@@ -1,0 +1,80 @@
+.field {
+  display: grid;
+  gap: var(--rf-spacing-2, 8px);
+}
+
+.control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rf-spacing-2, 8px);
+  cursor: pointer;
+  font-size: var(--rf-font-size-sm, 0.8125rem);
+  color: var(--rf-color-text, #13283d);
+}
+
+.input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dot {
+  inline-size: 16px;
+  block-size: 16px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-color-border, #c6d2e1);
+  background: var(--rf-color-surface, #ffffff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.dot::after {
+  content: '';
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 999px;
+  background: var(--rf-color-primary, #0f62fe);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+.input:checked + .dot::after {
+  transform: scale(1);
+}
+
+.input:focus-visible + .dot {
+  outline: 2px solid var(--rf-color-focus, #0f62fe);
+  outline-offset: 2px;
+}
+
+.input:disabled + .dot {
+  background: #f0f4fa;
+  border-color: #d3dce8;
+  cursor: not-allowed;
+}
+
+.input:disabled ~ .labelText {
+  color: var(--rf-color-text-muted, #4f6680);
+  cursor: not-allowed;
+}
+
+.labelText {
+  font-weight: 600;
+}
+
+.message {
+  margin: 0;
+  font-size: var(--rf-font-size-sm, 0.8125rem);
+  color: var(--rf-color-text-muted, #4f6680);
+}
+
+.messageError {
+  color: var(--rf-color-danger, #d92929);
+}
+
+.messageWarning {
+  color: var(--rf-color-warning, #d98324);
+}

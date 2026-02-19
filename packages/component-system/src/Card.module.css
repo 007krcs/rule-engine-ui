@@ -1,0 +1,60 @@
+.card {
+  display: grid;
+  gap: var(--rf-spacing-3, 12px);
+  border-radius: var(--rf-radius-md, 10px);
+  padding: var(--rf-spacing-4, 16px);
+  color: var(--rf-color-text, #13283d);
+}
+
+.elevated {
+  background: var(--rf-color-surface, #ffffff);
+  border: 1px solid var(--rf-color-border, #c6d2e1);
+  box-shadow: var(--rf-shadow-sm, 0 1px 2px rgba(16, 36, 63, 0.08));
+}
+
+.outline {
+  background: transparent;
+  border: 1px solid var(--rf-color-border, #c6d2e1);
+}
+
+.subtle {
+  background: var(--rf-color-surface-subtle, #f7f9fc);
+  border: 1px solid transparent;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-spacing-3, 12px);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--rf-font-size-md, 0.9375rem);
+  font-weight: 600;
+}
+
+.description {
+  margin: 0.25rem 0 0;
+  font-size: var(--rf-font-size-sm, 0.8125rem);
+  color: var(--rf-color-text-muted, #4f6680);
+}
+
+.actions {
+  display: inline-flex;
+  gap: var(--rf-spacing-2, 8px);
+}
+
+.body {
+  display: grid;
+  gap: var(--rf-spacing-3, 12px);
+}
+
+.footer {
+  border-top: 1px solid var(--rf-color-border, #c6d2e1);
+  padding-top: var(--rf-spacing-3, 12px);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--rf-spacing-2, 8px);
+}

@@ -7,10 +7,8 @@ describe('isComponentContract', () => {
       isComponentContract({
         type: 'input.text',
         displayName: 'Text Input',
-        category: 'input',
-        bindings: [],
-        events: [],
-        propsSchema: {},
+        category: 'Form Controls',
+        props: {},
       }),
     ).toBe(true);
   });

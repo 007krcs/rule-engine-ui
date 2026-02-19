@@ -1,5 +1,4 @@
 import { getDefaultComponentCatalog } from '@platform/component-system';
-import type { ComponentContract } from '@platform/component-contract';
 import { flowGraphToStateMachine } from '@platform/schema';
 import { BuilderShell, type BuilderPaletteEntry } from '../components/BuilderShell';
 import { summarizeBuilderWorkspace } from '../lib/builder-modules';
@@ -7,24 +6,10 @@ import { createInitialBuilderFlowState } from '../lib/flow-engine';
 
 const catalog = getDefaultComponentCatalog();
 
-function toContract(component: ReturnType<typeof getDefaultComponentCatalog>[number]): ComponentContract {
-  return {
-    type: component.type,
-    displayName: component.displayName,
-    category: component.category,
-    bindings: component.bindings,
-    events: component.events,
-    propsSchema: component.propsSchema,
-  };
-}
-
 export default function Page() {
   const initialFlowState = createInitialBuilderFlowState();
   const flowStateMachine = flowGraphToStateMachine(initialFlowState.flow);
-  const summary = summarizeBuilderWorkspace(
-    flowStateMachine,
-    catalog.map(toContract),
-  );
+  const summary = summarizeBuilderWorkspace(flowStateMachine, catalog);
 
   const paletteEntries: BuilderPaletteEntry[] = [
     {
@@ -49,9 +34,16 @@ export default function Page() {
       type: component.type,
       displayName: component.displayName,
       category: component.category,
-      description: `Add ${component.displayName}`,
+      description: component.description ?? `Add ${component.displayName}`,
     })),
   ];
 
-  return <BuilderShell summary={summary} paletteEntries={paletteEntries} initialFlowState={initialFlowState} />;
+  return (
+    <BuilderShell
+      summary={summary}
+      paletteEntries={paletteEntries}
+      componentContracts={catalog}
+      initialFlowState={initialFlowState}
+    />
+  );
 }

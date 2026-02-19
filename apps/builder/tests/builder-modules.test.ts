@@ -15,18 +15,18 @@ describe('summarizeBuilderWorkspace', () => {
         {
           type: 'input.text',
           displayName: 'Text Input',
-          category: 'input',
+          category: 'Form Controls',
+          props: {},
           bindings: [],
           events: [],
-          propsSchema: {},
         },
         {
           type: 'display.badge',
           displayName: 'Badge',
-          category: 'display',
+          category: 'Data Display',
+          props: {},
           bindings: [],
           events: [],
-          propsSchema: {},
         },
       ],
     );

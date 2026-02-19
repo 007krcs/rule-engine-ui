@@ -12,7 +12,6 @@
   },
   "files": ["dist"],
   "dependencies": {
-    "@mui/material": "^7.3.4",
     "@platform/ui-kit": "workspace:*"
   },
   "scripts": {
@@ -22,4 +21,3 @@
     "test": "vitest run"
   }
 }
-
