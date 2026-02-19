@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useMemo, useReducer } from 'react';
 import type { FlowSchema, RuleSet, UISchema } from '@platform/schema';
 import { createEmptyRuleset } from '@platform/schema';
