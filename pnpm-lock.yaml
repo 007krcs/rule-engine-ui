@@ -150,6 +150,10 @@ importers:
       '@platform/web-component-bridge':
         specifier: workspace:*
         version: link:../../packages/adapters/web-component-bridge
+    devDependencies:
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@25.3.0)(jsdom@27.4.0)(sass@1.97.3)(tsx@4.21.0)
 
   apps/demo-host-react:
     dependencies:
