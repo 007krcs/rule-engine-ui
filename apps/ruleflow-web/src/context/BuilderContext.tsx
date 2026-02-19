@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useMemo, useReducer } from 'react';
-import type { FlowSchema, RuleSet, UISchema } from '@platform/schema';
+import type { ApiMapping, FlowSchema, RuleSet, UISchema } from '@platform/schema';
 import { createEmptyRuleset } from '@platform/schema';
 
 export interface BuilderState {
@@ -10,7 +10,7 @@ export interface BuilderState {
   screens: Record<string, UISchema>;
   flow: FlowSchema;
   rules: RuleSet;
-  apiMappings: unknown[];
+  apiMappings: ApiMapping[];
   tokens: Record<string, string>;
   plugins: string[];
 }

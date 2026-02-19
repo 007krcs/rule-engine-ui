@@ -23,7 +23,7 @@ export function generateBundleFromState(state: BuilderState): ApplicationBundle 
     uiSchemas: state.screens,
     flowSchema: state.flow,
     rules: state.rules,
-    apiMappings: state.apiMappings as any[], // TODO: tighten api mappings shape
+    apiMappings: state.apiMappings,
     extensions: {
       plugins: state.plugins,
       tokens: state.tokens,
