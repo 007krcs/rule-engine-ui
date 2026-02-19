@@ -33,7 +33,12 @@ function shouldSkipDirectory(dirPath: string): boolean {
     return false;
   }
   const segments = relative.split(path.sep);
-  return segments.some((segment) => SKIP_SEGMENTS.has(segment));
+  return segments.some(
+    (segment) =>
+      SKIP_SEGMENTS.has(segment) ||
+      segment.startsWith('.next_backup_') ||
+      segment.startsWith('.next_stale_'),
+  );
 }
 
 function collectEmptyDirectories(rootPath: string): string[] {

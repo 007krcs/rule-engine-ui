@@ -1,0 +1,30 @@
+{
+  "name": "playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm --filter @platform/schema --filter @platform/component-system --filter @platform/core-runtime build",
+    "prebuild": "pnpm --filter @platform/schema --filter @platform/component-system --filter @platform/core-runtime build",
+    "dev": "next dev --port 3201",
+    "build": "next build",
+    "start": "next start --port 3201",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@platform/component-system": "workspace:*",
+    "@platform/core-runtime": "workspace:*",
+    "@platform/schema": "workspace:*",
+    "next": "^15.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

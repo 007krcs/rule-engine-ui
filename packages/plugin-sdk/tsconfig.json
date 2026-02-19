@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@platform/component-contract": ["../component-contract/src/index.ts"],
+      "@platform/schema": ["../schema/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../component-contract" },
+    { "path": "../schema" }
+  ]
+}

@@ -29,9 +29,54 @@ export interface UISchema {
   pageId: string;
   layout: LayoutNode;
   components: UIComponent[];
+  sections?: SectionNode[];
   layoutType?: 'grid';
   grid?: UIGridSpec;
   items?: UIGridItem[];
+}
+
+export type LayoutTreeNode = SectionNode | RowNode | ColumnNode | LayoutComponentNode;
+
+export type LayoutContainerNode = SectionNode | RowNode | ColumnNode;
+
+export interface BaseLayoutTreeNode {
+  id: string;
+  kind: 'section' | 'row' | 'column' | 'component';
+  label?: string;
+  className?: string;
+  props?: Record<string, JSONValue>;
+  hiddenWhen?: RuleCondition;
+}
+
+export interface SectionNode extends BaseLayoutTreeNode {
+  kind: 'section';
+  title?: string;
+  rows: RowNode[];
+}
+
+export interface RowNode extends BaseLayoutTreeNode {
+  kind: 'row';
+  columns: ColumnNode[];
+}
+
+export interface ColumnNode extends BaseLayoutTreeNode {
+  kind: 'column';
+  span?: number;
+  children: LayoutColumnChildNode[];
+}
+
+export interface LayoutComponentNode extends BaseLayoutTreeNode {
+  kind: 'component';
+  componentId: string;
+  componentType?: string;
+  componentSpan?: number;
+}
+
+export type LayoutColumnChildNode = SectionNode | LayoutComponentNode;
+
+export interface UISchemaPage {
+  pageId: string;
+  sections: SectionNode[];
 }
 
 export type LayoutNode = GridLayout | StackLayout | TabsLayout | SectionLayout;
@@ -191,6 +236,7 @@ export interface FlowState {
 export interface FlowTransition {
   target: string;
   guard?: RuleCondition;
+  condition?: string | RuleCondition;
   actions?: FlowAction[];
   apiId?: string;
 }

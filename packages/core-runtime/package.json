@@ -7,6 +7,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./orchestrator": {
+      "types": "./dist/orchestrator.d.ts",
+      "default": "./dist/orchestrator.js"
+    },
     "./store": {
       "types": "./dist/store.d.ts",
       "default": "./dist/store.js"

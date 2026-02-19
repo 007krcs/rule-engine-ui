@@ -1,0 +1,209 @@
+{
+  "version": "1.0.0",
+  "pageId": "kyc-form-page",
+  "components": [
+    {
+      "id": "firstName",
+      "type": "input.text",
+      "adapterHint": "react.input",
+      "props": {
+        "label": "First Name"
+      },
+      "accessibility": {
+        "ariaLabelKey": "kyc.firstName",
+        "keyboardNav": true,
+        "focusOrder": 1
+      }
+    },
+    {
+      "id": "lastName",
+      "type": "input.text",
+      "adapterHint": "react.input",
+      "props": {
+        "label": "Last Name"
+      },
+      "accessibility": {
+        "ariaLabelKey": "kyc.lastName",
+        "keyboardNav": true,
+        "focusOrder": 2
+      }
+    },
+    {
+      "id": "email",
+      "type": "input.email",
+      "adapterHint": "react.input",
+      "props": {
+        "label": "Email"
+      },
+      "accessibility": {
+        "ariaLabelKey": "kyc.email",
+        "keyboardNav": true,
+        "focusOrder": 3
+      }
+    },
+    {
+      "id": "documentType",
+      "type": "select",
+      "adapterHint": "react.select",
+      "props": {
+        "label": "Document Type"
+      },
+      "accessibility": {
+        "ariaLabelKey": "kyc.documentType",
+        "keyboardNav": true,
+        "focusOrder": 4
+      }
+    },
+    {
+      "id": "documentNumber",
+      "type": "input.text",
+      "adapterHint": "react.input",
+      "props": {
+        "label": "Document Number"
+      },
+      "accessibility": {
+        "ariaLabelKey": "kyc.documentNumber",
+        "keyboardNav": true,
+        "focusOrder": 5
+      }
+    },
+    {
+      "id": "reviewSummary",
+      "type": "display.card",
+      "adapterHint": "react.card",
+      "props": {
+        "title": "Application Summary"
+      },
+      "accessibility": {
+        "ariaLabelKey": "kyc.summary",
+        "keyboardNav": true,
+        "focusOrder": 6
+      }
+    }
+  ],
+  "sections": [
+    {
+      "id": "section-personal",
+      "kind": "section",
+      "title": "Personal Information",
+      "rows": [
+        {
+          "id": "row-personal-1",
+          "kind": "row",
+          "columns": [
+            {
+              "id": "col-personal-1",
+              "kind": "column",
+              "span": 6,
+              "children": [
+                {
+                  "id": "node-first-name",
+                  "kind": "component",
+                  "componentId": "firstName",
+                  "componentType": "input.text"
+                }
+              ]
+            },
+            {
+              "id": "col-personal-2",
+              "kind": "column",
+              "span": 6,
+              "children": [
+                {
+                  "id": "node-last-name",
+                  "kind": "component",
+                  "componentId": "lastName",
+                  "componentType": "input.text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "row-personal-2",
+          "kind": "row",
+          "columns": [
+            {
+              "id": "col-personal-3",
+              "kind": "column",
+              "span": 12,
+              "children": [
+                {
+                  "id": "node-email",
+                  "kind": "component",
+                  "componentId": "email",
+                  "componentType": "input.email"
+                },
+                {
+                  "id": "nested-section-document",
+                  "kind": "section",
+                  "title": "Document Details",
+                  "rows": [
+                    {
+                      "id": "row-document-1",
+                      "kind": "row",
+                      "columns": [
+                        {
+                          "id": "col-document-1",
+                          "kind": "column",
+                          "span": 6,
+                          "children": [
+                            {
+                              "id": "node-document-type",
+                              "kind": "component",
+                              "componentId": "documentType",
+                              "componentType": "select"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "col-document-2",
+                          "kind": "column",
+                          "span": 6,
+                          "children": [
+                            {
+                              "id": "node-document-number",
+                              "kind": "component",
+                              "componentId": "documentNumber",
+                              "componentType": "input.text"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "section-review",
+      "kind": "section",
+      "title": "Review",
+      "rows": [
+        {
+          "id": "row-review-1",
+          "kind": "row",
+          "columns": [
+            {
+              "id": "col-review-1",
+              "kind": "column",
+              "span": 12,
+              "children": [
+                {
+                  "id": "node-review-summary",
+                  "kind": "component",
+                  "componentId": "reviewSummary",
+                  "componentType": "display.card"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

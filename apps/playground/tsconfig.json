@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowArbitraryExtensions": true,
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@platform/schema": ["../../packages/schema/src/index.ts"],
+      "@platform/core-runtime": ["../../packages/core-runtime/src/index.ts"],
+      "@platform/core-runtime/orchestrator": ["../../packages/core-runtime/src/orchestrator.ts"],
+      "@platform/component-system": ["../../packages/component-system/src/index.ts"]
+    },
+    "isolatedModules": true,
+    "plugins": [{ "name": "next" }]
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"],
+  "references": [
+    { "path": "../../packages/schema" },
+    { "path": "../../packages/component-system" },
+    { "path": "../../packages/core-runtime" }
+  ]
+}

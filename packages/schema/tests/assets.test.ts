@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applicationBundleSchema,
   apiMappingSchema,
   executionContextSchema,
   flowSchema,
@@ -20,11 +21,13 @@ describe('schema assets', () => {
     expect(flowSchema).toBeTruthy();
     expect(rulesSchema).toBeTruthy();
     expect(apiMappingSchema).toBeTruthy();
+    expect(applicationBundleSchema).toBeTruthy();
 
     expect(readSchemaId(executionContextSchema)).toBe('execution-context.schema.json');
     expect(readSchemaId(uiSchema)).toBe('ui.schema.json');
     expect(readSchemaId(flowSchema)).toBe('flow.schema.json');
     expect(readSchemaId(rulesSchema)).toBe('rules.schema.json');
     expect(readSchemaId(apiMappingSchema)).toBe('api-mapping.schema.json');
+    expect(readSchemaId(applicationBundleSchema)).toBe('application-bundle.schema.json');
   });
 });

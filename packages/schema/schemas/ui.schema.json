@@ -4,11 +4,20 @@
   "title": "UISchema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "pageId", "layout", "components"],
+  "required": ["version", "pageId", "components"],
+  "allOf": [
+    {
+      "anyOf": [{ "required": ["layout"] }, { "required": ["sections"] }]
+    }
+  ],
   "properties": {
     "version": { "type": "string", "minLength": 1 },
     "pageId": { "type": "string", "minLength": 1 },
     "layout": { "$ref": "#/$defs/layoutNode" },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sectionNode" }
+    },
     "components": {
       "type": "array",
       "items": { "$ref": "#/$defs/component" }
@@ -28,6 +37,89 @@
         { "$ref": "#/$defs/tabsLayout" },
         { "$ref": "#/$defs/sectionLayout" }
       ]
+    },
+    "layoutTreeNode": {
+      "oneOf": [
+        { "$ref": "#/$defs/sectionNode" },
+        { "$ref": "#/$defs/rowNode" },
+        { "$ref": "#/$defs/columnNode" },
+        { "$ref": "#/$defs/layoutComponentNode" }
+      ]
+    },
+    "sectionNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "rows"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "const": "section" },
+        "title": { "type": "string" },
+        "label": { "type": "string" },
+        "className": { "type": "string" },
+        "props": { "type": "object", "additionalProperties": true },
+        "hiddenWhen": { "$ref": "#/$defs/ruleCondition" },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rowNode" }
+        }
+      }
+    },
+    "rowNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "columns"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "const": "row" },
+        "label": { "type": "string" },
+        "className": { "type": "string" },
+        "props": { "type": "object", "additionalProperties": true },
+        "hiddenWhen": { "$ref": "#/$defs/ruleCondition" },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/columnNode" }
+        }
+      }
+    },
+    "columnNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "children"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "const": "column" },
+        "label": { "type": "string" },
+        "className": { "type": "string" },
+        "props": { "type": "object", "additionalProperties": true },
+        "hiddenWhen": { "$ref": "#/$defs/ruleCondition" },
+        "span": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layoutColumnChildNode" }
+        }
+      }
+    },
+    "layoutColumnChildNode": {
+      "oneOf": [
+        { "$ref": "#/$defs/sectionNode" },
+        { "$ref": "#/$defs/layoutComponentNode" }
+      ]
+    },
+    "layoutComponentNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "componentId"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "const": "component" },
+        "componentId": { "type": "string", "minLength": 1 },
+        "componentType": { "type": "string", "minLength": 1 },
+        "componentSpan": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "label": { "type": "string" },
+        "className": { "type": "string" },
+        "props": { "type": "object", "additionalProperties": true },
+        "hiddenWhen": { "$ref": "#/$defs/ruleCondition" }
+      }
     },
     "baseLayout": {
       "type": "object",

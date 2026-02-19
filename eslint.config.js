@@ -1,7 +1,7 @@
 const js = require("@eslint/js");
 const { FlatCompat } = require("@eslint/eslintrc");
 
-const legacyConfig = require("./.eslintrc.cjs");
+const legacyConfig = require("./.eslintrc.json");
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,

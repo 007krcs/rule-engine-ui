@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "flowId": "application-onboarding",
+  "initialScreenId": "screen-welcome",
+  "screens": [
+    {
+      "id": "screen-welcome",
+      "title": "Welcome",
+      "uiPageId": "welcome-page",
+      "position": { "x": 80, "y": 100 }
+    },
+    {
+      "id": "screen-eligibility",
+      "title": "Eligibility",
+      "uiPageId": "eligibility-page",
+      "position": { "x": 380, "y": 100 }
+    },
+    {
+      "id": "screen-rejected",
+      "title": "Rejected",
+      "uiPageId": "rejected-page",
+      "position": { "x": 680, "y": 220 }
+    },
+    {
+      "id": "screen-approved",
+      "title": "Approved",
+      "uiPageId": "approved-page",
+      "position": { "x": 680, "y": 20 }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "transition-start",
+      "from": "screen-welcome",
+      "to": "screen-eligibility",
+      "onEvent": "next"
+    },
+    {
+      "id": "transition-approved",
+      "from": "screen-eligibility",
+      "to": "screen-approved",
+      "onEvent": "submit",
+      "condition": "rule:EligibilityPassed"
+    },
+    {
+      "id": "transition-rejected",
+      "from": "screen-eligibility",
+      "to": "screen-rejected",
+      "onEvent": "submit",
+      "condition": "rule:EligibilityFailed"
+    }
+  ]
+}

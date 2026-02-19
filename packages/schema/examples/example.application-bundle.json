@@ -1,0 +1,109 @@
+{
+  "metadata": {
+    "configId": "app-eligibility-demo",
+    "version": 1,
+    "status": "DRAFT",
+    "tenantId": "tenant-acme",
+    "createdAt": "2026-02-19T00:00:00.000Z",
+    "updatedAt": "2026-02-19T00:00:00.000Z",
+    "createdBy": "builder-user"
+  },
+  "uiSchemas": {
+    "screen-welcome": {
+      "version": "1.0.0",
+      "pageId": "welcome-page",
+      "layout": {
+        "id": "root-layout",
+        "type": "stack",
+        "direction": "vertical"
+      },
+      "components": [],
+      "sections": []
+    },
+    "screen-result": {
+      "version": "1.0.0",
+      "pageId": "result-page",
+      "layout": {
+        "id": "root-layout",
+        "type": "stack",
+        "direction": "vertical"
+      },
+      "components": [],
+      "sections": []
+    }
+  },
+  "flowSchema": {
+    "version": "1.0.0",
+    "flowId": "eligibility-flow",
+    "initialState": "screen-welcome",
+    "states": {
+      "screen-welcome": {
+        "uiPageId": "welcome-page",
+        "on": {
+          "submit": {
+            "target": "screen-result",
+            "condition": "rule:EligibilityPassed"
+          }
+        }
+      },
+      "screen-result": {
+        "uiPageId": "result-page",
+        "on": {}
+      }
+    }
+  },
+  "flowGraph": {
+    "version": "1.0.0",
+    "flowId": "eligibility-flow",
+    "initialScreenId": "screen-welcome",
+    "screens": [
+      {
+        "id": "screen-welcome",
+        "title": "Welcome",
+        "uiPageId": "welcome-page",
+        "position": { "x": 80, "y": 100 }
+      },
+      {
+        "id": "screen-result",
+        "title": "Result",
+        "uiPageId": "result-page",
+        "position": { "x": 380, "y": 100 }
+      }
+    ],
+    "transitions": [
+      {
+        "id": "transition-submit",
+        "from": "screen-welcome",
+        "to": "screen-result",
+        "onEvent": "submit",
+        "condition": "rule:EligibilityPassed"
+      }
+    ]
+  },
+  "rules": {
+    "version": "1.0.0",
+    "rules": [
+      {
+        "ruleId": "EligibilityPassed",
+        "description": "Sample placeholder rule",
+        "when": {
+          "op": "eq",
+          "left": { "path": "data.eligibility.result" },
+          "right": { "value": "PASS" }
+        },
+        "actions": []
+      }
+    ]
+  },
+  "apiMappings": [],
+  "themes": {
+    "id": "default-theme",
+    "name": "Default",
+    "tokens": {
+      "color.surface": "#ffffff",
+      "color.text.primary": "#10243f",
+      "radius.md": "12px"
+    }
+  },
+  "extensions": {}
+}

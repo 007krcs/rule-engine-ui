@@ -1,19 +1,32 @@
-﻿{
+{
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "pnpm-lock.yaml",
+    "tsconfig.base.json",
+    "tsconfig.json",
+    ".eslintrc.json",
+    ".prettierrc"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**", ".next/**"]
     },
-    "test": {
+    "dev": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "cache": false,
+      "persistent": true
     },
     "lint": {
+      "dependsOn": ["^lint"],
       "outputs": []
     },
-    "typecheck": {
+    "test": {
       "dependsOn": ["^build"],
+      "outputs": ["coverage/**", "test-results/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "^typecheck"],
       "outputs": []
     }
   }

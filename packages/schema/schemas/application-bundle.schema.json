@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "application-bundle.schema.json",
+  "title": "ApplicationBundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata", "uiSchemas", "flowSchema", "rules", "apiMappings"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configId", "version", "status", "tenantId", "createdAt", "updatedAt"],
+      "properties": {
+        "configId": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string", "enum": ["DRAFT", "PUBLISHED", "ARCHIVED"] },
+        "tenantId": { "type": "string", "minLength": 1 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "uiSchemas": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "flowSchema": {
+      "type": "object"
+    },
+    "flowGraph": {
+      "type": "object"
+    },
+    "rules": {
+      "type": "object"
+    },
+    "apiMappings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "themes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokens"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tokens": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

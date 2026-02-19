@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/schema" },
+    { "path": "packages/component-contract" },
+    { "path": "packages/component-system" },
+    { "path": "packages/plugin-sdk" },
+    { "path": "packages/adapters" },
+    { "path": "packages/core-runtime" }
+  ]
+}
