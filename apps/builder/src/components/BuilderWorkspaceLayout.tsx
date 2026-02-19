@@ -15,8 +15,6 @@ const navItems: NavItem[] = [
   { label: 'Screens', href: '/builder/screens', icon: '[]' },
   { label: 'Flow', href: '/builder/flow', icon: '->' },
   { label: 'Rules', href: '/builder/rules', icon: 'RL' },
-  { label: 'Data', href: '/builder/data', icon: 'DB' },
-  { label: 'Components', href: '/builder/components', icon: 'CM' },
   { label: 'Docs', href: '/builder/docs', icon: 'DOC' },
   { label: 'Repo', href: '/builder/repo', icon: 'GIT' },
   { label: 'JSON', href: '/builder/json', icon: '{}' },
@@ -24,7 +22,7 @@ const navItems: NavItem[] = [
 
 export function BuilderWorkspaceLayout({ children }: BuilderWorkspaceLayoutProps) {
   const pathname = usePathname();
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(false);
 
   useEffect(() => {

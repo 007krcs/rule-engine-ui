@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import ScreensWorkspacePage from '../src/app/builder/screens/page';
 import FlowWorkspacePage from '../src/app/builder/flow/page';
 import RulesWorkspacePage from '../src/app/builder/rules/page';
@@ -8,11 +9,12 @@ import ComponentsWorkspacePage from '../src/app/builder/components/page';
 import DocsWorkspacePage from '../src/app/builder/docs/page';
 import RepoWorkspacePage from '../src/app/builder/repo/page';
 import JsonWorkspacePage from '../src/app/builder/json/page';
+import '@testing-library/jest-dom';
 
 describe('builder workspaces routing', () => {
   it('renders Screens workspace', () => {
     render(<ScreensWorkspacePage />);
-    expect(screen.getByText('Screens')).toBeInTheDocument();
+    expect(screen.getByText(/NEW BUILDER SHELL/)).toBeInTheDocument();
   });
 
   it('renders Flow workspace', () => {

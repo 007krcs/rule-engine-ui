@@ -1,4 +1,9 @@
 {
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true
+  },
   "files": [],
   "references": [
     { "path": "packages/schema" },

@@ -15,5 +15,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
   }
 }
