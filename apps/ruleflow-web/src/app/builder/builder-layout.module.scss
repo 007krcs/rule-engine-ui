@@ -15,15 +15,15 @@
   overflow: hidden;
 }
 
-:global(.rf-app-shell .body) {
+:global(.rf-app-shell) .body {
   height: 100vh;
 }
 
-:global(.rf-app-shell .main) {
+:global(.rf-app-shell) .main {
   padding-right: 0;
 }
 
-:global(.rf-app-shell .mainInner) {
+:global(.rf-app-shell) .mainInner {
   width: 100%;
   max-width: none;
   padding: 0;
