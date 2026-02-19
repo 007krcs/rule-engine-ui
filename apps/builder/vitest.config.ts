@@ -6,8 +6,9 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'builder',
-      include: ['tests/**/*.test.ts'],
-      environment: 'node',
+      include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+      environment: 'jsdom',
+      setupFiles: ['tests/setup.ts'],
     },
   }),
 );

@@ -1,6 +1,6 @@
 :root {
-  color-scheme: light;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  color-scheme: light dark;
+  font-family: var(--dt-font-family, 'Segoe UI', Arial, sans-serif);
 }
 
 * {
@@ -15,8 +15,13 @@ body {
 body {
   margin: 0;
   min-height: 100%;
-  background: radial-gradient(circle at top left, #eef4fd, #f6f9fe 45%, #eef3fb 100%);
-  color: #10243f;
+  background: radial-gradient(
+    circle at top left,
+    var(--dt-color-surface-subtle, #eef4fd),
+    var(--dt-color-surface, #f6f9fe) 45%,
+    var(--dt-color-surface-subtle, #eef3fb) 100%
+  );
+  color: var(--dt-color-text, #10243f);
   overflow: hidden;
 }
 

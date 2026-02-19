@@ -13,7 +13,10 @@
       "properties": {
         "configId": { "type": "string", "minLength": 1 },
         "version": { "type": "integer", "minimum": 1 },
-        "status": { "type": "string", "enum": ["DRAFT", "PUBLISHED", "ARCHIVED"] },
+        "status": {
+          "type": "string",
+          "enum": ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PUBLISHED", "ARCHIVED"]
+        },
         "tenantId": { "type": "string", "minLength": 1 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" },

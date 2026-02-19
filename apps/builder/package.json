@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/component-system --filter @platform/plugin-sdk build",
-    "prebuild": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/core-runtime build",
+    "predev": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/design-tokens build",
+    "prebuild": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/core-runtime --filter @platform/design-tokens build",
     "dev": "next dev --port 3200",
     "build": "next build",
     "start": "next start --port 3200",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@platform/component-contract": "workspace:*",
     "@platform/component-system": "workspace:*",
+    "@platform/design-tokens": "workspace:*",
     "@platform/plugin-sdk": "workspace:*",
     "@platform/schema": "workspace:*",
     "next": "^15.1.0",
@@ -23,9 +24,13 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25.2.1",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "4.0.18"
   }
 }

@@ -1,7 +1,8 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { ComponentSystemProvider } from '@platform/component-system';
+import { BuilderThemeProvider } from '../components/BuilderThemeProvider';
+import { ThemeToggle } from '../components/ThemeToggle';
 import styles from './layout.module.css';
 
 export const metadata = {
@@ -13,7 +14,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <ComponentSystemProvider>
+        <BuilderThemeProvider>
           <div className={styles.appShell}>
             <header className={styles.topNav}>
               <div className={styles.brand}>
@@ -27,11 +28,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link className={styles.navLink} href="/studio">
                   Component Studio
                 </Link>
+                <ThemeToggle />
               </nav>
             </header>
             <main className={styles.main}>{children}</main>
           </div>
-        </ComponentSystemProvider>
+        </BuilderThemeProvider>
       </body>
     </html>
   );

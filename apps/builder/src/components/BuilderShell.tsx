@@ -1,11 +1,13 @@
 
 'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Button, Checkbox, Input, Select } from '@platform/component-system';
 import type { ComponentContract, ComponentPropDefinition } from '@platform/component-contract';
 import {
   serializeApplicationBundle,
+  stateMachineToFlowGraph,
+  type ApplicationBundle,
   type ApplicationBundleStatus,
   type FlowTransitionEdge,
   type LayoutTreeNode,
@@ -34,6 +36,22 @@ import {
   updateComponentProps,
   updateLayoutNodeProperties,
 } from '../lib/layout-engine';
+import { validateApplicationBundle } from '../lib/bundle-validator';
+import {
+  createConfigPackage,
+  createDraftVersion,
+  getActivePackage,
+  getActiveVersion,
+  getLatestVersion,
+  loadConfigStore,
+  persistConfigStore,
+  recordAuditEntry,
+  saveDraftVersion,
+  setActiveVersion as setActiveVersionInStore,
+  updateVersionStatus,
+  type AuditLogEntry,
+  type ConfigStoreState,
+} from '../lib/config-governance';
 import { Canvas } from './Canvas';
 import { FlowEditor } from './FlowEditor';
 import {
@@ -45,6 +63,19 @@ import {
 import styles from './BuilderShell.module.css';
 
 type BuilderMode = 'layout' | 'flow';
+
+const DEFAULT_CONFIG_ID = 'ruleflow-builder-config';
+const DEFAULT_TENANT_ID = 'tenant-default';
+const DEFAULT_ACTOR = 'builder@local';
+const DEFAULT_THEME = {
+  id: 'builder-default',
+  name: 'Builder Default Theme',
+  tokens: {
+    'color.surface': '#ffffff',
+    'color.text.primary': '#10243f',
+    'radius.md': '12px',
+  },
+};
 
 export interface BuilderPaletteEntry {
   id: string;
@@ -94,12 +125,85 @@ export function BuilderShell({
     onEvent: 'next',
     condition: '',
   });
-  const [bundleConfigId, setBundleConfigId] = useState('ruleflow-builder-config');
-  const [bundleTenantId, setBundleTenantId] = useState('tenant-default');
+  const [bundleConfigId, setBundleConfigId] = useState(DEFAULT_CONFIG_ID);
+  const [bundleTenantId, setBundleTenantId] = useState(DEFAULT_TENANT_ID);
   const [bundleStatus, setBundleStatus] = useState<ApplicationBundleStatus>('DRAFT');
   const [bundleVersion, setBundleVersion] = useState(1);
-  const [bundleCreatedAt] = useState(() => new Date().toISOString());
+  const [bundleCreatedAt, setBundleCreatedAt] = useState(() => new Date().toISOString());
   const [bundleUpdatedAt, setBundleUpdatedAt] = useState(() => new Date().toISOString());
+  const [suppressUpdatedAt, setSuppressUpdatedAt] = useState(false);
+  const [configMessage, setConfigMessage] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [newConfigId, setNewConfigId] = useState('');
+  const [newConfigName, setNewConfigName] = useState('');
+  const [newConfigTenantId, setNewConfigTenantId] = useState(DEFAULT_TENANT_ID);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const activeVersionRef = useRef<string | null>(null);
+  const [configStore, setConfigStore] = useState<ConfigStoreState>(() => {
+    const stored = loadConfigStore();
+    if (stored.packages.length > 0) return stored;
+    const now = new Date().toISOString();
+    const seedBundle = assembleBundle({
+      flowGraph: initialFlowState.flow,
+      uiSchemasByScreenId: initialFlowState.schemasByScreenId,
+      configId: DEFAULT_CONFIG_ID,
+      tenantId: DEFAULT_TENANT_ID,
+      version: 1,
+      status: 'DRAFT',
+      createdAt: now,
+      updatedAt: now,
+      rules: {
+        version: '1.0.0',
+        rules: [],
+      },
+      apiMappings: [],
+      themes: DEFAULT_THEME,
+    });
+    const result = createConfigPackage(stored, {
+      id: DEFAULT_CONFIG_ID,
+      name: 'Default Config',
+      tenantId: DEFAULT_TENANT_ID,
+      bundle: seedBundle,
+      actor: DEFAULT_ACTOR,
+    });
+    return result.ok ? result.state : stored;
+  });
+
+  const commitConfigStore = (nextState: ConfigStoreState) => {
+    setConfigStore(nextState);
+    persistConfigStore(nextState);
+  };
+
+  const updateConfigStore = (updater: (state: ConfigStoreState) => ConfigStoreState) => {
+    setConfigStore((current) => {
+      const nextState = updater(current);
+      persistConfigStore(nextState);
+      return nextState;
+    });
+  };
+
+  const loadBundleIntoBuilder = useCallback((bundle: ApplicationBundle) => {
+    const nextFlowGraph = bundle.flowGraph ?? stateMachineToFlowGraph(bundle.flowSchema);
+    const nextSchemas: Record<string, UISchema> = {};
+    for (const screen of nextFlowGraph.screens) {
+      const existing = bundle.uiSchemas?.[screen.id];
+      nextSchemas[screen.id] = existing ?? createInitialBuilderSchema(screen.uiPageId);
+    }
+    setSuppressUpdatedAt(true);
+    setFlowGraph(nextFlowGraph);
+    setSchemasByScreenId(nextSchemas);
+    const nextActive = nextFlowGraph.initialScreenId || nextFlowGraph.screens[0]?.id;
+    if (nextActive) {
+      setActiveScreenId(nextActive);
+      setSelectedFlowScreenId(nextActive);
+    }
+    setSelectedTransitionId(null);
+    setSelectedLayoutNodeByScreen(
+      Object.fromEntries(
+        Object.entries(nextSchemas).map(([screenId, schema]) => [screenId, schema.sections?.[0]?.id ?? null]),
+      ),
+    );
+  }, []);
 
   useEffect(() => {
     if (flowGraph.screens.some((screen) => screen.id === activeScreenId)) return;
@@ -120,8 +224,39 @@ export function BuilderShell({
   }, [flowGraph.screens]);
 
   useEffect(() => {
+    if (suppressUpdatedAt) {
+      setSuppressUpdatedAt(false);
+      return;
+    }
     setBundleUpdatedAt(new Date().toISOString());
-  }, [flowGraph, schemasByScreenId]);
+  }, [flowGraph, schemasByScreenId, suppressUpdatedAt]);
+
+  const activePackage = useMemo(() => getActivePackage(configStore), [configStore]);
+  const activeVersion = useMemo(() => getActiveVersion(configStore), [configStore]);
+  const activeVersions = useMemo(
+    () => (activePackage ? [...activePackage.versions].sort((a, b) => b.version - a.version) : []),
+    [activePackage],
+  );
+
+  useEffect(() => {
+    persistConfigStore(configStore);
+  }, [configStore]);
+
+  useEffect(() => {
+    const pkg = getActivePackage(configStore);
+    const version = getActiveVersion(configStore);
+    if (!pkg || !version) return;
+    if (activeVersionRef.current === version.id) return;
+    activeVersionRef.current = version.id;
+    setBundleConfigId(pkg.id);
+    setBundleTenantId(pkg.tenantId);
+    setBundleStatus(version.status);
+    setBundleVersion(version.version);
+    setBundleCreatedAt(version.createdAt);
+    setBundleUpdatedAt(version.updatedAt);
+    setNewConfigTenantId(pkg.tenantId);
+    loadBundleIntoBuilder(version.bundle);
+  }, [configStore, loadBundleIntoBuilder]);
 
   const activeScreen = useMemo(
     () => flowGraph.screens.find((screen) => screen.id === activeScreenId) ?? flowGraph.screens[0] ?? null,
@@ -180,21 +315,13 @@ export function BuilderShell({
         status: bundleStatus,
         createdAt: bundleCreatedAt,
         updatedAt: bundleUpdatedAt,
-        rules: {
-          version: '1.0.0',
-          rules: [],
-        },
-        apiMappings: [],
-        themes: {
-          id: 'builder-default',
-          name: 'Builder Default Theme',
-          tokens: {
-            'color.surface': '#ffffff',
-            'color.text.primary': '#10243f',
-            'radius.md': '12px',
-          },
-        },
-      }),
+      rules: {
+        version: '1.0.0',
+        rules: [],
+      },
+      apiMappings: [],
+      themes: DEFAULT_THEME,
+    }),
     [
       flowGraph,
       schemasByScreenId,
@@ -207,6 +334,13 @@ export function BuilderShell({
     ],
   );
 
+  const validationResult = useMemo(
+    () => validateApplicationBundle(applicationBundle, componentContracts),
+    [applicationBundle, componentContracts],
+  );
+  const validationErrors = validationResult.issues.filter((issue) => issue.severity === 'error');
+  const validationWarnings = validationResult.issues.filter((issue) => issue.severity === 'warning');
+
   const legacyFlowStateMachine = applicationBundle.flowSchema;
 
   const sortedPalette = useMemo(
@@ -217,6 +351,59 @@ export function BuilderShell({
       ),
     [paletteEntries],
   );
+
+  const packageOptions = useMemo(
+    () =>
+      configStore.packages.map((pkg) => ({
+        value: pkg.id,
+        label: `${pkg.name} (${pkg.id})`,
+      })),
+    [configStore.packages],
+  );
+
+  const versionOptions = useMemo(
+    () =>
+      activeVersions.map((version) => ({
+        value: version.id,
+        label: `v${version.version} · ${version.status}`,
+      })),
+    [activeVersions],
+  );
+
+  const recentAuditEntries = useMemo(() => {
+    const entries = activePackage
+      ? configStore.audit.filter((entry) => entry.packageId === activePackage.id)
+      : configStore.audit;
+    return entries.slice(-8).reverse();
+  }, [configStore.audit, activePackage]);
+
+  const canSaveDraft = activeVersion?.status === 'DRAFT' || activeVersion?.status === 'REJECTED';
+  const canPromote = activeVersion?.status === 'DRAFT' || activeVersion?.status === 'REJECTED';
+  const canApprove = activeVersion?.status === 'SUBMITTED';
+  const canReject = activeVersion?.status === 'SUBMITTED';
+  const canPublish = activeVersion?.status === 'APPROVED';
+  const canCreateDraft =
+    activeVersion?.status === 'APPROVED' ||
+    activeVersion?.status === 'PUBLISHED' ||
+    activeVersion?.status === 'ARCHIVED';
+
+  const buildAuditEntry = (
+    entry: Omit<AuditLogEntry, 'id' | 'timestamp'> & Partial<Pick<AuditLogEntry, 'packageId' | 'versionId'>>,
+  ): AuditLogEntry => ({
+    id: createAuditId(),
+    packageId: entry.packageId ?? activePackage?.id ?? bundleConfigId,
+    versionId: entry.versionId ?? activeVersion?.id ?? 'unknown',
+    timestamp: new Date().toISOString(),
+    actor: entry.actor ?? DEFAULT_ACTOR,
+    action: entry.action,
+    summary: entry.summary,
+    metadata: entry.metadata,
+  });
+
+  const pushAuditEntry = (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'packageId' | 'versionId'>) => {
+    if (!activePackage || !activeVersion) return;
+    updateConfigStore((state) => recordAuditEntry(state, buildAuditEntry(entry)));
+  };
 
   const handleSelectScreen = (screenId: string) => {
     setActiveScreenId(screenId);
@@ -235,6 +422,15 @@ export function BuilderShell({
     setSchemasByScreenId((current) => ({ ...current, [activeScreen.id]: result.schema }));
     if (result.changed) {
       setSelectedLayoutNodeByScreen((current) => ({ ...current, [activeScreen.id]: result.selectedNodeId }));
+      pushAuditEntry({
+        action: 'layout.insert',
+        summary: `Inserted ${item.displayName} into ${activeScreen.title}`,
+        metadata: {
+          screenId: activeScreen.id,
+          kind: item.kind,
+          type: item.type,
+        },
+      });
     }
   };
 
@@ -268,6 +464,13 @@ export function BuilderShell({
     }));
     setTransitionDraft({ from: result.newScreenId, to: result.newScreenId, onEvent: 'next', condition: '' });
     setNewScreenTitle('');
+    pushAuditEntry({
+      action: 'screen.add',
+      summary: `Added screen ${result.newScreenId}`,
+      metadata: {
+        screenId: result.newScreenId,
+      },
+    });
   };
 
   const handleRemoveSelectedScreen = () => {
@@ -283,6 +486,11 @@ export function BuilderShell({
       const next = { ...current };
       delete next[targetScreenId];
       return next;
+    });
+    pushAuditEntry({
+      action: 'screen.remove',
+      summary: `Removed screen ${targetScreenId}`,
+      metadata: { screenId: targetScreenId },
     });
   };
 
@@ -302,6 +510,11 @@ export function BuilderShell({
     const currentSchema = schemasByScreenId[activeScreen.id] ?? createInitialBuilderSchema(activeScreen.uiPageId);
     const nextSchema = updateLayoutNodeProperties(currentSchema, selectedLayoutNodeId, patch);
     setSchemasByScreenId((current) => ({ ...current, [activeScreen.id]: nextSchema }));
+    pushAuditEntry({
+      action: 'layout.update',
+      summary: `Updated layout node ${selectedLayoutNodeId}`,
+      metadata: patch,
+    });
   };
 
   const updateSelectedComponentProp = (propKey: string, value: JSONValue | undefined) => {
@@ -311,6 +524,11 @@ export function BuilderShell({
       [propKey]: value,
     });
     setSchemasByScreenId((current) => ({ ...current, [activeScreen.id]: nextSchema }));
+    pushAuditEntry({
+      action: 'component.prop.update',
+      summary: `Updated ${selectedComponent.type} ${propKey}`,
+      metadata: { componentId: selectedComponent.id, propKey, value },
+    });
   };
 
   const handleLayoutTextFieldChange =
@@ -329,6 +547,11 @@ export function BuilderShell({
     setFlowGraph(result.flow);
     setSelectedTransitionId(result.transitionId);
     setSelectedFlowScreenId(input.to);
+    pushAuditEntry({
+      action: 'flow.transition.add',
+      summary: `Added transition ${input.from} -> ${input.to}`,
+      metadata: { from: input.from, to: input.to },
+    });
   };
 
   const handleAddTransitionFromForm = () => {
@@ -341,6 +564,11 @@ export function BuilderShell({
     });
     setFlowGraph(result.flow);
     setSelectedTransitionId(result.transitionId);
+    pushAuditEntry({
+      action: 'flow.transition.add',
+      summary: `Added transition ${transitionDraft.from} -> ${transitionDraft.to}`,
+      metadata: { ...transitionDraft },
+    });
   };
 
   const handleTransitionPatch = (
@@ -348,6 +576,235 @@ export function BuilderShell({
     patch: Partial<Pick<FlowTransitionEdge, 'from' | 'to' | 'onEvent' | 'condition'>>,
   ) => {
     setFlowGraph((current) => updateBuilderTransition(current, transitionId, patch));
+    pushAuditEntry({
+      action: 'flow.transition.update',
+      summary: `Updated transition ${transitionId}`,
+      metadata: patch,
+    });
+  };
+
+  const handleCreateConfig = () => {
+    setConfigMessage(null);
+    const trimmedId = newConfigId.trim();
+    if (!trimmedId) {
+      setConfigMessage('Config ID is required.');
+      return;
+    }
+    if (!ensureValidForAction('creating a config')) return;
+    const trimmedTenant = newConfigTenantId.trim() || DEFAULT_TENANT_ID;
+    const result = createConfigPackage(configStore, {
+      id: trimmedId,
+      name: newConfigName.trim() || trimmedId,
+      tenantId: trimmedTenant,
+      bundle: applicationBundle,
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: trimmedId,
+      versionId: result.value.version.id,
+      action: 'config.create',
+      summary: `Created config ${trimmedId} (v${result.value.version.version})`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setNewConfigId('');
+    setNewConfigName('');
+    setNewConfigTenantId(trimmedTenant);
+  };
+
+  const handlePackageSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    const packageId = event.target.value;
+    const pkg = configStore.packages.find((entry) => entry.id === packageId);
+    if (!pkg) return;
+    const latest = getLatestVersion(pkg) ?? pkg.versions[0];
+    if (!latest) return;
+    commitConfigStore(setActiveVersionInStore(configStore, pkg.id, latest.id));
+  };
+
+  const handleVersionSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    if (!activePackage) return;
+    const versionId = event.target.value;
+    commitConfigStore(setActiveVersionInStore(configStore, activePackage.id, versionId));
+  };
+
+  const ensureValidForAction = (actionLabel: string) => {
+    if (validationErrors.length === 0) return true;
+    setConfigMessage(`Fix ${validationErrors.length} validation errors before ${actionLabel.toLowerCase()}.`);
+    return false;
+  };
+
+  const handleSaveDraft = () => {
+    setConfigMessage(null);
+    if (!activePackage || !activeVersion) return;
+    if (!canSaveDraft) {
+      setConfigMessage('Only draft or rejected versions can be saved.');
+      return;
+    }
+    if (!ensureValidForAction('saving')) return;
+
+    const result = saveDraftVersion(configStore, {
+      packageId: activePackage.id,
+      versionId: activeVersion.id,
+      bundle: applicationBundle,
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: activePackage.id,
+      versionId: result.value.id,
+      action: 'version.save',
+      summary: `Saved draft v${result.value.version}`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setBundleUpdatedAt(result.value.updatedAt);
+    setBundleStatus(result.value.status);
+  };
+
+  const handleCreateDraft = () => {
+    setConfigMessage(null);
+    if (!activePackage) return;
+    if (!ensureValidForAction('creating a draft')) return;
+    const result = createDraftVersion(configStore, {
+      packageId: activePackage.id,
+      bundle: applicationBundle,
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: activePackage.id,
+      versionId: result.value.id,
+      action: 'version.create',
+      summary: `Created draft v${result.value.version}`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setBundleVersion(result.value.version);
+    setBundleStatus(result.value.status);
+    setBundleCreatedAt(result.value.createdAt);
+    setBundleUpdatedAt(result.value.updatedAt);
+  };
+
+  const handlePromote = () => {
+    setConfigMessage(null);
+    if (!activePackage || !activeVersion) return;
+    if (!canPromote) {
+      setConfigMessage('Only drafts can be submitted.');
+      return;
+    }
+    if (!ensureValidForAction('promoting')) return;
+    const result = updateVersionStatus(configStore, {
+      packageId: activePackage.id,
+      versionId: activeVersion.id,
+      status: 'SUBMITTED',
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: activePackage.id,
+      versionId: result.value.id,
+      action: 'version.promote',
+      summary: `Submitted v${result.value.version}`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setBundleStatus(result.value.status);
+    setBundleUpdatedAt(result.value.updatedAt);
+  };
+
+  const handleApprove = () => {
+    setConfigMessage(null);
+    if (!activePackage || !activeVersion) return;
+    if (!canApprove) {
+      setConfigMessage('Only submitted versions can be approved.');
+      return;
+    }
+    if (!ensureValidForAction('approving')) return;
+    const result = updateVersionStatus(configStore, {
+      packageId: activePackage.id,
+      versionId: activeVersion.id,
+      status: 'APPROVED',
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: activePackage.id,
+      versionId: result.value.id,
+      action: 'version.approve',
+      summary: `Approved v${result.value.version}`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setBundleStatus(result.value.status);
+    setBundleUpdatedAt(result.value.updatedAt);
+  };
+
+  const handleReject = () => {
+    setConfigMessage(null);
+    if (!activePackage || !activeVersion) return;
+    if (!canReject) {
+      setConfigMessage('Only submitted versions can be rejected.');
+      return;
+    }
+    const result = updateVersionStatus(configStore, {
+      packageId: activePackage.id,
+      versionId: activeVersion.id,
+      status: 'REJECTED',
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: activePackage.id,
+      versionId: result.value.id,
+      action: 'version.reject',
+      summary: `Rejected v${result.value.version}`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setBundleStatus(result.value.status);
+    setBundleUpdatedAt(result.value.updatedAt);
+  };
+
+  const handlePublish = () => {
+    setConfigMessage(null);
+    if (!activePackage || !activeVersion) return;
+    if (!canPublish) {
+      setConfigMessage('Only approved versions can be published.');
+      return;
+    }
+    if (!ensureValidForAction('publishing')) return;
+    const result = updateVersionStatus(configStore, {
+      packageId: activePackage.id,
+      versionId: activeVersion.id,
+      status: 'PUBLISHED',
+      actor: DEFAULT_ACTOR,
+    });
+    if (!result.ok) {
+      setConfigMessage(result.error);
+      return;
+    }
+    const auditEntry = buildAuditEntry({
+      packageId: activePackage.id,
+      versionId: result.value.id,
+      action: 'version.publish',
+      summary: `Published v${result.value.version}`,
+    });
+    commitConfigStore(recordAuditEntry(result.state, auditEntry));
+    setBundleStatus(result.value.status);
+    setBundleUpdatedAt(result.value.updatedAt);
   };
 
   const handleExportBundle = () => {
@@ -360,6 +817,89 @@ export function BuilderShell({
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+    pushAuditEntry({
+      action: 'bundle.export',
+      summary: `Exported bundle ${filename}`,
+    });
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportBundle = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+    setImportMessage(null);
+    setConfigMessage(null);
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      if (!parsed || typeof parsed !== 'object') {
+        setImportMessage('Invalid bundle format.');
+        return;
+      }
+      const bundle = parsed as ApplicationBundle;
+      if (!bundle.metadata?.configId || !bundle.metadata?.tenantId) {
+        setImportMessage('Bundle metadata is missing configId or tenantId.');
+        return;
+      }
+      if (!bundle.flowSchema || !bundle.uiSchemas) {
+        setImportMessage('Bundle is missing flowSchema or uiSchemas.');
+        return;
+      }
+      const validation = validateApplicationBundle(bundle, componentContracts);
+      if (validation.issues.some((issue) => issue.severity === 'error')) {
+        setImportMessage(`Import rejected: ${validation.issues.filter((issue) => issue.severity === 'error').length} errors found.`);
+        return;
+      }
+
+      const existing = configStore.packages.find((pkg) => pkg.id === bundle.metadata.configId);
+      if (!existing) {
+        const result = createConfigPackage(configStore, {
+          id: bundle.metadata.configId,
+          name: bundle.metadata.configId,
+          tenantId: bundle.metadata.tenantId,
+          bundle,
+          actor: DEFAULT_ACTOR,
+        });
+        if (!result.ok) {
+          setImportMessage(result.error);
+          return;
+        }
+        const auditEntry = buildAuditEntry({
+          packageId: bundle.metadata.configId,
+          versionId: result.value.version.id,
+          action: 'bundle.import',
+          summary: `Imported new config ${bundle.metadata.configId}`,
+        });
+        commitConfigStore(recordAuditEntry(result.state, auditEntry));
+        setImportMessage(`Imported ${bundle.metadata.configId} as a new config.`);
+        return;
+      }
+
+      const draftResult = createDraftVersion(configStore, {
+        packageId: existing.id,
+        bundle,
+        actor: DEFAULT_ACTOR,
+      });
+      if (!draftResult.ok) {
+        setImportMessage(draftResult.error);
+        return;
+      }
+      const auditEntry = buildAuditEntry({
+        packageId: existing.id,
+        versionId: draftResult.value.id,
+        action: 'bundle.import',
+        summary: `Imported bundle as v${draftResult.value.version}`,
+      });
+      commitConfigStore(recordAuditEntry(draftResult.state, auditEntry));
+      setImportMessage(`Imported bundle as draft v${draftResult.value.version}.`);
+    } catch {
+      setImportMessage('Invalid JSON file.');
+    }
   };
 
   const screensCount = flowGraph.screens.length;
@@ -553,69 +1093,179 @@ export function BuilderShell({
           aria-label="Properties panel"
         >
           <h2>Inspector</h2>
-          <dl className={styles.summaryList}>
-            <div><dt>Mode</dt><dd>{builderMode}</dd></div>
-            <div><dt>Screens</dt><dd>{screensCount}</dd></div>
-            <div><dt>Transitions</dt><dd>{transitionsCount}</dd></div>
-            <div><dt>Sections</dt><dd>{sectionsCount}</dd></div>
-            <div><dt>Rows</dt><dd>{rowsCount}</dd></div>
-            <div><dt>Columns</dt><dd>{columnsCount}</dd></div>
-            <div><dt>Layout Components</dt><dd>{componentsCount}</dd></div>
-            <div><dt>Catalog Items</dt><dd>{summary.componentCount}</dd></div>
-            <div><dt>Flow States</dt><dd>{Object.keys(legacyFlowStateMachine.states).length}</dd></div>
-          </dl>
+            <dl className={styles.summaryList}>
+              <div><dt>Mode</dt><dd>{builderMode}</dd></div>
+              <div><dt>Screens</dt><dd>{screensCount}</dd></div>
+              <div><dt>Transitions</dt><dd>{transitionsCount}</dd></div>
+              <div><dt>Sections</dt><dd>{sectionsCount}</dd></div>
+              <div><dt>Rows</dt><dd>{rowsCount}</dd></div>
+              <div><dt>Columns</dt><dd>{columnsCount}</dd></div>
+              <div><dt>Layout Components</dt><dd>{componentsCount}</dd></div>
+              <div><dt>Catalog Items</dt><dd>{summary.componentCount}</dd></div>
+              <div><dt>Flow States</dt><dd>{Object.keys(legacyFlowStateMachine.states).length}</dd></div>
+            </dl>
 
-          <div className={styles.propertyPanel}>
-            <h3>Bundle Metadata</h3>
-            <div className={styles.fieldGroup}>
-              <div className={styles.field}>
-                <Input
-                  id="bundle-config-id"
-                  label="Config ID"
-                  value={bundleConfigId}
-                  onChange={(event) => setBundleConfigId(event.target.value)}
-                  size="sm"
-                />
+            <div className={styles.propertyPanel}>
+              <h3>Config Management</h3>
+              <div className={styles.fieldGroup}>
+                <div className={styles.field}>
+                  <Select
+                    id="config-package"
+                    label="Config"
+                    value={activePackage?.id ?? ''}
+                    onChange={handlePackageSelect}
+                    size="sm"
+                    options={packageOptions}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <Select
+                    id="config-version"
+                    label="Version"
+                    value={activeVersion?.id ?? ''}
+                    onChange={handleVersionSelect}
+                    size="sm"
+                    options={versionOptions}
+                  />
+                </div>
               </div>
-              <div className={styles.field}>
-                <Input
-                  id="bundle-tenant-id"
-                  label="Tenant ID"
-                  value={bundleTenantId}
-                  onChange={(event) => setBundleTenantId(event.target.value)}
-                  size="sm"
-                />
+              <div className={styles.fieldGroup}>
+                <div className={styles.field}>
+                  <Input
+                    label="New Config ID"
+                    value={newConfigId}
+                    onChange={(event) => setNewConfigId(event.target.value)}
+                    placeholder="customer-onboarding"
+                    size="sm"
+                  />
+                </div>
+                <div className={styles.field}>
+                  <Input
+                    label="New Config Name"
+                    value={newConfigName}
+                    onChange={(event) => setNewConfigName(event.target.value)}
+                    placeholder="Customer Onboarding"
+                    size="sm"
+                  />
+                </div>
+                <div className={styles.field}>
+                  <Input
+                    label="New Tenant ID"
+                    value={newConfigTenantId}
+                    onChange={(event) => setNewConfigTenantId(event.target.value)}
+                    placeholder="tenant-001"
+                    size="sm"
+                  />
+                </div>
+                <Button type="button" variant="primary" size="sm" onClick={handleCreateConfig}>
+                  Create Config
+                </Button>
               </div>
-              <div className={styles.field}>
-                <Input
-                  id="bundle-version"
-                  label="Bundle Version"
-                  type="number"
-                  min={1}
-                  value={bundleVersion}
-                  onChange={(event) => {
-                    const parsed = Number.parseInt(event.target.value, 10);
-                    setBundleVersion(Number.isFinite(parsed) && parsed > 0 ? parsed : 1);
-                  }}
-                  size="sm"
-                />
+              <div className={styles.actionRow}>
+                <Button type="button" variant="primary" size="sm" onClick={handleSaveDraft} disabled={!canSaveDraft}>
+                  Save Draft
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handlePromote} disabled={!canPromote}>
+                  Submit
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleApprove} disabled={!canApprove}>
+                  Approve
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleReject} disabled={!canReject}>
+                  Reject
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handlePublish} disabled={!canPublish}>
+                  Publish
+                </Button>
               </div>
-              <div className={styles.field}>
-                <Select
-                  id="bundle-status"
-                  label="Status"
-                  value={bundleStatus}
-                  onChange={(event) => setBundleStatus(event.target.value as ApplicationBundleStatus)}
-                  size="sm"
-                  options={[
-                    { value: 'DRAFT', label: 'DRAFT' },
-                    { value: 'PUBLISHED', label: 'PUBLISHED' },
-                    { value: 'ARCHIVED', label: 'ARCHIVED' },
-                  ]}
-                />
+              <div className={styles.actionRow}>
+                <Button type="button" variant="secondary" size="sm" onClick={handleCreateDraft} disabled={!canCreateDraft}>
+                  New Draft
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleExportBundle}>
+                  Export JSON
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleImportClick}>
+                  Import JSON
+                </Button>
+              </div>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json"
+                onChange={handleImportBundle}
+                className={styles.hiddenInput}
+              />
+              {configMessage ? <p className={styles.notice}>{configMessage}</p> : null}
+              {importMessage ? <p className={styles.notice}>{importMessage}</p> : null}
+            </div>
+
+            <div className={styles.propertyPanel}>
+              <h3>Bundle Metadata</h3>
+              <div className={styles.fieldGroup}>
+                <div className={styles.field}>
+                  <Input id="bundle-config-id" label="Config ID" value={bundleConfigId} readOnly size="sm" />
+                </div>
+                <div className={styles.field}>
+                  <Input id="bundle-tenant-id" label="Tenant ID" value={bundleTenantId} readOnly size="sm" />
+                </div>
+                <div className={styles.field}>
+                  <Input id="bundle-version" label="Bundle Version" value={bundleVersion} readOnly size="sm" />
+                </div>
+                <div className={styles.field}>
+                  <Input id="bundle-status" label="Status" value={bundleStatus} readOnly size="sm" />
+                </div>
+                <div className={styles.field}>
+                  <Input id="bundle-created" label="Created At" value={bundleCreatedAt} readOnly size="sm" />
+                </div>
+                <div className={styles.field}>
+                  <Input id="bundle-updated" label="Updated At" value={bundleUpdatedAt} readOnly size="sm" />
+                </div>
               </div>
             </div>
-          </div>
+
+            <div className={styles.propertyPanel}>
+              <h3>Validation</h3>
+              {validationResult.issues.length === 0 ? (
+                <p className={styles.emptyNotice}>No validation issues found.</p>
+              ) : (
+                <>
+                  <p className={styles.validationSummary}>
+                    {validationErrors.length} errors, {validationWarnings.length} warnings
+                  </p>
+                  <ul className={styles.validationList}>
+                    {validationResult.issues.map((issue, index) => (
+                      <li
+                        key={`${issue.path}-${index}`}
+                        className={issue.severity === 'error' ? styles.validationError : styles.validationWarning}
+                      >
+                        <span className={styles.validationBadge}>{issue.severity.toUpperCase()}</span>
+                        <span>{issue.path || 'root'}: {issue.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+
+            <div className={styles.propertyPanel}>
+              <h3>Audit Log</h3>
+              {recentAuditEntries.length === 0 ? (
+                <p className={styles.emptyNotice}>No audit events yet.</p>
+              ) : (
+                <ul className={styles.auditList}>
+                  {recentAuditEntries.map((entry) => (
+                    <li key={entry.id} className={styles.auditItem}>
+                      <div className={styles.auditHeader}>
+                        <span className={styles.auditAction}>{entry.action}</span>
+                        <span className={styles.auditTimestamp}>{formatAuditTimestamp(entry.timestamp)}</span>
+                      </div>
+                      <p className={styles.auditSummary}>{entry.summary}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
           {builderMode === 'layout' ? (
             <>
@@ -819,6 +1469,11 @@ export function BuilderShell({
                       onClick={() => {
                         setFlowGraph((current) => deleteBuilderTransition(current, selectedTransition.id));
                         setSelectedTransitionId(null);
+                        pushAuditEntry({
+                          action: 'flow.transition.remove',
+                          summary: `Removed transition ${selectedTransition.from} -> ${selectedTransition.to}`,
+                          metadata: { transitionId: selectedTransition.id },
+                        });
                       }}
                     >
                       Remove Transition
@@ -1062,4 +1717,16 @@ function countLayoutComponents(sections: readonly LayoutTreeNode[]): number {
     }
   }
   return count;
+}
+
+function formatAuditTimestamp(value: string): string {
+  if (!value) return '';
+  return value.replace('T', ' ').slice(0, 19);
+}
+
+function createAuditId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `audit_${crypto.randomUUID()}`;
+  }
+  return `audit_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }

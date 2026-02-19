@@ -161,7 +161,7 @@ function parseDateByLocale(value: string, locale: string): Date | null {
   for (let index = 0; index < order.length; index += 1) {
     const part = order[index];
     const token = tokens[index];
-    if (!token) return null;
+    if (!part || !token) return null;
     values[part] = Number(token);
   }
 
@@ -206,7 +206,7 @@ function parseDateByPattern(value: string, pattern: string): Date | null {
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     const raw = match[index + 1];
-    if (!raw) return null;
+    if (!token || !raw) return null;
     values[token] = Number(raw);
   }
 

@@ -354,10 +354,106 @@
   gap: 0.4rem;
 }
 
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
 .emptyNotice {
   margin: 0;
   color: #526c88;
   font-size: 0.82rem;
+}
+
+.notice {
+  margin: 0.35rem 0 0;
+  color: #29415f;
+  font-size: 0.78rem;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.validationSummary {
+  margin: 0 0 0.5rem;
+  color: #1f3a57;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.validationList,
+.auditList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.validationError,
+.validationWarning {
+  border: 1px solid #d9e2ee;
+  border-radius: 0.45rem;
+  background: #f9fbfe;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.76rem;
+  color: #1b3552;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.validationError {
+  border-color: #e3b4b4;
+  background: #fff6f6;
+}
+
+.validationWarning {
+  border-color: #ecd39c;
+  background: #fff9ef;
+}
+
+.validationBadge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #8b2d2d;
+}
+
+.validationWarning .validationBadge {
+  color: #8a5a12;
+}
+
+.auditItem {
+  border: 1px solid #d9e2ee;
+  border-radius: 0.45rem;
+  background: #f9fbfe;
+  padding: 0.45rem 0.5rem;
+}
+
+.auditHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: #4b647f;
+}
+
+.auditAction {
+  font-weight: 600;
+  color: #17314d;
+}
+
+.auditTimestamp {
+  font-variant-numeric: tabular-nums;
+}
+
+.auditSummary {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #1a3552;
 }
 
 .schemaPanel pre {

@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Card } from '@platform/component-system';
-import { getDefaultComponentCatalog } from '@platform/component-system';
+import { getBuilderComponentCatalog } from '../../lib/plugin-host';
 import styles from '../../components/studio/Studio.module.css';
 
-const catalog = getDefaultComponentCatalog();
+const catalog = getBuilderComponentCatalog();
 const groupedCatalog = groupByCategory(catalog);
 
 export default function ComponentStudioHome() {

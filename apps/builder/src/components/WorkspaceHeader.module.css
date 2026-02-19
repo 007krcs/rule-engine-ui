@@ -1,0 +1,28 @@
+.header {
+  padding: 4px 0 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--dt-color-border, #c6d2e1);
+  margin-bottom: 16px;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  color: var(--dt-color-text-muted, #4f6680);
+  margin: 0 0 4px;
+}
+
+.title {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: var(--dt-color-text-muted, #4f6680);
+  line-height: 1.5;
+}

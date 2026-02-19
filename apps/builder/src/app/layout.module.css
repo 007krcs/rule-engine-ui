@@ -10,8 +10,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  border-bottom: 1px solid rgba(16, 36, 63, 0.12);
-  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid var(--dt-color-border, rgba(16, 36, 63, 0.12));
+  background: color-mix(in srgb, var(--dt-color-surface, #ffffff) 82%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -29,7 +29,7 @@
 
 .brandSubtitle {
   font-size: 0.75rem;
-  color: rgba(16, 36, 63, 0.7);
+  color: var(--dt-color-text-muted, rgba(16, 36, 63, 0.7));
 }
 
 .navLinks {
@@ -40,7 +40,7 @@
 
 .navLink {
   text-decoration: none;
-  color: #10243f;
+  color: var(--dt-color-text, #10243f);
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 999px;
@@ -49,8 +49,8 @@
 }
 
 .navLink:hover {
-  background: rgba(15, 98, 254, 0.08);
-  border-color: rgba(15, 98, 254, 0.3);
+  background: color-mix(in srgb, var(--dt-color-primary, #0f62fe) 10%, transparent);
+  border-color: color-mix(in srgb, var(--dt-color-primary, #0f62fe) 35%, transparent);
 }
 
 .main {

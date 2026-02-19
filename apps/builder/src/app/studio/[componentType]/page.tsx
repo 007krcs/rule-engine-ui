@@ -1,6 +1,14 @@
 'use client';
 
-import { createElement, useEffect, useMemo, useState, type ChangeEvent, type ComponentType } from 'react';
+import {
+  createElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ComponentType,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button,
@@ -8,14 +16,17 @@ import {
   Checkbox,
   Input,
   Select,
-  createDefaultComponentRegistry,
-  getDefaultComponentCatalog,
 } from '@platform/component-system';
 import type {
   ComponentContract,
   ComponentPropDefinition,
   ComponentPropValue,
 } from '@platform/component-contract';
+import {
+  getBuilderComponentCatalog,
+  getBuilderComponentRegistry,
+  getBuilderRenderers,
+} from '../../../lib/plugin-host';
 import styles from '../../../components/studio/Studio.module.css';
 
 interface StudioPageProps {
@@ -24,13 +35,12 @@ interface StudioPageProps {
 
 type PropState = Record<string, ComponentPropValue>;
 
-type ThemeMode = 'light' | 'dark';
-
 export default function ComponentStudioDetail({ params }: StudioPageProps) {
   const router = useRouter();
   const componentType = decodeURIComponent(params.componentType);
-  const catalog = useMemo(() => getDefaultComponentCatalog(), []);
-  const registry = useMemo(() => createDefaultComponentRegistry(), []);
+  const catalog = useMemo(() => getBuilderComponentCatalog(), []);
+  const registry = useMemo(() => getBuilderComponentRegistry(), []);
+  const renderers = useMemo(() => getBuilderRenderers(), []);
 
   const contract = useMemo(() => {
     return registry.getContract(componentType) ?? catalog.find((entry) => entry.type === componentType);
@@ -40,11 +50,25 @@ export default function ComponentStudioDetail({ params }: StudioPageProps) {
   const initialProps = useMemo(() => buildDefaultProps(contract), [contract]);
 
   const [propsState, setPropsState] = useState<PropState>(initialProps);
-  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const defaultRendererId = useMemo(() => {
+    return (
+      renderers.find((renderer) => renderer.framework === 'react')?.id ??
+      renderers[0]?.id ??
+      'renderer.react'
+    );
+  }, [renderers]);
+  const [rendererId, setRendererId] = useState(defaultRendererId);
+  const rendererMountRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setPropsState(initialProps);
   }, [initialProps]);
+
+  useEffect(() => {
+    if (!renderers.find((renderer) => renderer.id === rendererId)) {
+      setRendererId(defaultRendererId);
+    }
+  }, [defaultRendererId, renderers, rendererId]);
 
   const componentOptions = useMemo(
     () =>
@@ -57,10 +81,40 @@ export default function ComponentStudioDetail({ params }: StudioPageProps) {
     [catalog],
   );
 
+  const rendererOptions = useMemo(
+    () =>
+      renderers.map((renderer) => ({
+        value: renderer.id,
+        label: `${renderer.name} (${renderer.framework})`,
+      })),
+    [renderers],
+  );
+
+  const selectedRenderer = useMemo(
+    () => renderers.find((renderer) => renderer.id === rendererId) ?? renderers[0] ?? null,
+    [rendererId, renderers],
+  );
+  const useReactPreview = !selectedRenderer || selectedRenderer.framework === 'react';
+
   const previewProps = useMemo(() => mapPreviewProps(contract, propsState), [contract, propsState]);
   const preview = implementation
     ? createElement(implementation as ComponentType<any>, previewProps)
     : null;
+
+  useEffect(() => {
+    if (!selectedRenderer || selectedRenderer.framework === 'react') return;
+    const mount = rendererMountRef.current;
+    if (!mount) return;
+    selectedRenderer.render({
+      mount,
+      componentType: contract?.type,
+      props: previewProps as Record<string, ComponentPropValue>,
+      registry,
+    });
+    return () => {
+      selectedRenderer.unmount?.(mount);
+    };
+  }, [contract?.type, previewProps, registry, selectedRenderer]);
 
   if (!contract) {
     return (
@@ -97,6 +151,10 @@ export default function ComponentStudioDetail({ params }: StudioPageProps) {
     router.push(`/studio/${encodeURIComponent(nextType)}`);
   };
 
+  const handleRendererChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setRendererId(event.target.value);
+  };
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -113,14 +171,17 @@ export default function ComponentStudioDetail({ params }: StudioPageProps) {
             onChange={handleComponentChange}
             size="sm"
           />
+          {rendererOptions.length ? (
+            <Select
+              label="Preview Renderer"
+              value={rendererId}
+              options={rendererOptions}
+              onChange={handleRendererChange}
+              size="sm"
+            />
+          ) : null}
           <Button variant="secondary" onClick={handleReset}>
             Reset Props
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setThemeMode((mode) => (mode === 'light' ? 'dark' : 'light'))}
-          >
-            Theme: {themeMode === 'light' ? 'Light' : 'Dark'}
           </Button>
         </div>
       </header>
@@ -189,17 +250,18 @@ export default function ComponentStudioDetail({ params }: StudioPageProps) {
         <section className={styles.panel}>
           <Card title="Live Preview" description="Changes update instantly." variant="outline">
             <div
-              className={[
-                styles.previewSurface,
-                themeMode === 'dark' ? styles.previewDark : '',
-              ]
-                .join(' ')
-                .trim()}
+              className={styles.previewSurface}
             >
-              {preview ?? (
-                <p className={styles.description}>
-                  No implementation registered for {contract.type}. The contract is still viewable.
-                </p>
+              {useReactPreview ? (
+                preview ?? (
+                  <p className={styles.description}>
+                    No implementation registered for {contract.type}. The contract is still viewable.
+                  </p>
+                )
+              ) : (
+                <div ref={rendererMountRef} className={styles.rendererMount}>
+                  <p className={styles.description}>Loading renderer preview...</p>
+                </div>
               )}
             </div>
           </Card>

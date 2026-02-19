@@ -7,7 +7,13 @@ import type {
 } from './types';
 import type { FlowGraphSchema } from './flow';
 
-export type ApplicationBundleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type ApplicationBundleStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PUBLISHED'
+  | 'ARCHIVED';
 
 export interface ApplicationBundleMetadata {
   configId: string;
