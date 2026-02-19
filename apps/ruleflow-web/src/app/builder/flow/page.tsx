@@ -19,6 +19,7 @@ import {
   createConditionGroupDraft,
   type ConditionDraft,
 } from '@/components/rules/rule-visual-model';
+import { useBuilder } from '@/context/BuilderContext';
 import styles from './flow-builder.module.scss';
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
@@ -63,13 +64,16 @@ function buildNodePositions(stateIds: string[]): NodePosition[] {
   });
 }
 
-export default function FlowBuilderPage() {
+function FlowBuilderInner() {
   const searchParams = useSearchParams();
   const versionId = searchParams.get('versionId');
   const { toast } = useToast();
+  const {
+    state: { flow },
+    dispatch,
+  } = useBuilder();
 
   const [version, setVersion] = useState<ConfigVersion | null>(null);
-  const [flow, setFlow] = useState<FlowSchema | null>(null);
   const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
   const [newStateId, setNewStateId] = useState('');
   const [guardEditor, setGuardEditor] = useState<GuardEditor | null>(null);
@@ -120,7 +124,7 @@ export default function FlowBuilderPage() {
         const normalizedFlow = normalizeFlowSchema(response.version.bundle.flowSchema, fallback);
 
         setVersion(response.version);
-        setFlow(normalizedFlow);
+        dispatch({ type: 'SET_FLOW', flow: normalizedFlow });
         setSelectedStateId(normalizedFlow.initialState);
         setDirty(false);
       } catch (error) {
@@ -141,7 +145,7 @@ export default function FlowBuilderPage() {
   }, [toast, versionId]);
 
   const setNextFlow = (nextFlow: FlowSchema) => {
-    setFlow(nextFlow);
+    dispatch({ type: 'SET_FLOW', flow: nextFlow });
     setDirty(true);
   };
 
@@ -600,4 +604,8 @@ export default function FlowBuilderPage() {
       {loading ? <div className={styles.loadingMask}>Loading flow schema...</div> : null}
     </div>
   );
+}
+
+export default function FlowBuilderPage() {
+  return <FlowBuilderInner />;
 }

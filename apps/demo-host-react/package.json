@@ -13,6 +13,9 @@
     "@platform/react-material-adapter": "workspace:*",
     "@platform/react-renderer": "workspace:*",
     "@platform/schema": "workspace:*",
+    "@mui/material": "^5.15.21",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

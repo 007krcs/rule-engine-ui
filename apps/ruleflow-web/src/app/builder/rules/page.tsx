@@ -20,6 +20,7 @@ import {
   type RuleDraft,
   rulesToDrafts,
 } from '@/components/rules/rule-visual-model';
+import { useBuilder } from '@/context/BuilderContext';
 import styles from './rules.module.scss';
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
@@ -48,14 +49,23 @@ export default function RulesBuilderPage() {
   const versionId = searchParams.get('versionId');
   const { toast } = useToast();
   const onboarding = useOnboarding();
+  const {
+    state: { rules },
+    dispatch,
+  } = useBuilder();
 
   const [loading, setLoading] = useState(false);
   const [loadedVersion, setLoadedVersion] = useState<ConfigVersion | null>(null);
-  const [ruleDrafts, setRuleDrafts] = useState<RuleDraft[]>([]);
   const [selectedRuleDraftId, setSelectedRuleDraftId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [dirty, setDirty] = useState(false);
   const lastLoadedVersionId = useRef<string | null>(null);
+
+  const ruleDrafts = useMemo(() => rulesToDrafts(rules), [rules]);
+  const ruleVersion = useMemo(
+    () => loadedVersion?.bundle.rules.version ?? rules.version ?? '1.0.0',
+    [loadedVersion?.bundle.rules.version, rules.version],
+  );
 
   const selectedRule = useMemo(
     () => ruleDrafts.find((rule) => rule.id === selectedRuleDraftId) ?? null,
@@ -63,9 +73,8 @@ export default function RulesBuilderPage() {
   );
 
   const compiledRuleSet = useMemo(() => {
-    const version = loadedVersion?.bundle.rules.version ?? '1.0.0';
-    return draftsToRuleSet(version, ruleDrafts);
-  }, [loadedVersion?.bundle.rules.version, ruleDrafts]);
+    return draftsToRuleSet(ruleVersion, ruleDrafts);
+  }, [ruleDrafts, ruleVersion]);
 
   const validation = useMemo(() => validateRulesSchema(compiledRuleSet), [compiledRuleSet]);
 
@@ -83,7 +92,7 @@ export default function RulesBuilderPage() {
       const drafts = rulesToDrafts(response.version.bundle.rules);
 
       setLoadedVersion(response.version);
-      setRuleDrafts(drafts);
+      dispatch({ type: 'SET_RULES', rules: response.version.bundle.rules });
       setSelectedRuleDraftId(drafts[0]?.id ?? null);
       setSearchText('');
       setDirty(false);
@@ -92,7 +101,7 @@ export default function RulesBuilderPage() {
     } catch (error) {
       toast({ variant: 'error', title: 'Failed to load rules', description: error instanceof Error ? error.message : String(error) });
       setLoadedVersion(null);
-      setRuleDrafts([]);
+      dispatch({ type: 'SET_RULES', rules: { version: '1.0.0', rules: [] } });
       setSelectedRuleDraftId(null);
       setDirty(false);
     } finally {
@@ -106,20 +115,32 @@ export default function RulesBuilderPage() {
     void loadFromStore(true);
   }, [versionId]);
 
+  useEffect(() => {
+    if (selectedRuleDraftId && ruleDrafts.some((r) => r.id === selectedRuleDraftId)) return;
+    setSelectedRuleDraftId(ruleDrafts[0]?.id ?? null);
+  }, [ruleDrafts, selectedRuleDraftId]);
+
+  const applyDrafts = (drafts: RuleDraft[], opts?: { dirty?: boolean; selectedId?: string | null }) => {
+    const nextRuleSet = draftsToRuleSet(ruleVersion, drafts);
+    dispatch({ type: 'SET_RULES', rules: nextRuleSet });
+    if (opts && 'selectedId' in opts) {
+      setSelectedRuleDraftId(opts.selectedId ?? null);
+    } else if (drafts.length && !drafts.some((d) => d.id === selectedRuleDraftId)) {
+      setSelectedRuleDraftId(drafts[0]?.id ?? null);
+    }
+    setDirty(opts?.dirty ?? true);
+  };
+
   const updateRuleDraft = (rule: RuleDraft) => {
-    setRuleDrafts((current) =>
-      current.map((candidate) => (candidate.id === rule.id ? rule : candidate)),
-    );
-    setDirty(true);
+    const nextDrafts = ruleDrafts.map((candidate) => (candidate.id === rule.id ? rule : candidate));
+    applyDrafts(nextDrafts);
   };
 
   const addRuleDraft = () => {
     const existing = new Set(ruleDrafts.map((rule) => rule.ruleId));
     const next = createDefaultRuleDraft();
     next.ruleId = nextRuleId(existing, next.ruleId);
-    setRuleDrafts((current) => [next, ...current]);
-    setSelectedRuleDraftId(next.id);
-    setDirty(true);
+    applyDrafts([next, ...ruleDrafts], { selectedId: next.id });
   };
 
   const duplicateRuleDraft = (ruleId: string) => {
@@ -128,20 +149,13 @@ export default function RulesBuilderPage() {
     const existing = new Set(ruleDrafts.map((rule) => rule.ruleId));
     const duplicated = cloneRuleDraft(source);
     duplicated.ruleId = nextRuleId(existing, duplicated.ruleId);
-    setRuleDrafts((current) => [duplicated, ...current]);
-    setSelectedRuleDraftId(duplicated.id);
-    setDirty(true);
+    applyDrafts([duplicated, ...ruleDrafts], { selectedId: duplicated.id });
   };
 
   const deleteRuleDraft = (ruleId: string) => {
-    setRuleDrafts((current) => {
-      const next = current.filter((rule) => rule.id !== ruleId);
-      if (selectedRuleDraftId === ruleId) {
-        setSelectedRuleDraftId(next[0]?.id ?? null);
-      }
-      return next;
-    });
-    setDirty(true);
+    const next = ruleDrafts.filter((rule) => rule.id !== ruleId);
+    const nextSelected = selectedRuleDraftId === ruleId ? next[0]?.id ?? null : selectedRuleDraftId;
+    applyDrafts(next, { selectedId: nextSelected });
   };
 
   const save = async () => {
@@ -248,8 +262,7 @@ export default function RulesBuilderPage() {
               onDuplicateRule={duplicateRuleDraft}
               onDeleteRule={deleteRuleDraft}
               onReorderRules={(fromRuleId, toRuleId) => {
-                setRuleDrafts((current) => reorderByIds(current, fromRuleId, toRuleId));
-                setDirty(true);
+                applyDrafts(reorderByIds(ruleDrafts, fromRuleId, toRuleId));
               }}
             />
           </CardContent>
