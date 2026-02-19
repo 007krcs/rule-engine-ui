@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { UISchema } from "@platform/schema";
+import { createUISchema } from "@platform/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBuilder } from "@/context/BuilderContext";
@@ -16,14 +16,6 @@ const nav = [
   { href: "/builder/legacy", label: "Legacy Builder" },
 ];
 
-function createDefaultScreen(id: string): UISchema {
-  return {
-    version: "1.0.0",
-    pageId: id,
-    layout: { type: "vertical", children: [] },
-  };
-}
-
 export default function ScreensPage() {
   const {
     state: { screens, flow },
@@ -34,7 +26,7 @@ export default function ScreensPage() {
   const addScreen = () => {
     const id = (newId || `screen-${Object.keys(screens).length + 1}`).trim();
     if (!id || screens[id]) return;
-    dispatch({ type: "ADD_SCREEN", id, schema: createDefaultScreen(id) });
+    dispatch({ type: "ADD_SCREEN", id, schema: createUISchema({ pageId: id }) });
     setNewId("");
   };
 

@@ -1,0 +1,31 @@
+.builderViewport {
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.builderContent {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+:global(.rf-app-shell .body) {
+  height: 100vh;
+}
+
+:global(.rf-app-shell .main) {
+  padding-right: 0;
+}
+
+:global(.rf-app-shell .mainInner) {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  height: 100%;
+}
