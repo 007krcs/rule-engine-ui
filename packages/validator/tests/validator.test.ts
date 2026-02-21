@@ -147,4 +147,36 @@ describe('validator', () => {
     const result = validateUISchema(schema);
     expect(result.valid).toBe(true);
   });
+
+  it('validates advanced flow fork/join references', () => {
+    const schema: FlowSchema = {
+      version: '1.0.0',
+      flowId: 'advanced-flow',
+      initialState: 'start',
+      states: {
+        start: {
+          uiPageId: 'start-page',
+          on: {},
+          transitions: [
+            {
+              onEvent: 'begin',
+              target: 'noop',
+              fork: {
+                branches: ['branchA', 'missingBranch'],
+                joinType: 'and',
+                joinState: 'missingJoin',
+              },
+            },
+          ],
+        },
+        branchA: { uiPageId: 'branchA-page', on: {} },
+        noop: { uiPageId: 'noop-page', on: {} },
+      },
+    };
+
+    const result = validateFlowSchema(schema);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((issue) => issue.path.endsWith('fork.joinState'))).toBe(true);
+    expect(result.issues.some((issue) => issue.message.includes('branch state'))).toBe(true);
+  });
 });

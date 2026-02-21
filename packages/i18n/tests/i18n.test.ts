@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createDevelopmentMachineTranslator,
+  createDynamicImportBundleLoader,
   createI18nProvider,
   createMemoryCache,
   createProviderFromBundles,
@@ -110,5 +112,80 @@ describe('i18n', () => {
       value: 'Hello there',
     });
     expect(updated[0]?.messages.hello).toBe('Hello there');
+  });
+
+  it('supports dynamic import bundle loader with locale fallback', async () => {
+    const loader = createDynamicImportBundleLoader({
+      importer: async ({ locale }) => {
+        if (locale === 'fr') {
+          return {
+            messages: {
+              'filters.customerName.label': 'Nom client dynamique',
+            },
+          };
+        }
+        throw new Error('missing');
+      },
+    });
+
+    const provider = await createI18nProvider({
+      locale: 'fr-CA',
+      namespaces: ['runtime'],
+      tenantBundleLoader: loader,
+      platformBundles: [],
+      fallbackLocale: 'en',
+    });
+
+    expect(provider.t('runtime.filters.customerName.label')).toBe('Nom client dynamique');
+  });
+
+  it('prefills missing keys via machine translation in development', async () => {
+    const prevEnv = process.env.RULEFLOW_ENV;
+    process.env.RULEFLOW_ENV = 'development';
+    const loader = createMockTenantLoader([]);
+    const provider = await createI18nProvider({
+      locale: 'es',
+      namespaces: ['runtime'],
+      tenantBundleLoader: loader,
+      platformBundles: [
+        {
+          locale: 'en',
+          namespace: 'runtime',
+          messages: { hello: 'Hello' },
+        },
+      ],
+      machineTranslation: {
+        enabled: true,
+        envs: ['development'],
+        provider: createDevelopmentMachineTranslator(),
+      },
+      mode: 'prod',
+    });
+
+    expect(provider.t('runtime.hello')).toContain('[MT es]');
+    process.env.RULEFLOW_ENV = prevEnv;
+  });
+
+  it('resolves localized theme tokens', () => {
+    const provider = createProviderFromBundles({
+      locale: 'ar',
+      bundles: PLATFORM_BUNDLES,
+      localeThemes: {
+        base: {
+          'font.size.base': 14,
+          'spacing.inline': 8,
+        },
+        byLocale: {
+          ar: {
+            'font.size.base': 15,
+            'spacing.inline': 10,
+          },
+        },
+      },
+    });
+
+    expect(provider.themeTokens['font.size.base']).toBe(15);
+    expect(provider.themeTokens['spacing.inline']).toBe(10);
+    expect(provider.direction).toBe('rtl');
   });
 });

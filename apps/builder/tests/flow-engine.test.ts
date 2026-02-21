@@ -5,6 +5,7 @@ import {
   createInitialBuilderFlowState,
   deleteBuilderTransition,
   removeBuilderScreen,
+  updateBuilderScreenPosition,
   updateBuilderTransition,
 } from '../src/lib/flow-engine';
 
@@ -52,5 +53,13 @@ describe('flow engine', () => {
 
     const deleted = deleteBuilderTransition(updated, transition.transitionId);
     expect(deleted.transitions).toHaveLength(0);
+  });
+
+  it('updates screen position for flow drag-and-drop', () => {
+    const initial = createInitialBuilderFlowState();
+    const screenId = initial.activeScreenId;
+    const updated = updateBuilderScreenPosition(initial.flow, screenId, { x: 333.7, y: 128.2 });
+    const screen = updated.screens.find((candidate) => candidate.id === screenId);
+    expect(screen?.position).toEqual({ x: 334, y: 128 });
   });
 });

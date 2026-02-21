@@ -4,6 +4,7 @@ import path from 'node:path';
 const DEFAULT_FILE_STORE_DIR = '.ruleflow-demo-data';
 const DEFAULT_TMP_STORE_DIR = '/tmp/.ruleflow-demo-data';
 const DEFAULT_STORE_FILENAME = 'configs.json';
+const DEFAULT_LOCK_FILENAME = '.configs.lock';
 const STORE_WRITE_FAILED_MESSAGE = 'Store write failed';
 
 export type ConfigStoreProvider = 'file' | 'tmp';
@@ -116,12 +117,14 @@ abstract class BaseFsConfigStore implements ConfigStore {
   readonly baseDir: string;
 
   private readonly storeFile: string;
+  private readonly lockFile: string;
   private writeQueue: Promise<void> = Promise.resolve();
 
   protected constructor(provider: ConfigStoreProvider, baseDir: string, filename: string) {
     this.provider = provider;
     this.baseDir = baseDir;
     this.storeFile = path.join(baseDir, filename);
+    this.lockFile = path.join(baseDir, DEFAULT_LOCK_FILENAME);
   }
 
   async createConfig(input: CreateConfigInput): Promise<ConfigRecord> {
@@ -276,11 +279,36 @@ abstract class BaseFsConfigStore implements ConfigStore {
 
   private async writeStore(next: StoreFile): Promise<void> {
     try {
-      await fs.mkdir(path.dirname(this.storeFile), { recursive: true });
-      await fs.writeFile(this.storeFile, JSON.stringify(next, null, 2), 'utf8');
+      await this.withFileLock(async () => {
+        await fs.mkdir(path.dirname(this.storeFile), { recursive: true });
+        const temp = `${this.storeFile}.${Date.now()}.tmp`;
+        await fs.writeFile(temp, JSON.stringify(next, null, 2), 'utf8');
+        await fs.rename(temp, this.storeFile);
+      });
     } catch (error) {
       throw toStoreWriteError(error);
     }
+  }
+
+  private async withFileLock<T>(fn: () => Promise<T>): Promise<T> {
+    await fs.mkdir(path.dirname(this.lockFile), { recursive: true });
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      try {
+        const handle = await fs.open(this.lockFile, 'wx');
+        await handle.close();
+        try {
+          return await fn();
+        } finally {
+          await fs.unlink(this.lockFile).catch(() => undefined);
+        }
+      } catch (error) {
+        if (!(error instanceof Error) || !('code' in error) || (error as { code?: string }).code !== 'EEXIST') {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20 + attempt * 4));
+      }
+    }
+    throw new Error(`Timed out acquiring config store lock: ${this.lockFile}`);
   }
 }
 

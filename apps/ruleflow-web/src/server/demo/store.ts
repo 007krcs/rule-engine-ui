@@ -88,10 +88,12 @@ export type ConfigStoreFactoryOptions = {
 type StoreFilePaths = {
   stateFile: string;
   signingKeyFile: string;
+  lockFile: string;
 };
 
 const STORE_FILENAME = 'store.json';
 const SIGNING_KEY_FILENAME = 'gitops-signing-key.txt';
+const LOCK_FILENAME = '.store.lock';
 const DEFAULT_TMP_DIR = '/tmp/.ruleflow-demo-data';
 
 type StoreInit = {
@@ -400,6 +402,7 @@ class FileStore extends BaseConfigStore {
     this.files = {
       stateFile: path.join(params.baseDir, STORE_FILENAME),
       signingKeyFile: path.join(params.baseDir, SIGNING_KEY_FILENAME),
+      lockFile: path.join(params.baseDir, LOCK_FILENAME),
     };
   }
 
@@ -416,8 +419,12 @@ class FileStore extends BaseConfigStore {
   }
 
   protected async writeStateFile(state: StoreState): Promise<void> {
-    await fs.mkdir(path.dirname(this.files.stateFile), { recursive: true });
-    await fs.writeFile(this.files.stateFile, JSON.stringify(state, null, 2), 'utf8');
+    await this.withFileLock(async () => {
+      await fs.mkdir(path.dirname(this.files.stateFile), { recursive: true });
+      const tempFile = `${this.files.stateFile}.${crypto.randomUUID()}.tmp`;
+      await fs.writeFile(tempFile, JSON.stringify(state, null, 2), 'utf8');
+      await fs.rename(tempFile, this.files.stateFile);
+    });
   }
 
   protected async readSigningKeyFile(): Promise<string | null> {
@@ -432,8 +439,33 @@ class FileStore extends BaseConfigStore {
   }
 
   protected async writeSigningKeyFile(encoded: string): Promise<void> {
-    await fs.mkdir(path.dirname(this.files.signingKeyFile), { recursive: true });
-    await fs.writeFile(this.files.signingKeyFile, encoded, 'utf8');
+    await this.withFileLock(async () => {
+      await fs.mkdir(path.dirname(this.files.signingKeyFile), { recursive: true });
+      const tempFile = `${this.files.signingKeyFile}.${crypto.randomUUID()}.tmp`;
+      await fs.writeFile(tempFile, encoded, 'utf8');
+      await fs.rename(tempFile, this.files.signingKeyFile);
+    });
+  }
+
+  private async withFileLock<T>(fn: () => Promise<T>): Promise<T> {
+    await fs.mkdir(path.dirname(this.files.lockFile), { recursive: true });
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      try {
+        const handle = await fs.open(this.files.lockFile, 'wx');
+        await handle.close();
+        try {
+          return await fn();
+        } finally {
+          await fs.unlink(this.files.lockFile).catch(() => undefined);
+        }
+      } catch (error) {
+        if (!(error instanceof Error) || !('code' in error) || (error as { code?: string }).code !== 'EEXIST') {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20 + attempt * 5));
+      }
+    }
+    throw new Error(`Timed out acquiring store lock: ${this.files.lockFile}`);
   }
 }
 

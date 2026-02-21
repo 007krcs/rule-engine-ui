@@ -9,8 +9,10 @@ import type { ConfigBundle, ConfigVersion, ConsoleSnapshot, GitOpsBundle, JsonDi
 import { applyUiPageUpdateToBundle, createSinglePageBundle } from '@/lib/demo/ui-pages';
 import { listRuntimeAdapterDefinitions, resolveRuntimeAdapterIds } from '@/lib/runtime-adapter-definitions';
 import { buildGitOpsBundlePayloadFromPostgres, normalizeGitOpsBundleForPostgres } from '@/server/gitops';
+import { appendImmutableAuditEvent } from '@/server/immutable-audit';
+import { toFeatureFlagMap } from '@/server/runtime-controls';
 import * as demo from '@/server/demo/repository';
-import { recordRuntimeTrace } from '@/server/metrics';
+import { recordBundleLoad, recordRuntimeTrace } from '@/server/metrics';
 import {
   evaluatePolicies,
   listPolicies,
@@ -99,6 +101,41 @@ function versionKilledFailure(reason?: string) {
   };
 }
 
+async function maybeRollbackOnPolicyFailure(input: {
+  stage: PolicyCheckStage;
+  currentBundle: ConfigBundle;
+  nextBundle: ConfigBundle;
+  rollback: () => Promise<void>;
+}): Promise<PolicyError[] | null> {
+  if (opaMode() !== 'enforce') {
+    return null;
+  }
+  const session = getMockSession();
+  const errors = await evaluatePolicies({
+    stage: input.stage,
+    tenantId: session.tenantId,
+    userId: session.user.id,
+    roles: session.roles,
+    currentBundle: input.currentBundle,
+    nextBundle: input.nextBundle,
+  });
+  if (errors.length === 0) {
+    return null;
+  }
+  await input.rollback();
+  await appendImmutableAuditEvent({
+    tenantId: session.tenantId,
+    actor: session.user.id,
+    category: 'policy',
+    action: 'Mutation rolled back due to policy failure',
+    target: input.stage,
+    metadata: {
+      errors,
+    },
+  });
+  return errors;
+}
+
 async function evaluatePolicyStage(input: {
   stage: PolicyCheckStage;
   requiredRole?: Role;
@@ -127,17 +164,9 @@ async function evaluatePolicyStage(input: {
   return errors;
 }
 
-function toFeatureFlagMap(
-  flags: ReadonlyArray<{
-    key: string;
-    enabled: boolean;
-  }>,
-): Record<string, boolean> {
-  const map: Record<string, boolean> = {};
-  for (const flag of flags) {
-    map[flag.key] = flag.enabled;
-  }
-  return map;
+function opaMode(): 'shadow' | 'enforce' {
+  const raw = (process.env.RULEFLOW_OPA_MODE ?? 'shadow').trim().toLowerCase();
+  return raw === 'enforce' ? 'enforce' : 'shadow';
 }
 
 function killSwitchMatchesVersion(
@@ -146,14 +175,20 @@ function killSwitchMatchesVersion(
     active: boolean;
     versionId?: string;
     packageId?: string;
+    componentId?: string;
+    rulesetKey?: string;
     reason?: string;
   },
-  input: { versionId?: string; packageId?: string },
+  input: { versionId?: string; packageId?: string; componentId?: string },
 ): boolean {
   if (!killSwitch.active) return false;
   if (killSwitch.scope === 'TENANT') return true;
   if (killSwitch.scope === 'VERSION') return Boolean(input.versionId && killSwitch.versionId === input.versionId);
   if (killSwitch.scope === 'RULESET') return Boolean(input.packageId && killSwitch.packageId === input.packageId);
+  if (killSwitch.scope === 'COMPONENT') {
+    const key = killSwitch.componentId ?? killSwitch.rulesetKey;
+    return Boolean(input.componentId && key === input.componentId);
+  }
   return false;
 }
 
@@ -187,6 +222,7 @@ function summarizeKillState(
 async function resolveRuntimeKillState(input: {
   versionId?: string;
   packageId?: string;
+  componentId?: string;
 }): Promise<RuntimeKillState> {
   if (providerMode() !== 'postgres') {
     return {
@@ -210,6 +246,18 @@ async function resolveRuntimeKillState(input: {
         active: true,
         reason: version.killReason,
       };
+    } else {
+      const killedByScope = await repo.isVersionKilled({
+        tenantId: session.tenantId,
+        versionId: input.versionId,
+        packageId: input.packageId,
+        componentId: input.componentId,
+      });
+      if (killedByScope) {
+        versionKill = {
+          active: true,
+        };
+      }
     }
   }
 
@@ -329,11 +377,12 @@ export async function getStoreDiagnostics(): Promise<{
 }
 
 export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
+  const started = Date.now();
   if (providerMode() === 'postgres') {
     const session = toRepoSession();
     const repo = await getPostgresRepo();
     const snapshot = await repo.getConsoleSnapshot(session.tenantId);
-    return {
+    const response = {
       tenantId: snapshot.tenantId,
       packages: snapshot.packages.map((pkg) => ({
         id: pkg.id,
@@ -395,11 +444,26 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
         metadata: event.metadata,
       })),
     };
+    recordBundleLoad(Date.now() - started, {
+      tenantId: session.tenantId,
+      env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
+      source: 'postgres',
+      chunked: false,
+    });
+    return response;
   }
-  return await demo.getConsoleSnapshot();
+  const snapshot = await demo.getConsoleSnapshot();
+  recordBundleLoad(Date.now() - started, {
+    tenantId: getMockSession().tenantId,
+    env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
+    source: 'demo',
+    chunked: false,
+  });
+  return snapshot;
 }
 
 export async function getConfigVersion(versionId: string): Promise<ConfigVersion | null> {
+  const started = Date.now();
   if (providerMode() === 'postgres') {
     const session = toRepoSession();
     const repo = await getPostgresRepo();
@@ -410,7 +474,7 @@ export async function getConfigVersion(versionId: string): Promise<ConfigVersion
       versionId: version.id,
       packageId: version.packageId,
     });
-    return {
+    const response = {
       id: version.id,
       packageId: version.packageId,
       version: version.version,
@@ -423,8 +487,22 @@ export async function getConfigVersion(versionId: string): Promise<ConfigVersion
       isKilled: disabled || version.isKilled,
       killReason: version.killReason,
     };
+    recordBundleLoad(Date.now() - started, {
+      tenantId: session.tenantId,
+      env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
+      source: 'postgres',
+      chunked: false,
+    });
+    return response;
   }
-  return await demo.getConfigVersion(versionId);
+  const response = await demo.getConfigVersion(versionId);
+  recordBundleLoad(Date.now() - started, {
+    tenantId: getMockSession().tenantId,
+    env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
+    source: 'demo',
+    chunked: false,
+  });
+  return response;
 }
 
 export async function createConfigPackage(input: {
@@ -543,7 +621,24 @@ export async function updateUiSchema(input: {
         }) as unknown as JsonRecord,
     });
   }
-  return await demo.updateUiSchema(input);
+  const result = await demo.updateUiSchema(input);
+  if (!result.ok || !baseVersion || !nextBundle) return result;
+  const rollbackErrors = await maybeRollbackOnPolicyFailure({
+    stage: 'save',
+    currentBundle: baseVersion.bundle,
+    nextBundle,
+    rollback: async () => {
+      await demo.updateUiSchema({
+        versionId: input.versionId,
+        uiSchema: baseVersion.bundle.uiSchema,
+        uiSchemasById: baseVersion.bundle.uiSchemasById,
+        activeUiPageId: baseVersion.bundle.activeUiPageId,
+        flowSchema: baseVersion.bundle.flowSchema,
+      });
+    },
+  });
+  if (rollbackErrors) return policyFailure(rollbackErrors);
+  return result;
 }
 
 export async function updateRules(input: { versionId: string; rules: ConfigBundle['rules'] }) {
@@ -576,7 +671,18 @@ export async function updateRules(input: { versionId: string; rules: ConfigBundl
       mutate: (bundle) => ({ ...bundle, rules: input.rules }),
     });
   }
-  return await demo.updateRules(input);
+  const result = await demo.updateRules(input);
+  if (!result.ok || !baseVersion) return result;
+  const rollbackErrors = await maybeRollbackOnPolicyFailure({
+    stage: 'save',
+    currentBundle: baseVersion.bundle,
+    nextBundle: { ...baseVersion.bundle, rules: input.rules },
+    rollback: async () => {
+      await demo.updateRules({ versionId: input.versionId, rules: baseVersion.bundle.rules });
+    },
+  });
+  if (rollbackErrors) return policyFailure(rollbackErrors);
+  return result;
 }
 
 export async function updateFlowSchema(input: {
@@ -612,7 +718,21 @@ export async function updateFlowSchema(input: {
       mutate: (bundle) => ({ ...bundle, flowSchema: input.flowSchema }),
     });
   }
-  return await demo.updateFlowSchema(input);
+  const result = await demo.updateFlowSchema(input);
+  if (!result.ok || !baseVersion) return result;
+  const rollbackErrors = await maybeRollbackOnPolicyFailure({
+    stage: 'save',
+    currentBundle: baseVersion.bundle,
+    nextBundle: { ...baseVersion.bundle, flowSchema: input.flowSchema },
+    rollback: async () => {
+      await demo.updateFlowSchema({
+        versionId: input.versionId,
+        flowSchema: baseVersion.bundle.flowSchema,
+      });
+    },
+  });
+  if (rollbackErrors) return policyFailure(rollbackErrors);
+  return result;
 }
 
 export async function updateApiMappings(input: {
@@ -648,7 +768,21 @@ export async function updateApiMappings(input: {
       mutate: (bundle) => ({ ...bundle, apiMappingsById: input.apiMappingsById }),
     });
   }
-  return await demo.updateApiMappings(input);
+  const result = await demo.updateApiMappings(input);
+  if (!result.ok || !baseVersion) return result;
+  const rollbackErrors = await maybeRollbackOnPolicyFailure({
+    stage: 'save',
+    currentBundle: baseVersion.bundle,
+    nextBundle: { ...baseVersion.bundle, apiMappingsById: input.apiMappingsById },
+    rollback: async () => {
+      await demo.updateApiMappings({
+        versionId: input.versionId,
+        apiMappingsById: baseVersion.bundle.apiMappingsById,
+      });
+    },
+  });
+  if (rollbackErrors) return policyFailure(rollbackErrors);
+  return result;
 }
 
 export async function submitForReview(input: { versionId: string; scope: string; risk: RiskLevel }) {
@@ -876,15 +1010,17 @@ export async function getRuntimeFlags(input?: {
   env?: string;
   versionId?: string;
   packageId?: string;
+  componentId?: string;
 }) {
   const env = input?.env?.trim() || 'prod';
   const tenantId = toRepoSession().tenantId;
   const featureFlagResult = await listFeatureFlags({ env });
-  const featureFlags = toFeatureFlagMap(featureFlagResult.flags);
+  const featureFlags = toFeatureFlagMap(featureFlagResult.flags, { tenantId });
 
   const killSwitch = await resolveRuntimeKillState({
     versionId: input?.versionId,
     packageId: input?.packageId,
+    componentId: input?.componentId,
   });
 
   return {
@@ -918,15 +1054,25 @@ export async function upsertKillSwitch(input: {
   active: boolean;
   packageId?: string;
   versionId?: string;
+  componentId?: string;
   rulesetKey?: string;
   reason?: string;
 }) {
   const checks = await evaluatePolicyStage({ stage: 'promote', requiredRole: 'Publisher' });
   if (checks.length > 0) return policyFailure(checks);
+  if (input.scope === 'COMPONENT' && !input.componentId && !input.rulesetKey) {
+    return { ok: false as const, error: 'componentId is required for COMPONENT scope' };
+  }
 
   if (providerMode() === 'postgres') {
     const repo = await getPostgresRepo();
-    return { ok: true as const, killSwitch: await repo.upsertKillSwitch({ session: toRepoSession(), ...input }) };
+    return {
+      ok: true as const,
+      killSwitch: await repo.upsertKillSwitch({
+        session: toRepoSession(),
+        ...input,
+      }),
+    };
   }
   return { ok: false as const, error: 'Kill switch requires Postgres provider' };
 }
@@ -980,6 +1126,26 @@ export async function recordExecutionTrace(input: {
     tenantId: session.tenantId,
     env: process.env.RULEFLOW_ENV ?? process.env.NODE_ENV ?? 'dev',
   };
+  await appendImmutableAuditEvent({
+    tenantId: session.tenantId,
+    actor: session.userId,
+    category: 'runtime',
+    action: 'Execution trace recorded',
+    target: input.executionId,
+    metadata: {
+      correlationId: input.correlationId,
+      packageId: input.packageId,
+      versionId: input.versionId,
+      traceSummary: {
+        flow: (input.trace.flow as { toStateId?: string; reason?: string })?.toStateId ?? null,
+        rulesMatched:
+          Array.isArray((input.trace.rules as { rulesMatched?: unknown })?.rulesMatched)
+            ? ((input.trace.rules as { rulesMatched?: unknown[] }).rulesMatched?.length ?? 0)
+            : 0,
+        apiId: (input.trace.api as { apiId?: string })?.apiId ?? null,
+      },
+    },
+  });
   if (providerMode() === 'postgres') {
     const repo = await getPostgresRepo();
     recordRuntimeTrace(input.trace, metricLabels);

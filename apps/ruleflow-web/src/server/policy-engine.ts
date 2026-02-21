@@ -1,6 +1,7 @@
 import type { RuleSet } from '@platform/schema';
 import { hasRole, type Role, type Session } from '@/lib/auth';
 import { clearOpaDecisionCacheForTests, evaluateOpaPolicy, OpaClientError } from '@/server/policy/opa-client';
+import { appendImmutableAuditEvent } from '@/server/immutable-audit';
 import type { PolicyCheckStage, PolicyError, PolicyEvaluationInput } from '@/server/policy/types';
 
 export type { PolicyCheckStage, PolicyError, PolicyEvaluationInput } from '@/server/policy/types';
@@ -113,6 +114,15 @@ const builtinPolicies: PolicyDefinition[] = [
 
 const policyEngine = new PolicyEngine(builtinPolicies);
 
+function opaMode(): 'shadow' | 'enforce' {
+  const raw = (process.env.RULEFLOW_OPA_MODE ?? 'shadow').trim().toLowerCase();
+  return raw === 'enforce' ? 'enforce' : 'shadow';
+}
+
+export function getPolicyEngineMode(): 'shadow' | 'enforce' {
+  return opaMode();
+}
+
 export async function evaluatePolicies(input: PolicyEvaluationInput): Promise<PolicyError[]> {
   const errors = await policyEngine.evaluate(input);
   errors.push(...(await evaluateExternalPolicies(input)));
@@ -169,6 +179,8 @@ function detectEuInterestRateMutation(ruleSet: RuleSet): string | null {
 }
 
 async function evaluateExternalPolicies(input: PolicyEvaluationInput): Promise<PolicyError[]> {
+  const mode = opaMode();
+  const auditActor = input.userId || 'unknown';
   try {
     const decision = await evaluateOpaPolicy(input);
     if (!decision || decision.allow) {
@@ -178,20 +190,53 @@ async function evaluateExternalPolicies(input: PolicyEvaluationInput): Promise<P
     const primaryMessage = decision.messages[0] ?? 'External OPA policy denied this operation.';
     const rest = decision.messages.slice(1);
 
+    const deny: PolicyError = {
+      policyKey: 'policy.external.opa',
+      code: 'opa_denied',
+      stage: input.stage,
+      message: primaryMessage,
+      hint:
+        rest.length > 0
+          ? rest.join(' | ')
+          : 'Ask your policy administrator to update the OPA rule set for this stage.',
+      mode,
+    };
+    await appendImmutableAuditEvent({
+      tenantId: input.tenantId,
+      actor: auditActor,
+      category: 'policy',
+      action: mode === 'enforce' ? 'OPA policy denied (enforced)' : 'OPA policy denied (shadow)',
+      target: input.stage,
+      metadata: {
+        policyKey: deny.policyKey,
+        code: deny.code,
+        message: deny.message,
+      },
+    });
+    if (mode === 'shadow') {
+      return [];
+    }
     return [
       {
-        policyKey: 'policy.external.opa',
-        code: 'opa_denied',
-        stage: input.stage,
-        message: primaryMessage,
-        hint:
-          rest.length > 0
-            ? rest.join(' | ')
-            : 'Ask your policy administrator to update the OPA rule set for this stage.',
+        ...deny,
       },
     ];
   } catch (error) {
     if (error instanceof OpaClientError) {
+      await appendImmutableAuditEvent({
+        tenantId: input.tenantId,
+        actor: auditActor,
+        category: 'policy',
+        action: mode === 'enforce' ? 'OPA policy error (enforced)' : 'OPA policy error (shadow)',
+        target: input.stage,
+        metadata: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+      if (mode === 'shadow') {
+        return [];
+      }
       return [
         {
           policyKey: 'policy.external.opa',
@@ -199,17 +244,30 @@ async function evaluateExternalPolicies(input: PolicyEvaluationInput): Promise<P
           stage: input.stage,
           message: error.message,
           hint: 'Check OPA_URL, OPA_PACKAGE, OPA_TIMEOUT_MS, and OPA service health.',
+          mode,
         },
       ];
     }
-
+    const message = `OPA policy evaluation failed: ${error instanceof Error ? error.message : String(error)}`;
+    await appendImmutableAuditEvent({
+      tenantId: input.tenantId,
+      actor: auditActor,
+      category: 'policy',
+      action: mode === 'enforce' ? 'OPA policy evaluation failure (enforced)' : 'OPA policy evaluation failure (shadow)',
+      target: input.stage,
+      metadata: { message },
+    });
+    if (mode === 'shadow') {
+      return [];
+    }
     return [
       {
         policyKey: 'policy.external.opa',
         code: 'opa_error',
         stage: input.stage,
-        message: `OPA policy evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
+        message,
         hint: 'Check external policy service connectivity and response payload.',
+        mode,
       },
     ];
   }

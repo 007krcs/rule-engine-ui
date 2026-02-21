@@ -195,4 +195,62 @@ describe('core-runtime', () => {
       }),
     ).rejects.toThrow('Execution blocked by kill switch: Emergency stop');
   });
+
+  it('enforces tenant and role access control for screens and apis', async () => {
+    await expect(
+      executeStep({
+        flow,
+        uiSchemasById,
+        rules,
+        apiMappingsById: { submitOrder: apiMapping },
+        stateId: 'start',
+        event: 'submit',
+        context,
+        data: {},
+        accessControl: {
+          tenantId: 't1',
+          requiredRolesByUiPageId: {
+            'page-done': ['Publisher'],
+          },
+        },
+      }),
+    ).rejects.toThrow('Access denied: missing role for ui page "page-done".');
+  });
+
+  it('sanitizes unsafe event/data input before rule evaluation', async () => {
+    const filteredRules: Rule[] = [
+      {
+        ruleId: 'BLOCK_CTRL',
+        priority: 1,
+        when: { op: 'contains', left: { path: 'data.note' }, right: { value: '\u0000' } },
+        actions: [{ type: 'setField', path: 'data.hasCtrl', value: true }],
+      },
+    ];
+    const result = await executeStep({
+      flow: {
+        ...flow,
+        states: {
+          ...flow.states,
+          start: {
+            ...flow.states.start,
+            on: {
+              go: {
+                target: 'done',
+                actions: ['evaluateRules'],
+              },
+            },
+          },
+        },
+      },
+      uiSchemasById,
+      rules: filteredRules,
+      apiMappingsById: {},
+      stateId: 'start',
+      event: ' go\u0000 ',
+      context,
+      data: { note: 'hello\u0000world' as never },
+      validate: false,
+    });
+    expect(result.updatedData.hasCtrl).toBeUndefined();
+  });
 });

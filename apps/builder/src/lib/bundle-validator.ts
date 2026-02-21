@@ -15,6 +15,12 @@ export interface ValidationIssue {
   path: string;
   message: string;
   severity: ValidationSeverity;
+  category?: 'schema' | 'accessibility' | 'i18n';
+}
+
+export interface ValidationOptions {
+  developmentMode?: boolean;
+  skipA11yI18nInDev?: boolean;
 }
 
 export interface ValidationResult {
@@ -25,6 +31,7 @@ export interface ValidationResult {
 export function validateApplicationBundle(
   bundle: ApplicationBundle,
   contracts: ComponentContract[],
+  options: ValidationOptions = {},
 ): ValidationResult {
   const issues: ValidationIssue[] = [];
   const contractMap = new Map<string, ComponentContract>(contracts.map((contract) => [contract.type, contract]));
@@ -34,6 +41,7 @@ export function validateApplicationBundle(
       path: 'metadata.configId',
       message: 'configId is required',
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -42,6 +50,7 @@ export function validateApplicationBundle(
       path: 'metadata.tenantId',
       message: 'tenantId is required',
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -50,6 +59,7 @@ export function validateApplicationBundle(
       path: 'metadata.version',
       message: 'version must be a positive number',
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -59,6 +69,7 @@ export function validateApplicationBundle(
       path: 'uiSchemas',
       message: 'At least one UI screen is required',
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -73,10 +84,12 @@ export function validateApplicationBundle(
         issues.push({
           path: `uiSchemas.${screenId}.pageId`,
           message: `pageId "${schema.pageId}" is duplicated`,
-        severity: 'warning',
-      });
+          severity: 'warning',
+          category: 'schema',
+        });
+      }
+      pageIds.add(schema.pageId);
     }
-    pageIds.add(schema.pageId);
     globalComponentIds.push(...schema.components.map((component) => component.id));
   }
 
@@ -86,16 +99,18 @@ export function validateApplicationBundle(
       path: 'uiSchemas',
       message: `Component id "${duplicateId}" is duplicated across screens`,
       severity: 'error',
+      category: 'schema',
     });
-  }
   }
 
   validateRuleReferences(bundle.flowSchema, bundle.rules?.rules ?? [], issues);
   validateThemeContrast(bundle, issues);
 
+  const normalizedIssues = normalizeSeverityForDevMode(issues, options);
+
   return {
-    valid: issues.every((issue) => issue.severity !== 'error'),
-    issues,
+    valid: normalizedIssues.every((issue) => issue.severity !== 'error'),
+    issues: normalizedIssues,
   };
 }
 
@@ -110,6 +125,7 @@ function validateFlowSchema(
       path: 'flowSchema.states',
       message: 'Flow schema must define at least one state',
       severity: 'error',
+      category: 'schema',
     });
     return;
   }
@@ -119,6 +135,7 @@ function validateFlowSchema(
       path: 'flowSchema.initialState',
       message: `Initial state "${flowSchema.initialState}" does not exist`,
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -128,12 +145,14 @@ function validateFlowSchema(
         path: `uiSchemas.${stateId}`,
         message: `No UISchema found for flow state "${stateId}"`,
         severity: 'error',
+        category: 'schema',
       });
     } else if (state.uiPageId && uiSchemas[stateId]?.pageId !== state.uiPageId) {
       issues.push({
         path: `flowSchema.states.${stateId}.uiPageId`,
         message: `uiPageId "${state.uiPageId}" does not match UISchema.pageId`,
         severity: 'warning',
+        category: 'schema',
       });
     }
 
@@ -143,6 +162,7 @@ function validateFlowSchema(
           path: `flowSchema.states.${stateId}.on.${eventName}`,
           message: `Transition target "${transition.target}" does not exist`,
           severity: 'error',
+          category: 'schema',
         });
       }
     }
@@ -154,6 +174,7 @@ function validateFlowSchema(
         path: `uiSchemas.${screenId}`,
         message: `UISchema "${screenId}" is not referenced by the flow schema`,
         severity: 'warning',
+        category: 'schema',
       });
     }
   }
@@ -170,6 +191,7 @@ function validateUiSchema(
       path: `uiSchemas.${screenId}.pageId`,
       message: 'pageId is required',
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -180,6 +202,7 @@ function validateUiSchema(
       path: `uiSchemas.${screenId}.components`,
       message: `Duplicate component id "${duplicateId}"`,
       severity: 'error',
+      category: 'schema',
     });
   }
 
@@ -189,6 +212,7 @@ function validateUiSchema(
       path: `uiSchemas.${screenId}.sections`,
       message: `Duplicate layout node id "${duplicateId}"`,
       severity: 'warning',
+      category: 'schema',
     });
   }
 
@@ -200,6 +224,7 @@ function validateUiSchema(
         path: `uiSchemas.${screenId}.sections`,
         message: `Layout references missing component "${refId}"`,
         severity: 'error',
+        category: 'schema',
       });
     }
   }
@@ -211,18 +236,21 @@ function validateUiSchema(
         path: `uiSchemas.${screenId}.components.${component.id}.type`,
         message: `Unknown component type "${component.type}"`,
         severity: 'error',
+        category: 'schema',
       });
       continue;
     }
 
     validateComponentProps(screenId, component, contract, issues);
     validateAccessibility(screenId, component, contract, issues);
+    validateI18n(screenId, component, issues);
 
     if (!referencedComponentIds.has(component.id)) {
       issues.push({
         path: `uiSchemas.${screenId}.components.${component.id}`,
         message: 'Component is not placed in the layout tree',
         severity: 'warning',
+        category: 'schema',
       });
     }
   }
@@ -237,25 +265,20 @@ function validateComponentProps(
   const props = component.props ?? {};
 
   for (const [propKey, definition] of Object.entries(contract.props ?? {})) {
+    if (!definition) continue;
     const propValue = props[propKey];
     if (definition.required && !isPresentValue(propValue)) {
       issues.push({
         path: `uiSchemas.${screenId}.components.${component.id}.props.${propKey}`,
         message: `${definition.label ?? propKey} is required`,
         severity: 'error',
+        category: 'schema',
       });
       continue;
     }
 
     if (propValue === undefined || propValue === null) continue;
-    validatePropValue(
-      screenId,
-      component,
-      propKey,
-      propValue,
-      definition as ComponentPropDefinition,
-      issues,
-    );
+    validatePropValue(screenId, component, propKey, propValue, definition as ComponentPropDefinition, issues);
   }
 }
 
@@ -270,6 +293,7 @@ function validateAccessibility(
       path: `uiSchemas.${screenId}.components.${component.id}.accessibility.ariaLabelKey`,
       message: 'ariaLabelKey is required for accessibility',
       severity: 'error',
+      category: 'accessibility',
     });
   }
 
@@ -284,6 +308,7 @@ function validateAccessibility(
         path: `uiSchemas.${screenId}.components.${component.id}.props.${propName}`,
         message: `Accessibility requires ${propName}`,
         severity: 'warning',
+        category: 'accessibility',
       });
     }
   }
@@ -295,6 +320,42 @@ function validateAccessibility(
       path: `uiSchemas.${screenId}.components.${component.id}.props.alt`,
       message: 'Image components must include non-empty alt text',
       severity: 'error',
+      category: 'accessibility',
+    });
+  }
+}
+
+function validateI18n(screenId: string, component: UIComponent, issues: ValidationIssue[]): void {
+  const i18n = component.i18n;
+  const stringLikeKeys = [
+    { prop: 'label', key: i18n?.labelKey, path: 'i18n.labelKey' },
+    { prop: 'helperText', key: i18n?.helperTextKey, path: 'i18n.helperTextKey' },
+    { prop: 'placeholder', key: i18n?.placeholderKey, path: 'i18n.placeholderKey' },
+  ];
+
+  for (const entry of stringLikeKeys) {
+    const value = component.props?.[entry.prop];
+    if (typeof value === 'string' && value.trim().length > 0 && !isPresentValue(entry.key)) {
+      issues.push({
+        path: `uiSchemas.${screenId}.components.${component.id}.${entry.path}`,
+        message: `${entry.path} is required when props.${entry.prop} is set`,
+        severity: 'error',
+        category: 'i18n',
+      });
+    }
+  }
+
+  if (!isPresentValue(component.accessibility?.ariaLabelKey)) {
+    return;
+  }
+
+  const ariaLabelKey = component.accessibility.ariaLabelKey;
+  if (typeof ariaLabelKey !== 'string' || !ariaLabelKey.includes('.')) {
+    issues.push({
+      path: `uiSchemas.${screenId}.components.${component.id}.accessibility.ariaLabelKey`,
+      message: 'ariaLabelKey should be a translation key path such as "form.submit"',
+      severity: 'warning',
+      category: 'i18n',
     });
   }
 }
@@ -311,7 +372,7 @@ function validatePropValue(
 
   if (definition.kind === 'string') {
     if (typeof value !== 'string') {
-      issues.push({ path, message: 'Expected a string value', severity: 'error' });
+      issues.push({ path, message: 'Expected a string value', severity: 'error', category: 'schema' });
       return;
     }
     if (definition.minLength !== undefined && value.length < definition.minLength) {
@@ -319,6 +380,7 @@ function validatePropValue(
         path,
         message: `Minimum length is ${definition.minLength}`,
         severity: 'error',
+        category: 'schema',
       });
     }
     if (definition.maxLength !== undefined && value.length > definition.maxLength) {
@@ -326,16 +388,17 @@ function validatePropValue(
         path,
         message: `Maximum length is ${definition.maxLength}`,
         severity: 'error',
+        category: 'schema',
       });
     }
     if (definition.pattern) {
       try {
         const re = new RegExp(definition.pattern);
         if (!re.test(value)) {
-          issues.push({ path, message: 'Value does not match required pattern', severity: 'error' });
+          issues.push({ path, message: 'Value does not match required pattern', severity: 'error', category: 'schema' });
         }
       } catch {
-        issues.push({ path, message: 'Invalid validation pattern in contract', severity: 'warning' });
+        issues.push({ path, message: 'Invalid validation pattern in contract', severity: 'warning', category: 'schema' });
       }
     }
     return;
@@ -343,33 +406,33 @@ function validatePropValue(
 
   if (definition.kind === 'number') {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
-      issues.push({ path, message: 'Expected a numeric value', severity: 'error' });
+      issues.push({ path, message: 'Expected a numeric value', severity: 'error', category: 'schema' });
       return;
     }
     if (definition.min !== undefined && value < definition.min) {
-      issues.push({ path, message: `Minimum value is ${definition.min}`, severity: 'error' });
+      issues.push({ path, message: `Minimum value is ${definition.min}`, severity: 'error', category: 'schema' });
     }
     if (definition.max !== undefined && value > definition.max) {
-      issues.push({ path, message: `Maximum value is ${definition.max}`, severity: 'error' });
+      issues.push({ path, message: `Maximum value is ${definition.max}`, severity: 'error', category: 'schema' });
     }
     return;
   }
 
   if (definition.kind === 'boolean') {
     if (typeof value !== 'boolean') {
-      issues.push({ path, message: 'Expected a boolean value', severity: 'error' });
+      issues.push({ path, message: 'Expected a boolean value', severity: 'error', category: 'schema' });
     }
     return;
   }
 
   if (definition.kind === 'enum') {
     if (typeof value !== 'string') {
-      issues.push({ path, message: 'Expected a string option value', severity: 'error' });
+      issues.push({ path, message: 'Expected a string option value', severity: 'error', category: 'schema' });
       return;
     }
     const options = definition.options.map((option) => option.value);
     if (!options.includes(value)) {
-      issues.push({ path, message: 'Value is not a valid option', severity: 'error' });
+      issues.push({ path, message: 'Value is not a valid option', severity: 'error', category: 'schema' });
     }
   }
 }
@@ -389,6 +452,7 @@ function validateRuleReferences(
             path: `flowSchema.states.${stateId}.on.${eventName}.condition`,
             message: `Referenced rule "${ruleId}" does not exist`,
             severity: 'error',
+            category: 'schema',
           });
         }
       }
@@ -413,8 +477,24 @@ function validateThemeContrast(bundle: ApplicationBundle, issues: ValidationIssu
       path: 'themes.tokens',
       message: `Color contrast ratio ${ratio.toFixed(2)} is below 4.5:1`,
       severity: 'warning',
+      category: 'accessibility',
     });
   }
+}
+
+function normalizeSeverityForDevMode(issues: ValidationIssue[], options: ValidationOptions): ValidationIssue[] {
+  const shouldDowngrade = options.developmentMode && options.skipA11yI18nInDev;
+  if (!shouldDowngrade) return issues;
+
+  return issues.map((issue) => {
+    if (issue.severity === 'error' && (issue.category === 'accessibility' || issue.category === 'i18n')) {
+      return {
+        ...issue,
+        severity: 'warning',
+      };
+    }
+    return issue;
+  });
 }
 
 function collectLayoutComponentIds(sections: SectionNode[]): string[] {
@@ -492,9 +572,9 @@ function parseColor(input: string): RGB | null {
   if (value.startsWith('#')) {
     const hex = value.slice(1);
     if (hex.length === 3) {
-      const r = parseInt(hex[0] + hex[0], 16);
-      const g = parseInt(hex[1] + hex[1], 16);
-      const b = parseInt(hex[2] + hex[2], 16);
+      const r = parseInt(hex.slice(0, 1).repeat(2), 16);
+      const g = parseInt(hex.slice(1, 2).repeat(2), 16);
+      const b = parseInt(hex.slice(2, 3).repeat(2), 16);
       return { r, g, b };
     }
     if (hex.length === 6) {
@@ -507,7 +587,9 @@ function parseColor(input: string): RGB | null {
 
   const rgbMatch = value.match(/rgba?\(([^)]+)\)/);
   if (rgbMatch) {
-    const parts = rgbMatch[1].split(',').map((part) => part.trim());
+    const channelList = rgbMatch[1];
+    if (!channelList) return null;
+    const parts = channelList.split(',').map((part) => part.trim());
     if (parts.length >= 3) {
       const r = Number(parts[0]);
       const g = Number(parts[1]);

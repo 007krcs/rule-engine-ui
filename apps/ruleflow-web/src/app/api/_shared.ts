@@ -3,6 +3,7 @@ import { getMockSession, type Role } from '@/lib/auth';
 import type { ConfigBundle } from '@/lib/demo/types';
 import { getConfigStore, getStoreDiagnostics, isPersistenceError } from '@/server/repository';
 import { recordApiCall } from '@/server/metrics';
+import { appendImmutableAuditEvent } from '@/server/immutable-audit';
 import {
   evaluatePolicies,
   requireRole,
@@ -34,6 +35,16 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
     await getConfigStore();
     const response = await handler();
     recordApiCall(Date.now() - startedAt, response.status, metricLabels);
+    await appendImmutableAuditEvent({
+      tenantId: session.tenantId,
+      actor: session.user.id,
+      category: 'api',
+      action: 'API request completed',
+      target: 'http',
+      metadata: {
+        status: response.status,
+      },
+    });
     return response;
   } catch (error) {
     const diagnostics = await getStoreDiagnostics().catch(() => null);
@@ -48,6 +59,14 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
         500,
       );
       recordApiCall(Date.now() - startedAt, response.status, metricLabels);
+      await appendImmutableAuditEvent({
+        tenantId: session.tenantId,
+        actor: session.user.id,
+        category: 'api',
+        action: 'API request failed',
+        target: 'http',
+        metadata: { status: response.status, type: 'persistence' },
+      });
       return response;
     }
 
@@ -62,6 +81,14 @@ export async function withApiErrorHandling(handler: () => Promise<NextResponse>)
       500,
     );
     recordApiCall(Date.now() - startedAt, response.status, metricLabels);
+    await appendImmutableAuditEvent({
+      tenantId: session.tenantId,
+      actor: session.user.id,
+      category: 'api',
+      action: 'API request failed',
+      target: 'http',
+      metadata: { status: response.status, message },
+    });
     return response;
   }
 }

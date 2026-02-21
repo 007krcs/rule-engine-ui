@@ -11,6 +11,7 @@ export type PolicyError = {
   message: string;
   stage: PolicyCheckStage;
   hint: string;
+  mode?: 'shadow' | 'enforce';
 };
 
 export interface PolicyEvaluationInput {

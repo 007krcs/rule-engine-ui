@@ -24,6 +24,9 @@ export interface FlowTransitionEdge {
   condition?: FlowConditionExpression;
   actions?: FlowAction[];
   apiId?: string;
+  priority?: number;
+  weight?: number;
+  delayMs?: number;
   label?: string;
   metadata?: Record<string, JSONValue>;
 }
@@ -70,6 +73,9 @@ export interface CreateFlowTransitionOptions {
   condition?: FlowConditionExpression;
   actions?: FlowAction[];
   apiId?: string;
+  priority?: number;
+  weight?: number;
+  delayMs?: number;
   label?: string;
 }
 
@@ -82,6 +88,9 @@ export function createFlowTransition(options: CreateFlowTransitionOptions): Flow
     condition: options.condition,
     actions: options.actions ?? [],
     apiId: options.apiId,
+    priority: options.priority,
+    weight: options.weight,
+    delayMs: options.delayMs,
     label: options.label,
   };
 }
@@ -193,6 +202,9 @@ export function flowGraphToStateMachine(flow: FlowGraphSchema): FlowSchema {
       target: transition.to,
       actions: transition.actions,
       apiId: transition.apiId,
+      priority: transition.priority,
+      weight: transition.weight,
+      delayMs: transition.delayMs,
     };
 
     if (transition.condition !== undefined) {
@@ -240,6 +252,9 @@ export function stateMachineToFlowGraph(flow: FlowSchema): FlowGraphSchema {
           condition: transition.condition ?? transition.guard,
           actions: transition.actions,
           apiId: transition.apiId,
+          priority: transition.priority,
+          weight: transition.weight,
+          delayMs: transition.delayMs,
         }),
       );
     }

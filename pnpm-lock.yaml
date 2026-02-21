@@ -819,6 +819,12 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
+  packages/governance-sdk:
+    dependencies:
+      '@platform/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/i18n:
     dependencies:
       intl-messageformat:
@@ -842,6 +848,12 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../schema
+
+  packages/persistence-dal:
+    dependencies:
+      '@platform/observability':
+        specifier: workspace:*
+        version: link:../observability
 
   packages/persistence-postgres:
     dependencies:

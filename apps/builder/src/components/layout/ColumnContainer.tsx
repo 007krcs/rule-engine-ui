@@ -1,5 +1,4 @@
-import type { CSSProperties, DragEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import React, { type CSSProperties, type DragEvent, type ReactNode, useState } from 'react';
 import type { ColumnNode } from '@platform/schema';
 import {
   allowPaletteDrop,
@@ -11,11 +10,15 @@ import styles from './LayoutContainers.module.css';
 
 type ColumnStyleVariables = CSSProperties & {
   '--column-span': string;
+  '--column-span-desktop': string;
+  '--column-span-tablet': string;
+  '--column-span-mobile': string;
 };
 
 export interface ColumnContainerProps {
   column: ColumnNode;
   editMode: boolean;
+  previewBreakpoint?: 'desktop' | 'tablet' | 'mobile';
   selected: boolean;
   defaultSpan: number;
   onSelect: (columnId: string) => void;
@@ -26,6 +29,7 @@ export interface ColumnContainerProps {
 export function ColumnContainer({
   column,
   editMode,
+  previewBreakpoint = 'desktop',
   selected,
   defaultSpan,
   onSelect,
@@ -66,6 +70,29 @@ export function ColumnContainer({
   };
 
   const columnSpan = clampSpan(column.span ?? defaultSpan);
+  const resolvedSpans = resolveResponsiveSpans(column, columnSpan);
+  const columnStyle: ColumnStyleVariables = {
+    '--column-span': String(columnSpan),
+    '--column-span-desktop': String(resolvedSpans.desktop),
+    '--column-span-tablet': String(resolvedSpans.tablet),
+    '--column-span-mobile': String(resolvedSpans.mobile),
+  };
+  const activeSpan =
+    previewBreakpoint === 'mobile'
+      ? resolvedSpans.mobile
+      : previewBreakpoint === 'tablet'
+        ? resolvedSpans.tablet
+        : resolvedSpans.desktop;
+  columnStyle['--column-span'] = String(activeSpan);
+  const cssVars = column.props?.cssVars;
+  if (cssVars && typeof cssVars === 'object' && !Array.isArray(cssVars)) {
+    for (const [key, value] of Object.entries(cssVars)) {
+      if (!key.startsWith('--')) continue;
+      if (typeof value === 'string' || typeof value === 'number') {
+        (columnStyle as unknown as Record<string, string | number>)[key] = value;
+      }
+    }
+  }
 
   return (
     <div
@@ -74,11 +101,7 @@ export function ColumnContainer({
         !editMode ? styles.columnPreview : '',
         selected ? styles.columnSelected : '',
       ].join(' ')}
-      style={
-        {
-          '--column-span': String(columnSpan),
-        } as ColumnStyleVariables
-      }
+      style={columnStyle}
       aria-label={column.label ?? 'Column'}
     >
       <header className={styles.columnHeader}>
@@ -111,4 +134,17 @@ export function ColumnContainer({
 
 function clampSpan(value: number): number {
   return Math.max(1, Math.min(12, Math.round(value)));
+}
+
+function resolveResponsiveSpans(column: ColumnNode, baseSpan: number): {
+  desktop: number;
+  tablet: number;
+  mobile: number;
+} {
+  const props = column.props ?? {};
+  return {
+    desktop: clampSpan(typeof props.spanDesktop === 'number' ? props.spanDesktop : baseSpan),
+    tablet: clampSpan(typeof props.spanTablet === 'number' ? props.spanTablet : Math.min(baseSpan, 12)),
+    mobile: clampSpan(typeof props.spanMobile === 'number' ? props.spanMobile : 12),
+  };
 }

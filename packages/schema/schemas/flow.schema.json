@@ -41,6 +41,10 @@
         "on": {
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/transition" }
+        },
+        "transitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/transition" }
         }
       }
     },
@@ -50,6 +54,7 @@
       "required": ["target"],
       "properties": {
         "target": { "type": "string", "minLength": 1 },
+        "onEvent": { "type": "string", "minLength": 1 },
         "guard": { "$ref": "#/$defs/condition" },
         "condition": {
           "oneOf": [
@@ -64,7 +69,48 @@
             "enum": ["evaluateRules", "callApi", "setContext", "navigate"]
           }
         },
-        "apiId": { "type": "string" }
+        "apiId": { "type": "string" },
+        "priority": { "type": "number" },
+        "weight": { "type": "number" },
+        "delayMs": { "type": "integer", "minimum": 0 },
+        "history": { "$ref": "#/$defs/historyCondition" },
+        "fork": { "$ref": "#/$defs/forkConfig" }
+      }
+    },
+    "historyCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hasVisitedAll": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "hasVisitedAny": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "notVisited": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "forkConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branches", "joinState"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "branches": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "joinType": {
+          "type": "string",
+          "enum": ["and", "or"]
+        },
+        "joinState": { "type": "string", "minLength": 1 }
       }
     },
     "screenNode": {

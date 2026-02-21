@@ -56,4 +56,25 @@ describe('ConfigStore', () => {
     const configs = await store.listConfigs();
     expect(configs).toHaveLength(1);
   });
+
+  it('uses file lock for concurrent version writes', async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), 'core-runtime-store-lock-'));
+    const store = new FileConfigStore({ baseDir });
+    await store.createConfig({
+      id: 'orders',
+      schema: { uiSchema: { version: '1.0.0' } },
+    });
+
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        store.addVersion('orders', {
+          id: `ver-${index}`,
+          schema: { uiSchema: { version: `1.0.${index}` } },
+        }),
+      ),
+    );
+
+    const config = await store.getConfig('orders');
+    expect(config?.versions.length).toBe(20);
+  });
 });

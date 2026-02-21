@@ -49,6 +49,7 @@ export interface LayoutNodePatch {
   className?: string | undefined;
   span?: number | undefined;
   componentSpan?: number | undefined;
+  props?: Record<string, JSONValue> | undefined;
 }
 
 export function createInitialBuilderSchema(pageId: string): UISchema {
@@ -193,6 +194,7 @@ function patchLayoutNode(node: LayoutTreeNode, patch: LayoutNodePatch): LayoutTr
       title: 'title' in patch ? toOptionalText(patch.title) : node.title,
       label: 'label' in patch ? toOptionalText(patch.label) : node.label,
       className: 'className' in patch ? toOptionalText(patch.className) : node.className,
+      props: 'props' in patch ? patch.props : node.props,
     };
   }
 
@@ -201,6 +203,7 @@ function patchLayoutNode(node: LayoutTreeNode, patch: LayoutNodePatch): LayoutTr
       ...node,
       label: 'label' in patch ? toOptionalText(patch.label) : node.label,
       className: 'className' in patch ? toOptionalText(patch.className) : node.className,
+      props: 'props' in patch ? patch.props : node.props,
     };
   }
 
@@ -210,6 +213,7 @@ function patchLayoutNode(node: LayoutTreeNode, patch: LayoutNodePatch): LayoutTr
       label: 'label' in patch ? toOptionalText(patch.label) : node.label,
       className: 'className' in patch ? toOptionalText(patch.className) : node.className,
       span: 'span' in patch ? clampSpan(patch.span) : node.span,
+      props: 'props' in patch ? patch.props : node.props,
     };
   }
 
@@ -218,6 +222,7 @@ function patchLayoutNode(node: LayoutTreeNode, patch: LayoutNodePatch): LayoutTr
     label: 'label' in patch ? toOptionalText(patch.label) : node.label,
     className: 'className' in patch ? toOptionalText(patch.className) : node.className,
     componentSpan: 'componentSpan' in patch ? clampSpan(patch.componentSpan) : node.componentSpan,
+    props: 'props' in patch ? patch.props : node.props,
   };
 }
 

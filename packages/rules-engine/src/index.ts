@@ -9,6 +9,7 @@
   RuleScope,
 } from '@platform/schema';
 import {
+  emitBusinessMetric,
   logRulesTrace,
   type ConditionExplain,
   type ExplainOperand,
@@ -26,7 +27,11 @@ export interface EvaluateRulesInput {
     timeoutMs?: number;
     maxRules?: number;
     maxDepth?: number;
+    memoizeConditionEvaluations?: boolean;
+    memoCacheSize?: number;
     mode?: 'apply' | 'predicate';
+    correlationId?: string;
+    versionId?: string;
     logTrace?: boolean;
     traceLogger?: (trace: RulesTrace) => void;
     logger?: TraceLogger<RulesTrace>;
@@ -39,17 +44,87 @@ export interface EvaluateRulesResult {
   trace: RulesTrace;
 }
 
+export interface RulesEngineLimits {
+  timeoutMs: number;
+  maxRules: number;
+  maxDepth: number;
+}
+
+export interface RulesEngineActionPolicy {
+  allowCustomActions: boolean;
+  allowedActionTypes: string[];
+}
+
+export interface RulesEnginePerformancePolicy {
+  pathCacheSize: number;
+  conditionMemoSize: number;
+  memoizeConditionEvaluations: boolean;
+}
+
+export interface RulesEngineConfig {
+  limits?: Partial<RulesEngineLimits>;
+  actionPolicy?: Partial<RulesEngineActionPolicy>;
+  performance?: Partial<RulesEnginePerformancePolicy>;
+}
+
+export interface RuleActionHandlerContext {
+  data: Record<string, JSONValue>;
+  context: ExecutionContext;
+  trace: RulesTrace;
+  ruleId: string;
+}
+
+export type RuleActionHandler = (
+  action: RuleAction,
+  ctx: RuleActionHandlerContext,
+) => void;
+
 const DEFAULT_TIMEOUT_MS = 50;
 const DEFAULT_MAX_RULES = 1000;
 const DEFAULT_MAX_DEPTH = 10;
+const DEFAULT_PATH_CACHE_SIZE = 500;
+const DEFAULT_CONDITION_MEMO_SIZE = 2048;
+
+const DEFAULT_RULES_ENGINE_CONFIG: Readonly<{
+  limits: RulesEngineLimits;
+  actionPolicy: RulesEngineActionPolicy;
+  performance: RulesEnginePerformancePolicy;
+}> = {
+  limits: {
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+    maxRules: DEFAULT_MAX_RULES,
+    maxDepth: DEFAULT_MAX_DEPTH,
+  },
+  actionPolicy: {
+    allowCustomActions: false,
+    allowedActionTypes: [],
+  },
+  performance: {
+    pathCacheSize: DEFAULT_PATH_CACHE_SIZE,
+    conditionMemoSize: DEFAULT_CONDITION_MEMO_SIZE,
+    memoizeConditionEvaluations: true,
+  },
+};
+
+let configuredRulesEngine: RulesEngineConfig = {};
+const customActionHandlers = new Map<string, RuleActionHandler>();
 
 export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
   const started = Date.now();
   const rulesArray = Array.isArray(input.rules) ? input.rules : input.rules.rules;
-  const timeoutMs = input.options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const maxRules = input.options?.maxRules ?? DEFAULT_MAX_RULES;
-  const maxDepth = input.options?.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const runtimeConfig = resolveRulesEngineConfig();
+  updatePathCacheLimit(runtimeConfig.performance.pathCacheSize);
+  const timeoutMs = input.options?.timeoutMs ?? runtimeConfig.limits.timeoutMs;
+  const maxRules = input.options?.maxRules ?? runtimeConfig.limits.maxRules;
+  const maxDepth = input.options?.maxDepth ?? runtimeConfig.limits.maxDepth;
+  const memoizeConditionEvaluations =
+    input.options?.memoizeConditionEvaluations ?? runtimeConfig.performance.memoizeConditionEvaluations;
+  const memoCacheSize = input.options?.memoCacheSize ?? runtimeConfig.performance.conditionMemoSize;
   const mode = input.options?.mode ?? 'apply';
+  const conditionMemo = memoizeConditionEvaluations
+    ? new LruCache<string, { result: boolean; explain: ConditionExplain; reads: RuleRead[] }>(memoCacheSize)
+    : null;
+  let mutationEpoch = 0;
 
   const trace: RulesTrace = {
     startedAt: new Date(started).toISOString(),
@@ -63,6 +138,12 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
     actionsApplied: [],
     events: [],
     errors: [],
+    context: {
+      correlationId: input.options?.correlationId,
+      tenantId: input.context.tenantId,
+      userId: input.context.userId,
+      versionId: input.options?.versionId,
+    },
   };
 
   const data = deepClone(input.data);
@@ -90,7 +171,22 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
     const rule = sorted[i];
     if (!rule) continue;
     try {
-      const explained = evaluateConditionExplain(rule.when, context, data, { maxDepth });
+      const memoKey = conditionMemo ? `${mutationEpoch}:${stableSerialize(rule.when)}` : '';
+      const cached = conditionMemo ? conditionMemo.get(memoKey) : undefined;
+      const explained = cached
+        ? {
+            result: cached.result,
+            explain: deepClone(cached.explain),
+            reads: deepClone(cached.reads),
+          }
+        : evaluateConditionExplain(rule.when, context, data, { maxDepth });
+      if (!cached && conditionMemo) {
+        conditionMemo.set(memoKey, {
+          result: explained.result,
+          explain: deepClone(explained.explain),
+          reads: deepClone(explained.reads),
+        });
+      }
       trace.conditionResults[rule.ruleId] = explained.result;
       trace.conditionExplains![rule.ruleId] = explained.explain;
       trace.readsByRuleId![rule.ruleId] = explained.reads;
@@ -98,8 +194,13 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
         trace.rulesMatched.push(rule.ruleId);
         if (mode === 'apply') {
           const actions = rule.actions ?? [];
+          let hadMutatingAction = false;
           for (const action of actions) {
-            applyAction(action, { data, context, trace, ruleId: rule.ruleId });
+            applyAction(action, { data, context, trace, ruleId: rule.ruleId }, runtimeConfig.actionPolicy);
+            hadMutatingAction = true;
+          }
+          if (hadMutatingAction) {
+            mutationEpoch += 1;
           }
         }
       }
@@ -112,6 +213,24 @@ export function evaluateRules(input: EvaluateRulesInput): EvaluateRulesResult {
   }
 
   trace.durationMs = Date.now() - started;
+  emitBusinessMetric({
+    name: 'rules.evaluation.duration_ms',
+    value: trace.durationMs,
+    unit: 'ms',
+    attributes: {
+      considered: trace.rulesConsidered.length,
+      matched: trace.rulesMatched.length,
+      errors: trace.errors.length,
+      tenant_id: input.context.tenantId,
+    },
+  });
+  emitBusinessMetric({
+    name: 'rules.evaluation.matched_count',
+    value: trace.rulesMatched.length,
+    attributes: {
+      tenant_id: input.context.tenantId,
+    },
+  });
 
   if (input.options?.traceLogger) {
     input.options.traceLogger(trace);
@@ -131,8 +250,27 @@ export function evaluateCondition(
   data: Record<string, JSONValue>,
   options?: { maxDepth?: number },
 ): boolean {
-  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const runtimeConfig = resolveRulesEngineConfig();
+  updatePathCacheLimit(runtimeConfig.performance.pathCacheSize);
+  const maxDepth = options?.maxDepth ?? runtimeConfig.limits.maxDepth;
   return evalCondition(condition, context, data, 0, maxDepth);
+}
+
+export function createMemoizedConditionEvaluator(options?: {
+  cacheSize?: number;
+  maxDepth?: number;
+}): (condition: RuleCondition, context: ExecutionContext, data: Record<string, JSONValue>) => boolean {
+  const cache = new LruCache<string, boolean>(options?.cacheSize ?? DEFAULT_CONDITION_MEMO_SIZE);
+  return (condition, context, data) => {
+    const key = `${stableSerialize(condition)}|${stableSerialize(context)}|${stableSerialize(data)}`;
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const result = evaluateCondition(condition, context, data, { maxDepth: options?.maxDepth });
+    cache.set(key, result);
+    return result;
+  };
 }
 
 function evaluateConditionExplain(
@@ -141,7 +279,8 @@ function evaluateConditionExplain(
   data: Record<string, JSONValue>,
   options?: { maxDepth?: number },
 ): { result: boolean; explain: ConditionExplain; reads: RuleRead[] } {
-  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const runtimeConfig = resolveRulesEngineConfig();
+  const maxDepth = options?.maxDepth ?? runtimeConfig.limits.maxDepth;
   const reads: RuleRead[] = [];
   const explain = evalConditionExplain(condition, context, data, reads, 0, maxDepth);
   const deduped = new Map<string, RuleRead>();
@@ -206,11 +345,15 @@ function evalConditionExplain(
     case 'lte':
       result = typeof leftValue === 'number' && typeof rightValue === 'number' && leftValue <= rightValue;
       break;
+    case 'before':
+    case 'after':
+    case 'on':
     case 'dateEq':
     case 'dateBefore':
     case 'dateAfter':
     case 'dateBetween':
-      result = compareDates(condition.op, leftValue, rightValue);
+    case 'plusDays':
+      result = compareDates(condition.op, leftValue, rightValue, context.locale);
       break;
     case 'in':
       result = Array.isArray(rightValue) && rightValue.some((item) => deepEqual(item, leftValue));
@@ -247,7 +390,8 @@ function resolveOperandExplain(
   reads: RuleRead[],
 ): ExplainOperand {
   if ('value' in operand) {
-    return { kind: 'value', value: operand.value };
+    const value = resolveDynamicValue(operand.value, context, data);
+    return { kind: 'value', value: value === undefined ? null : value };
   }
 
   const path = operand.path;
@@ -303,11 +447,15 @@ function evalCondition(
       return typeof left === 'number' && typeof right === 'number' && left < right;
     case 'lte':
       return typeof left === 'number' && typeof right === 'number' && left <= right;
+    case 'before':
+    case 'after':
+    case 'on':
     case 'dateEq':
     case 'dateBefore':
     case 'dateAfter':
     case 'dateBetween':
-      return compareDates(condition.op, left, right);
+    case 'plusDays':
+      return compareDates(condition.op, left, right, context.locale);
     case 'in':
       return Array.isArray(right) && right.some((item) => deepEqual(item, left));
     case 'contains':
@@ -335,7 +483,7 @@ function resolveOperand(
   data: Record<string, JSONValue>,
 ): JSONValue | undefined {
   if ('value' in operand) {
-    return operand.value;
+    return resolveDynamicValue(operand.value, context, data);
   }
   const path = operand.path;
   if (path.startsWith('context.')) {
@@ -387,6 +535,7 @@ function applyAction(
     trace: RulesTrace;
     ruleId: string;
   },
+  actionPolicy: RulesEngineActionPolicy,
 ): void {
   switch (action.type) {
     case 'setField': {
@@ -461,8 +610,7 @@ function applyAction(
       break;
     }
     default: {
-      const actionType = (action as { type?: string }).type ?? 'unknown';
-      ctx.trace.errors.push({ ruleId: ctx.ruleId, message: `Unsupported action: ${actionType}` });
+      executeCustomAction(action, ctx, actionPolicy);
     }
   }
 }
@@ -603,9 +751,6 @@ function tokenizePath(path: string): Array<string | number> {
       return Number.isNaN(index) ? segment : index;
     });
   pathCache.set(path, tokens);
-  if (pathCache.size > MAX_PATH_CACHE) {
-    pathCache.clear();
-  }
   return tokens;
 }
 
@@ -627,24 +772,33 @@ function deepEqual(a: JSONValue | undefined, b: JSONValue | undefined): boolean 
 }
 
 function compareDates(
-  op: 'dateEq' | 'dateBefore' | 'dateAfter' | 'dateBetween',
+  op: 'before' | 'after' | 'on' | 'plusDays' | 'dateEq' | 'dateBefore' | 'dateAfter' | 'dateBetween',
   left: JSONValue | undefined,
   right: JSONValue | undefined,
+  locale: string,
 ): boolean {
-  const leftMs = coerceDateMs(left);
+  const leftMs = coerceDateMs(left, locale);
   if (leftMs === null) return false;
   if (op === 'dateBetween') {
-    const range = coerceDateRange(right);
+    const range = coerceDateRange(right, locale);
     if (!range) return false;
     return leftMs >= range.start && leftMs <= range.end;
   }
-  const rightMs = coerceDateMs(right);
+  if (op === 'plusDays') {
+    const plusDaysValue = coercePlusDays(right, locale);
+    if (!plusDaysValue) return false;
+    return leftMs === plusDaysValue;
+  }
+  const rightMs = coerceDateMs(right, locale);
   if (rightMs === null) return false;
   switch (op) {
+    case 'on':
     case 'dateEq':
       return leftMs === rightMs;
+    case 'before':
     case 'dateBefore':
       return leftMs < rightMs;
+    case 'after':
     case 'dateAfter':
       return leftMs > rightMs;
     default:
@@ -652,15 +806,15 @@ function compareDates(
   }
 }
 
-function coerceDateRange(value: JSONValue | undefined): { start: number; end: number } | null {
+function coerceDateRange(value: JSONValue | undefined, locale: string): { start: number; end: number } | null {
   if (!Array.isArray(value) || value.length < 2) return null;
-  const start = coerceDateMs(value[0] as JSONValue);
-  const end = coerceDateMs(value[1] as JSONValue);
+  const start = coerceDateMs(value[0] as JSONValue, locale);
+  const end = coerceDateMs(value[1] as JSONValue, locale);
   if (start === null || end === null) return null;
   return { start, end };
 }
 
-function coerceDateMs(value: JSONValue | undefined): number | null {
+function coerceDateMs(value: JSONValue | undefined, locale: string): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'string') return null;
@@ -691,13 +845,418 @@ function coerceDateMs(value: JSONValue | undefined): number | null {
     return Number.isNaN(parsed) ? null : parsed;
   }
 
+  const localeDate = parseLocaleDateString(trimmed, locale);
+  if (localeDate !== null) return localeDate;
+
   return null;
+}
+
+function coercePlusDays(value: JSONValue | undefined, locale: string): number | null {
+  if (!value) return null;
+  if (Array.isArray(value) && value.length >= 2) {
+    const base = coerceDateMs(value[0] as JSONValue, locale);
+    const days = typeof value[1] === 'number' ? value[1] : Number(value[1]);
+    if (base === null || !Number.isFinite(days)) return null;
+    return shiftDateByDays(base, days);
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const rec = value as Record<string, JSONValue>;
+    const base = coerceDateMs(rec.date, locale);
+    const days = typeof rec.days === 'number' ? rec.days : Number(rec.days);
+    if (base === null || !Number.isFinite(days)) return null;
+    return shiftDateByDays(base, days);
+  }
+  return null;
+}
+
+function shiftDateByDays(baseMs: number, days: number): number {
+  const dayMs = 24 * 60 * 60 * 1000;
+  return baseMs + Math.round(days) * dayMs;
+}
+
+function parseLocaleDateString(value: string, locale: string): number | null {
+  const normalized = value.trim();
+  const parts = normalized.split(/[\/.-]/).map((part) => part.trim());
+  if (parts.length !== 3 || !parts.every((part) => /^\d{1,4}$/.test(part))) {
+    return null;
+  }
+
+  const order = detectLocaleDateOrder(locale);
+  const a = Number(parts[0]);
+  const b = Number(parts[1]);
+  const c = Number(parts[2]);
+  if (![a, b, c].every((part) => Number.isFinite(part))) return null;
+
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  if (order === 'ymd') {
+    year = a;
+    month = b;
+    day = c;
+  } else if (order === 'mdy') {
+    month = a;
+    day = b;
+    year = c;
+  } else {
+    day = a;
+    month = b;
+    year = c;
+  }
+
+  if (year < 100) {
+    year = year >= 70 ? year + 1900 : year + 2000;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return Date.UTC(year, month - 1, day);
+}
+
+function detectLocaleDateOrder(locale: string): 'mdy' | 'dmy' | 'ymd' {
+  try {
+    const formatter = new Intl.DateTimeFormat(locale || 'en-US');
+    const parts = formatter.formatToParts(new Date(Date.UTC(2001, 10, 22)));
+    const order = parts
+      .filter((part) => part.type === 'day' || part.type === 'month' || part.type === 'year')
+      .map((part) => part.type)
+      .join('');
+    if (order === 'yearmonthday') return 'ymd';
+    if (order === 'monthdayyear') return 'mdy';
+    return 'dmy';
+  } catch {
+    return 'mdy';
+  }
+}
+
+function resolveDynamicValue(
+  value: JSONValue,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+): JSONValue | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+  const record = value as Record<string, JSONValue>;
+  if (record.$path && typeof record.$path === 'string') {
+    return resolveOperand({ path: record.$path }, context, data);
+  }
+  if (record.$transform && typeof record.$transform === 'string') {
+    return evaluateTransform(record.$transform, record.args, context, data, context.locale);
+  }
+  return value;
+}
+
+function evaluateTransform(
+  transform: string,
+  args: JSONValue | undefined,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+  locale: string,
+): JSONValue | undefined {
+  if (!Array.isArray(args) || args.length > 8) return undefined;
+  const resolvedArgs = args.map((arg) => resolveTransformArg(arg, context, data));
+  switch (transform) {
+    case 'add':
+      return numericFold(resolvedArgs, (acc, value) => acc + value);
+    case 'subtract':
+      return numericFold(resolvedArgs, (acc, value) => acc - value);
+    case 'multiply':
+      return numericFold(resolvedArgs, (acc, value) => acc * value);
+    case 'divide':
+      return numericFold(resolvedArgs, (acc, value) => (value === 0 ? Number.NaN : acc / value));
+    case 'mod':
+      if (resolvedArgs.length !== 2) return undefined;
+      {
+        const left = toFiniteNumber(resolvedArgs[0]);
+        const right = toFiniteNumber(resolvedArgs[1]);
+        if (left === null || right === null || right === 0) return undefined;
+        return left % right;
+      }
+    case 'abs': {
+      const value = toFiniteNumber(resolvedArgs[0]);
+      return value === null ? undefined : Math.abs(value);
+    }
+    case 'round': {
+      const value = toFiniteNumber(resolvedArgs[0]);
+      return value === null ? undefined : Math.round(value);
+    }
+    case 'floor': {
+      const value = toFiniteNumber(resolvedArgs[0]);
+      return value === null ? undefined : Math.floor(value);
+    }
+    case 'ceil': {
+      const value = toFiniteNumber(resolvedArgs[0]);
+      return value === null ? undefined : Math.ceil(value);
+    }
+    case 'trim':
+      return typeof resolvedArgs[0] === 'string' ? resolvedArgs[0].trim() : undefined;
+    case 'lower':
+      return typeof resolvedArgs[0] === 'string' ? resolvedArgs[0].toLowerCase() : undefined;
+    case 'upper':
+      return typeof resolvedArgs[0] === 'string' ? resolvedArgs[0].toUpperCase() : undefined;
+    case 'concat':
+      return resolvedArgs.map((value) => String(value ?? '')).join('');
+    case 'plusDays': {
+      const payload: JSONValue = { date: resolvedArgs[0] as JSONValue, days: resolvedArgs[1] as JSONValue };
+      const shifted = coercePlusDays(payload, locale);
+      return shifted ?? undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function resolveTransformArg(
+  arg: JSONValue,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+): JSONValue | undefined {
+  if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+    const rec = arg as Record<string, JSONValue>;
+    if (rec.$path && typeof rec.$path === 'string') {
+      return resolveOperand({ path: rec.$path }, context, data);
+    }
+  }
+  return arg;
+}
+
+function numericFold(
+  args: Array<JSONValue | undefined>,
+  reducer: (acc: number, value: number) => number,
+): number | undefined {
+  if (args.length === 0) return undefined;
+  const first = toFiniteNumber(args[0]);
+  if (first === null) return undefined;
+  let acc = first;
+  for (let i = 1; i < args.length; i += 1) {
+    const value = toFiniteNumber(args[i]);
+    if (value === null) return undefined;
+    acc = reducer(acc, value);
+    if (!Number.isFinite(acc)) return undefined;
+  }
+  return acc;
+}
+
+function toFiniteNumber(value: JSONValue | undefined): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function executeCustomAction(
+  action: RuleAction,
+  ctx: RuleActionHandlerContext,
+  actionPolicy: RulesEngineActionPolicy,
+): void {
+  const actionType = typeof (action as { type?: unknown }).type === 'string'
+    ? ((action as { type: string }).type)
+    : 'unknown';
+  if (!actionPolicy.allowCustomActions) {
+    ctx.trace.errors.push({ ruleId: ctx.ruleId, message: `Unsupported action: ${actionType}` });
+    return;
+  }
+  if (actionPolicy.allowedActionTypes.length > 0 && !actionPolicy.allowedActionTypes.includes(actionType)) {
+    ctx.trace.errors.push({ ruleId: ctx.ruleId, message: `Action not allowed by policy: ${actionType}` });
+    return;
+  }
+  const handler = customActionHandlers.get(actionType);
+  if (!handler) {
+    ctx.trace.errors.push({ ruleId: ctx.ruleId, message: `No handler registered for action: ${actionType}` });
+    return;
+  }
+  handler(action, ctx);
+  ctx.trace.actionsApplied.push({ ruleId: ctx.ruleId, action });
+}
+
+export function configureRulesEngine(config: RulesEngineConfig): void {
+  configuredRulesEngine = {
+    limits: {
+      ...(configuredRulesEngine.limits ?? {}),
+      ...(config.limits ?? {}),
+    },
+    actionPolicy: {
+      ...(configuredRulesEngine.actionPolicy ?? {}),
+      ...(config.actionPolicy ?? {}),
+    },
+    performance: {
+      ...(configuredRulesEngine.performance ?? {}),
+      ...(config.performance ?? {}),
+    },
+  };
+}
+
+export function resetRulesEngineConfig(): void {
+  configuredRulesEngine = {};
+}
+
+export function registerRuleActionHandler(type: string, handler: RuleActionHandler): void {
+  if (!type || !/^[a-zA-Z0-9_.-]+$/.test(type)) {
+    throw new Error('Invalid custom action type. Use alphanumeric, ".", "-", "_" only.');
+  }
+  customActionHandlers.set(type, handler);
+}
+
+export function unregisterRuleActionHandler(type: string): void {
+  customActionHandlers.delete(type);
+}
+
+export function clearRuleActionHandlers(): void {
+  customActionHandlers.clear();
+}
+
+function resolveRulesEngineConfig(): {
+  limits: RulesEngineLimits;
+  actionPolicy: RulesEngineActionPolicy;
+  performance: RulesEnginePerformancePolicy;
+} {
+  const env = readConfigFromEnv();
+  return {
+    limits: {
+      timeoutMs:
+        configuredRulesEngine.limits?.timeoutMs ??
+        env.limits.timeoutMs ??
+        DEFAULT_RULES_ENGINE_CONFIG.limits.timeoutMs,
+      maxRules:
+        configuredRulesEngine.limits?.maxRules ??
+        env.limits.maxRules ??
+        DEFAULT_RULES_ENGINE_CONFIG.limits.maxRules,
+      maxDepth:
+        configuredRulesEngine.limits?.maxDepth ??
+        env.limits.maxDepth ??
+        DEFAULT_RULES_ENGINE_CONFIG.limits.maxDepth,
+    },
+    actionPolicy: {
+      allowCustomActions:
+        configuredRulesEngine.actionPolicy?.allowCustomActions ??
+        env.actionPolicy.allowCustomActions ??
+        DEFAULT_RULES_ENGINE_CONFIG.actionPolicy.allowCustomActions,
+      allowedActionTypes:
+        configuredRulesEngine.actionPolicy?.allowedActionTypes ??
+        env.actionPolicy.allowedActionTypes ??
+        DEFAULT_RULES_ENGINE_CONFIG.actionPolicy.allowedActionTypes,
+    },
+    performance: {
+      pathCacheSize:
+        configuredRulesEngine.performance?.pathCacheSize ??
+        env.performance.pathCacheSize ??
+        DEFAULT_RULES_ENGINE_CONFIG.performance.pathCacheSize,
+      conditionMemoSize:
+        configuredRulesEngine.performance?.conditionMemoSize ??
+        env.performance.conditionMemoSize ??
+        DEFAULT_RULES_ENGINE_CONFIG.performance.conditionMemoSize,
+      memoizeConditionEvaluations:
+        configuredRulesEngine.performance?.memoizeConditionEvaluations ??
+        env.performance.memoizeConditionEvaluations ??
+        DEFAULT_RULES_ENGINE_CONFIG.performance.memoizeConditionEvaluations,
+    },
+  };
+}
+
+function readConfigFromEnv(): {
+  limits: Partial<RulesEngineLimits>;
+  actionPolicy: Partial<RulesEngineActionPolicy>;
+  performance: Partial<RulesEnginePerformancePolicy>;
+} {
+  if (typeof process === 'undefined' || !process.env) {
+    return { limits: {}, actionPolicy: {}, performance: {} };
+  }
+  const timeoutMs = parsePositiveInt(process.env.RULEFLOW_RULES_TIMEOUT_MS);
+  const maxRules = parsePositiveInt(process.env.RULEFLOW_RULES_MAX_RULES);
+  const maxDepth = parsePositiveInt(process.env.RULEFLOW_RULES_MAX_DEPTH);
+  const pathCacheSize = parsePositiveInt(process.env.RULEFLOW_RULES_PATH_CACHE_SIZE);
+  const conditionMemoSize = parsePositiveInt(process.env.RULEFLOW_RULES_CONDITION_MEMO_SIZE);
+  const memoizeConditionEvaluations = parseBoolean(process.env.RULEFLOW_RULES_MEMOIZE_CONDITIONS);
+  const allowCustomActions = parseBoolean(process.env.RULEFLOW_RULES_ALLOW_CUSTOM_ACTIONS);
+  const allowedActionTypes = parseCsv(process.env.RULEFLOW_RULES_ALLOWED_ACTIONS);
+  const limits: Partial<RulesEngineLimits> = {};
+  if (timeoutMs !== undefined) limits.timeoutMs = timeoutMs;
+  if (maxRules !== undefined) limits.maxRules = maxRules;
+  if (maxDepth !== undefined) limits.maxDepth = maxDepth;
+  const performance: Partial<RulesEnginePerformancePolicy> = {};
+  if (pathCacheSize !== undefined) performance.pathCacheSize = pathCacheSize;
+  if (conditionMemoSize !== undefined) performance.conditionMemoSize = conditionMemoSize;
+  if (memoizeConditionEvaluations !== undefined) performance.memoizeConditionEvaluations = memoizeConditionEvaluations;
+  const actionPolicy: Partial<RulesEngineActionPolicy> = {};
+  if (allowCustomActions !== undefined) actionPolicy.allowCustomActions = allowCustomActions;
+  if (allowedActionTypes !== undefined) actionPolicy.allowedActionTypes = allowedActionTypes;
+  return {
+    limits,
+    actionPolicy,
+    performance,
+  };
+}
+
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
+
+function parseBoolean(value: string | undefined): boolean | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'true') return true;
+  if (normalized === '0' || normalized === 'false') return false;
+  return undefined;
+}
+
+function parseCsv(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  const parts = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : undefined;
 }
 
 class RuleActionError extends Error {}
 
-const MAX_PATH_CACHE = 500;
-const pathCache = new Map<string, Array<string | number>>();
+class LruCache<K, V> {
+  private store = new Map<K, V>();
+
+  constructor(private limit: number) {}
+
+  setLimit(limit: number): void {
+    this.limit = Math.max(1, limit);
+    this.prune();
+  }
+
+  get(key: K): V | undefined {
+    const value = this.store.get(key);
+    if (value === undefined) return undefined;
+    this.store.delete(key);
+    this.store.set(key, value);
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.store.has(key)) this.store.delete(key);
+    this.store.set(key, value);
+    this.prune();
+  }
+
+  private prune(): void {
+    while (this.store.size > this.limit) {
+      const first = this.store.keys().next().value;
+      if (first === undefined) break;
+      this.store.delete(first);
+    }
+  }
+}
+
+const pathCache = new LruCache<string, Array<string | number>>(DEFAULT_PATH_CACHE_SIZE);
+let currentPathCacheLimit = DEFAULT_PATH_CACHE_SIZE;
+
+function updatePathCacheLimit(limit: number): void {
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : DEFAULT_PATH_CACHE_SIZE;
+  if (safeLimit === currentPathCacheLimit) return;
+  currentPathCacheLimit = safeLimit;
+  pathCache.setLimit(safeLimit);
+}
 
 function isUnsafeKey(value: string): boolean {
   return value === '__proto__' || value === 'constructor' || value === 'prototype';
@@ -710,4 +1269,23 @@ function isThrowError(error: unknown): boolean {
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function stableSerialize(value: unknown): string {
+  return JSON.stringify(sortValue(value));
+}
+
+function sortValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortValue(entry));
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(record).sort((a, b) => a.localeCompare(b))) {
+      sorted[key] = sortValue(record[key]);
+    }
+    return sorted;
+  }
+  return value;
 }

@@ -9,11 +9,13 @@ export async function GET(request: Request) {
     const env = url.searchParams.get('env') ?? undefined;
     const versionId = url.searchParams.get('versionId') ?? undefined;
     const packageId = url.searchParams.get('packageId') ?? undefined;
+    const componentId = url.searchParams.get('componentId') ?? undefined;
 
     const result = await getRuntimeFlags({
       env,
       versionId,
       packageId,
+      componentId,
     });
 
     return noStoreJson(result);

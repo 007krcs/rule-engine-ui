@@ -9,7 +9,7 @@ export type ConfigStatus =
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED';
 export type RiskLevel = 'Low' | 'Medium' | 'High';
 export type AuditSeverity = 'info' | 'warning' | 'error';
-export type KillScope = 'TENANT' | 'RULESET' | 'VERSION';
+export type KillScope = 'TENANT' | 'RULESET' | 'VERSION' | 'COMPONENT';
 
 export type JsonRecord = Record<string, unknown>;
 
@@ -88,6 +88,7 @@ export interface RepoKillSwitch {
   scope: KillScope;
   packageId?: string;
   versionId?: string;
+  componentId?: string;
   rulesetKey?: string;
   active: boolean;
   reason?: string;

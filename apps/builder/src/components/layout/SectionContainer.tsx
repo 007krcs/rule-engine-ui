@@ -1,5 +1,4 @@
-import type { DragEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import React, { type CSSProperties, type DragEvent, type ReactNode, useState } from 'react';
 import type { SectionNode } from '@platform/schema';
 import {
   allowPaletteDrop,
@@ -12,6 +11,7 @@ import styles from './LayoutContainers.module.css';
 export interface SectionContainerProps {
   section: SectionNode;
   editMode: boolean;
+  previewBreakpoint?: 'desktop' | 'tablet' | 'mobile';
   selected: boolean;
   onSelect: (sectionId: string) => void;
   onDropItem: (target: DropTarget, item: PaletteDragItem) => void;
@@ -21,12 +21,14 @@ export interface SectionContainerProps {
 export function SectionContainer({
   section,
   editMode,
+  previewBreakpoint = 'desktop',
   selected,
   onSelect,
   onDropItem,
   children,
 }: SectionContainerProps) {
   const [isDropActive, setDropActive] = useState(false);
+  const sectionStyle = buildSectionStyle(section, previewBreakpoint);
 
   const handleRowDrop = (event: DragEvent<HTMLDivElement>) => {
     const item = readPaletteDragItem(event.dataTransfer);
@@ -66,6 +68,7 @@ export function SectionContainer({
         !editMode ? styles.sectionPreview : '',
         selected ? styles.sectionSelected : '',
       ].join(' ')}
+      style={sectionStyle}
       aria-label={section.title ?? 'Section'}
     >
       <header className={styles.sectionHeader}>
@@ -94,4 +97,24 @@ export function SectionContainer({
       ) : null}
     </section>
   );
+}
+
+function buildSectionStyle(
+  section: SectionNode,
+  previewBreakpoint: 'desktop' | 'tablet' | 'mobile',
+): CSSProperties {
+  const style: CSSProperties = {
+    '--layout-breakpoint': previewBreakpoint,
+  } as CSSProperties;
+
+  const cssVars = section.props?.cssVars;
+  if (cssVars && typeof cssVars === 'object' && !Array.isArray(cssVars)) {
+    for (const [key, value] of Object.entries(cssVars)) {
+      if (!key.startsWith('--')) continue;
+      if (typeof value === 'string' || typeof value === 'number') {
+        (style as Record<string, string | number>)[key] = value;
+      }
+    }
+  }
+  return style;
 }

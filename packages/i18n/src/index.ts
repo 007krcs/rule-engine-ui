@@ -12,6 +12,14 @@ export interface BundleLoader {
   load(params: { tenantId?: string; locale: string; namespace: string }): Promise<TranslationBundle | null>;
 }
 
+export interface DynamicImportBundleLoaderOptions {
+  importer: (params: { locale: string; namespace: string; tenantId?: string }) => Promise<
+    | TranslationBundle
+    | { messages: Record<string, string> }
+    | { default: TranslationBundle | { messages: Record<string, string> } }
+  >;
+}
+
 export interface BundleCache {
   get(key: string): TranslationBundle | undefined;
   set(key: string, value: TranslationBundle, ttlMs?: number): void;
@@ -22,6 +30,7 @@ export interface BundleCache {
 export interface I18nProvider {
   locale: string;
   direction: LocaleDirection;
+  themeTokens: Record<string, string | number>;
   t(key: string, params?: Record<string, unknown>, options?: TranslateOptions): string;
   has(key: string, options?: TranslateOptions): boolean;
   formatNumber(value: number, options?: Intl.NumberFormatOptions): string;
@@ -41,7 +50,33 @@ export interface CreateI18nProviderOptions {
   tenantBundleLoader?: BundleLoader;
   cache?: BundleCache;
   fallbackLocale?: string;
+  fallbackLocales?: string[];
   mode?: 'dev' | 'prod';
+  machineTranslation?: MachineTranslationOptions;
+  localeThemes?: LocaleThemeConfig;
+}
+
+export interface MachineTranslationProvider {
+  translate(params: { text: string; fromLocale: string; toLocale: string; namespace: string; key: string }): Promise<string>;
+}
+
+export interface MachineTranslationOptions {
+  enabled?: boolean;
+  envs?: Array<'development' | 'staging' | 'test' | 'production'>;
+  provider: MachineTranslationProvider;
+}
+
+export interface LocaleThemeConfig {
+  base?: Record<string, string | number>;
+  byLocale?: Record<string, Record<string, string | number>>;
+  fallbackLocale?: string;
+}
+
+export function resolveLocalizedTheme(
+  locale: string,
+  config?: LocaleThemeConfig,
+): Record<string, string | number> {
+  return resolveLocaleThemeTokens(config, locale);
 }
 
 export const RTL_LOCALES = ['ar', 'he', 'fa', 'ur'];
@@ -176,32 +211,51 @@ export const EXAMPLE_TENANT_BUNDLES: TranslationBundle[] = [
 export async function createI18nProvider(options: CreateI18nProviderOptions): Promise<I18nProvider> {
   const platformBundles = options.platformBundles ?? PLATFORM_BUNDLES;
   const resolvedBundles: TranslationBundle[] = [...platformBundles];
+  const localeChain = buildLocaleFallbackChain(
+    options.locale,
+    options.fallbackLocale,
+    options.fallbackLocales,
+  );
 
   if (options.tenantBundleLoader) {
     const cache = options.cache ?? createMemoryCache();
     for (const namespace of options.namespaces) {
-      const cacheKey = buildCacheKey(options.tenantId, options.locale, namespace);
-      let bundle = cache.get(cacheKey);
-      if (!bundle) {
-        const loaded = await options.tenantBundleLoader.load({
-          tenantId: options.tenantId,
-          locale: options.locale,
-          namespace,
-        });
-        if (loaded) {
-          cache.set(cacheKey, loaded);
-          bundle = loaded;
+      for (const locale of localeChain) {
+        const cacheKey = buildCacheKey(options.tenantId, locale, namespace);
+        let bundle = cache.get(cacheKey);
+        if (!bundle) {
+          const loaded = await options.tenantBundleLoader.load({
+            tenantId: options.tenantId,
+            locale,
+            namespace,
+          });
+          if (loaded) {
+            cache.set(cacheKey, loaded);
+            bundle = loaded;
+          }
         }
+        if (bundle) resolvedBundles.push(bundle);
       }
-      if (bundle) resolvedBundles.push(bundle);
     }
+  }
+
+  const machineTranslationEnabled = shouldEnableMachineTranslation(options.machineTranslation);
+  if (machineTranslationEnabled && options.machineTranslation) {
+    await prefillMissingMessagesWithMachineTranslation(
+      resolvedBundles,
+      options.namespaces,
+      localeChain,
+      options.machineTranslation.provider,
+    );
   }
 
   return createProviderFromBundles({
     locale: options.locale,
     bundles: resolvedBundles,
     fallbackLocale: options.fallbackLocale,
+    fallbackLocales: options.fallbackLocales,
     mode: options.mode ?? 'prod',
+    localeThemes: options.localeThemes,
   });
 }
 
@@ -209,17 +263,22 @@ export function createProviderFromBundles(options: {
   locale: string;
   bundles: TranslationBundle[];
   fallbackLocale?: string;
+  fallbackLocales?: string[];
   mode?: 'dev' | 'prod';
+  localeThemes?: LocaleThemeConfig;
 }): I18nProvider {
   const mode = options.mode ?? 'prod';
   const bundleIndex = indexBundles(options.bundles);
+  const localeChain = buildLocaleFallbackChain(options.locale, options.fallbackLocale, options.fallbackLocales);
+  const themeTokens = resolveLocaleThemeTokens(options.localeThemes, options.locale);
 
   return {
     locale: options.locale,
     direction: resolveDirection(options.locale),
+    themeTokens,
     t: (key, params, translateOptions) => {
       const { namespace, entryKey } = resolveKey(key, translateOptions);
-      const message = resolveMessage(bundleIndex, options.locale, namespace, entryKey, options.fallbackLocale);
+      const message = resolveMessage(bundleIndex, localeChain, namespace, entryKey);
       if (!message) {
         if (mode === 'dev') return key;
         return translateOptions?.defaultText ?? '';
@@ -228,7 +287,7 @@ export function createProviderFromBundles(options: {
     },
     has: (key, translateOptions) => {
       const { namespace, entryKey } = resolveKey(key, translateOptions);
-      return !!resolveMessage(bundleIndex, options.locale, namespace, entryKey, options.fallbackLocale);
+      return !!resolveMessage(bundleIndex, localeChain, namespace, entryKey);
     },
     formatNumber: (value, formatOptions) =>
       new Intl.NumberFormat(options.locale, formatOptions).format(value),
@@ -241,6 +300,7 @@ export function createFallbackI18nProvider(locale = 'en'): I18nProvider {
   return {
     locale,
     direction: resolveDirection(locale),
+    themeTokens: {},
     t: (key, _params, options) => options?.defaultText ?? key,
     has: () => true,
     formatNumber: (value, formatOptions) => new Intl.NumberFormat(locale, formatOptions).format(value),
@@ -299,6 +359,38 @@ export function createHttpBundleLoader(options: {
       if (!response.ok) return null;
       const messages = (await response.json()) as Record<string, string>;
       return { locale: params.locale, namespace: params.namespace, messages };
+    },
+  };
+}
+
+export function createDynamicImportBundleLoader(
+  options: DynamicImportBundleLoaderOptions,
+): BundleLoader {
+  return {
+    async load(params) {
+      try {
+        const loaded = await options.importer(params);
+        const normalized = normalizeDynamicBundlePayload(loaded);
+        if (!normalized) return null;
+        return {
+          locale: params.locale,
+          namespace: params.namespace,
+          messages: normalized.messages,
+        };
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+export function createDevelopmentMachineTranslator(
+  translateFn?: (params: { text: string; fromLocale: string; toLocale: string }) => Promise<string>,
+): MachineTranslationProvider {
+  return {
+    async translate(params) {
+      if (translateFn) return translateFn(params);
+      return `[MT ${params.toLocale}] ${params.text}`;
     },
   };
 }
@@ -421,15 +513,13 @@ function resolveKey(key: string, options?: TranslateOptions): { namespace: strin
 
 function resolveMessage(
   index: BundleIndex,
-  locale: string,
+  localeChain: string[],
   namespace: string,
   entryKey: string,
-  fallbackLocale?: string,
 ): string | undefined {
-  const local = lookupMessage(index, locale, namespace, entryKey);
-  if (local) return local;
-  if (fallbackLocale) {
-    return lookupMessage(index, fallbackLocale, namespace, entryKey);
+  for (const locale of localeChain) {
+    const local = lookupMessage(index, locale, namespace, entryKey);
+    if (local !== undefined) return local;
   }
   return undefined;
 }
@@ -444,6 +534,110 @@ function lookupMessage(index: BundleIndex, locale: string, namespace: string, en
     if (message !== undefined) return message;
   }
   return undefined;
+}
+
+function buildLocaleFallbackChain(
+  locale: string,
+  fallbackLocale?: string,
+  fallbackLocales?: string[],
+): string[] {
+  const chain: string[] = [];
+  const pushLocale = (value: string | undefined) => {
+    const normalized = normalizeLocale(value);
+    if (!normalized || chain.includes(normalized)) return;
+    chain.push(normalized);
+  };
+
+  pushLocale(locale);
+  const language = normalizeLocale(locale)?.split('-')[0];
+  if (language) pushLocale(language);
+  for (const fallback of fallbackLocales ?? []) pushLocale(fallback);
+  pushLocale(fallbackLocale);
+  if (chain.length === 0) pushLocale('en');
+  return chain;
+}
+
+function resolveLocaleThemeTokens(config: LocaleThemeConfig | undefined, locale: string): Record<string, string | number> {
+  if (!config) return {};
+  const base = { ...(config.base ?? {}) };
+  const localeChain = buildLocaleFallbackChain(locale, config.fallbackLocale, []);
+  for (const candidate of localeChain) {
+    const overrides = config.byLocale?.[candidate];
+    if (!overrides) continue;
+    Object.assign(base, overrides);
+  }
+  return base;
+}
+
+async function prefillMissingMessagesWithMachineTranslation(
+  bundles: TranslationBundle[],
+  namespaces: string[],
+  localeChain: string[],
+  provider: MachineTranslationProvider,
+): Promise<void> {
+  if (localeChain.length === 0) return;
+  const targetLocale = localeChain[0] ?? 'en';
+  const sourceLocale = localeChain.find((locale) => locale !== targetLocale) ?? 'en';
+
+  for (const namespace of namespaces) {
+    const targetBundle = ensureBundle(bundles, targetLocale, namespace);
+    const sourceBundle = findBundle(bundles, sourceLocale, namespace) ?? findBundle(bundles, 'en', namespace);
+    if (!sourceBundle) continue;
+    for (const [key, text] of Object.entries(sourceBundle.messages)) {
+      if (targetBundle.messages[key] !== undefined) continue;
+      targetBundle.messages[key] = await provider.translate({
+        text,
+        fromLocale: sourceBundle.locale,
+        toLocale: targetLocale,
+        namespace,
+        key,
+      });
+    }
+  }
+}
+
+function ensureBundle(bundles: TranslationBundle[], locale: string, namespace: string): TranslationBundle {
+  const existing = findBundle(bundles, locale, namespace);
+  if (existing) return existing;
+  const created: TranslationBundle = { locale, namespace, messages: {} };
+  bundles.push(created);
+  return created;
+}
+
+function findBundle(bundles: TranslationBundle[], locale: string, namespace: string): TranslationBundle | undefined {
+  return bundles.find((bundle) => bundle.locale === locale && bundle.namespace === namespace);
+}
+
+function shouldEnableMachineTranslation(options: MachineTranslationOptions | undefined): boolean {
+  if (!options?.enabled) return false;
+  const rawEnv = (typeof process !== 'undefined' ? process.env?.RULEFLOW_ENV : undefined) ?? '';
+  const normalizedEnv = rawEnv.trim().toLowerCase();
+  const currentEnv = (
+    normalizedEnv === 'production' ||
+    normalizedEnv === 'staging' ||
+    normalizedEnv === 'test' ||
+    normalizedEnv === 'development'
+      ? normalizedEnv
+      : ((typeof process !== 'undefined' ? process.env?.NODE_ENV : 'development') ?? 'development')
+  ) as 'development' | 'staging' | 'test' | 'production';
+  const allow = options.envs ?? ['development', 'staging'];
+  return allow.includes(currentEnv);
+}
+
+function normalizeDynamicBundlePayload(
+  loaded:
+    | TranslationBundle
+    | { messages: Record<string, string> }
+    | { default: TranslationBundle | { messages: Record<string, string> } },
+): TranslationBundle | { messages: Record<string, string> } | null {
+  if (!loaded || typeof loaded !== 'object') return null;
+  if ('default' in loaded && loaded.default && typeof loaded.default === 'object') {
+    return normalizeDynamicBundlePayload(loaded.default as TranslationBundle | { messages: Record<string, string> });
+  }
+  if ('messages' in loaded && loaded.messages && typeof loaded.messages === 'object') {
+    return loaded as TranslationBundle | { messages: Record<string, string> };
+  }
+  return null;
 }
 
 const formatterCache = new Map<string, IntlMessageFormat>();

@@ -11,7 +11,7 @@ import type {
 } from '@platform/schema';
 import type { I18nProvider } from '@platform/i18n';
 import { createFallbackI18nProvider } from '@platform/i18n';
-import { evaluateCondition } from '@platform/rules-engine';
+import { createMemoizedConditionEvaluator } from '@platform/rules-engine';
 
 export type UIEventName = 'onChange' | 'onClick' | 'onSubmit';
 
@@ -68,18 +68,38 @@ export interface RenderPageVueOptions {
   onDataChange?: (data: Record<string, JSONValue>) => void;
   onContextChange?: (context: ExecutionContext) => void;
   onChange?: (bindingPath: string, value: JSONValue, componentId: string) => void;
+  onRenderMetrics?: (input: { durationMs: number; componentCount: number }) => void;
 }
 
 export interface RenderPageVueResult {
   html: string;
   data: Record<string, JSONValue>;
   context: ExecutionContext;
+  dispatcher: RendererEventDispatcher;
   dispatchEvent: (input: {
     event: UIEventName;
     componentId: string;
     value?: JSONValue;
     bindingPath?: string;
   }) => void;
+}
+
+export interface RendererEventDispatcher {
+  dispatch: (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => void;
+  change: (componentId: string, value: JSONValue, bindingPath?: string) => void;
+  click: (componentId: string) => void;
+  submit: (componentId: string) => void;
+}
+
+export interface VueHydrationSession {
+  dispose: () => void;
+  rerender: () => void;
+  dispatcher: RendererEventDispatcher;
 }
 
 type Runtime = {
@@ -158,36 +178,44 @@ export function RenderPageVue(options: RenderPageVueOptions): RenderPageVueResul
     target: resolveTarget(options.target),
   };
   runtime.html = renderRuntime(runtime);
+  const dispatchCore = (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => {
+    const component = runtime.componentMap.get(input.componentId);
+    if (!component) return;
+    if (input.event === 'onChange') {
+      const bindingPath = input.bindingPath ?? component.bindings?.data?.value ?? 'data.value';
+      const parsed = parseBindingPath(bindingPath, 'data');
+      const value = input.value ?? null;
+      if (parsed) {
+        if (parsed.target === 'data') runtime.data = setPath(runtime.data, parsed.path, value);
+        else runtime.context = setPath(runtime.context as unknown as Record<string, JSONValue>, parsed.path, value) as unknown as ExecutionContext;
+      }
+      runtime.options.onChange?.(bindingPath, value, component.id);
+      runtime.options.onDataChange?.(runtime.data);
+      runtime.options.onContextChange?.(runtime.context);
+      runtime.options.onAdapterEvent?.('onChange', { componentId: component.id, value, bindingPath }, component);
+    } else {
+      runtime.options.onAdapterEvent?.(input.event, { componentId: component.id }, component);
+    }
+    const actions = component.events?.[input.event];
+    if (actions && actions.length > 0) runtime.options.onEvent?.(input.event, actions, component);
+    runtime.html = renderRuntime(runtime);
+    response.html = runtime.html;
+    response.data = runtime.data;
+    response.context = runtime.context;
+  };
+  const dispatcher = createVueEventDispatcher(dispatchCore);
 
   const response: RenderPageVueResult = {
     html: runtime.html,
     data: runtime.data,
     context: runtime.context,
-    dispatchEvent: (input) => {
-      const component = runtime.componentMap.get(input.componentId);
-      if (!component) return;
-      if (input.event === 'onChange') {
-        const bindingPath = input.bindingPath ?? component.bindings?.data?.value ?? 'data.value';
-        const parsed = parseBindingPath(bindingPath, 'data');
-        const value = input.value ?? null;
-        if (parsed) {
-          if (parsed.target === 'data') runtime.data = setPath(runtime.data, parsed.path, value);
-          else runtime.context = setPath(runtime.context as unknown as Record<string, JSONValue>, parsed.path, value) as unknown as ExecutionContext;
-        }
-        runtime.options.onChange?.(bindingPath, value, component.id);
-        runtime.options.onDataChange?.(runtime.data);
-        runtime.options.onContextChange?.(runtime.context);
-        runtime.options.onAdapterEvent?.('onChange', { componentId: component.id, value, bindingPath }, component);
-      } else {
-        runtime.options.onAdapterEvent?.(input.event, { componentId: component.id }, component);
-      }
-      const actions = component.events?.[input.event];
-      if (actions && actions.length > 0) runtime.options.onEvent?.(input.event, actions, component);
-      runtime.html = renderRuntime(runtime);
-      response.html = runtime.html;
-      response.data = runtime.data;
-      response.context = runtime.context;
-    },
+    dispatcher,
+    dispatchEvent: dispatchCore,
   };
   return response;
 }
@@ -198,6 +226,7 @@ export interface VueRenderOptions {
   context?: ExecutionContext;
   i18n?: I18nProvider;
   target?: HTMLElement | string;
+  onRenderMetrics?: (input: { durationMs: number; componentCount: number }) => void;
 }
 
 export function renderVue(options: VueRenderOptions): string {
@@ -207,20 +236,23 @@ export function renderVue(options: VueRenderOptions): string {
     context: options.context ?? defaultContext(),
     i18n: options.i18n,
     target: options.target,
+    onRenderMetrics: options.onRenderMetrics,
   });
   return result.html;
 }
 
 function renderRuntime(runtime: Runtime): string {
+  const started = Date.now();
+  const memoizedEvaluate = createMemoizedConditionEvaluator({ cacheSize: 512 });
   const renderComponent = (componentId: string, override?: Pick<UIGridItem, 'props' | 'bindings' | 'rules'>): string => {
     const source = runtime.componentMap.get(componentId);
     if (!source) return `<div data-missing-component="true">Missing component: ${escapeHtml(componentId)}</div>`;
     const component = mergeComponent(source, override);
     assertAccessibility(component);
-    const applied = applySetValueRule(component, runtime.data, runtime.context);
+    const applied = applySetValueRule(component, runtime.data, runtime.context, memoizedEvaluate);
     runtime.data = applied.data;
     runtime.context = applied.context;
-    const ruleState = resolveRuleState(component, runtime.context, runtime.data);
+    const ruleState = resolveRuleState(component, runtime.context, runtime.data, memoizedEvaluate);
     if (!ruleState.visible) return '';
     const adapter = runtime.adapterRegistry.resolve(component.adapterHint);
     if (!adapter) return `<div data-unsupported="true">Unsupported adapter: ${escapeHtml(component.adapterHint)}</div>`;
@@ -251,14 +283,19 @@ function renderRuntime(runtime: Runtime): string {
     }
     const components = node.componentIds?.map((id) => renderComponent(id)).join('') ?? '';
     const children = node.children?.map((child) => renderLayout(child)).join('') ?? '';
-    if (node.type === 'grid') return `<div data-layout="grid">${components}${children}</div>`;
-    if (node.type === 'stack') return `<div data-layout="stack">${components}${children}</div>`;
+    if (node.type === 'grid') return `<div data-layout="grid" style="${buildLayoutStyle(node, runtime.i18n.direction)}">${components}${children}</div>`;
+    if (node.type === 'stack') return `<div data-layout="stack" style="${buildLayoutStyle(node, runtime.i18n.direction)}">${components}${children}</div>`;
     if (node.type === 'tabs') return `<div data-layout="tabs">${node.tabs.map((tab) => `<section><h3>${escapeHtml(tab.label)}</h3>${renderLayout(tab.child)}</section>`).join('')}</div>`;
-    return `<section data-layout="section">${node.title ? `<h2>${escapeHtml(node.title)}</h2>` : ''}${components}${children}</section>`;
+    return `<section data-layout="section" style="${buildLayoutStyle(node, runtime.i18n.direction)}">${node.title ? `<h2>${escapeHtml(node.title)}</h2>` : ''}${components}${children}</section>`;
   };
 
-  const html = `<div data-ui-page="${escapeHtml(runtime.options.uiSchema.pageId)}" dir="${runtime.i18n.direction}">${renderLayout(runtime.options.uiSchema.layout)}</div>`;
+  const themeStyle = buildLocaleThemeStyle(runtime.i18n.themeTokens);
+  const html = `<div data-ui-page="${escapeHtml(runtime.options.uiSchema.pageId)}" dir="${runtime.i18n.direction}"${themeStyle ? ` style="${themeStyle}"` : ''}>${renderLayout(runtime.options.uiSchema.layout)}</div>`;
   if (runtime.target) runtime.target.innerHTML = html;
+  runtime.options.onRenderMetrics?.({
+    durationMs: Date.now() - started,
+    componentCount: runtime.options.uiSchema.components.length,
+  });
   return html;
 }
 
@@ -302,28 +339,43 @@ function ensureDefaultAdapters(adapterRegistry: VueAdapterRegistry): void {
   registerAdapter('aggrid.', (component, ctx) => adapterRegistry.resolve('platform.')!({ ...component, adapterHint: 'platform.table' }, ctx), adapterRegistry);
 }
 
-function resolveRuleState(component: UIComponent, context: ExecutionContext, data: Record<string, JSONValue>) {
+function resolveRuleState(
+  component: UIComponent,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+  evaluate: (condition: RuleCondition, context: ExecutionContext, data: Record<string, JSONValue>) => boolean,
+) {
   const rules = component.rules;
   if (!rules) return { visible: true, disabled: false, required: false };
   return {
-    visible: rules.visibleWhen ? safeEvaluate(rules.visibleWhen, context, data) : true,
-    disabled: rules.disabledWhen ? safeEvaluate(rules.disabledWhen, context, data) : false,
-    required: rules.requiredWhen ? safeEvaluate(rules.requiredWhen, context, data) : false,
+    visible: rules.visibleWhen ? safeEvaluate(rules.visibleWhen, context, data, evaluate) : true,
+    disabled: rules.disabledWhen ? safeEvaluate(rules.disabledWhen, context, data, evaluate) : false,
+    required: rules.requiredWhen ? safeEvaluate(rules.requiredWhen, context, data, evaluate) : false,
   };
 }
 
-function applySetValueRule(component: UIComponent, data: Record<string, JSONValue>, context: ExecutionContext) {
+function applySetValueRule(
+  component: UIComponent,
+  data: Record<string, JSONValue>,
+  context: ExecutionContext,
+  evaluate: (condition: RuleCondition, context: ExecutionContext, data: Record<string, JSONValue>) => boolean,
+) {
   const rule = component.rules?.setValueWhen;
-  if (!rule || !safeEvaluate(rule.when, context, data)) return { data, context };
+  if (!rule || !safeEvaluate(rule.when, context, data, evaluate)) return { data, context };
   const parsed = parseBindingPath(rule.path ?? component.bindings?.data?.value ?? `data.${component.id}`, 'data');
   if (!parsed) return { data, context };
   if (parsed.target === 'context') return { data, context: setPath(context as unknown as Record<string, JSONValue>, parsed.path, rule.value) as unknown as ExecutionContext };
   return { data: setPath(data, parsed.path, rule.value), context };
 }
 
-function safeEvaluate(condition: RuleCondition, context: ExecutionContext, data: Record<string, JSONValue>) {
+function safeEvaluate(
+  condition: RuleCondition,
+  context: ExecutionContext,
+  data: Record<string, JSONValue>,
+  evaluate: (condition: RuleCondition, context: ExecutionContext, data: Record<string, JSONValue>) => boolean,
+) {
   try {
-    return evaluateCondition(condition, context, data);
+    return evaluate(condition, context, data);
   } catch {
     return false;
   }
@@ -422,6 +474,138 @@ function eventAttrs(event: UIEventName, componentId: string, bindingPath?: strin
   return `data-rf-event="${event}" data-rf-component-id="${escapeHtml(componentId)}"${bindingPath ? ` data-rf-binding-path="${escapeHtml(bindingPath)}"` : ''}`;
 }
 
+export function createVueEventDispatcher(
+  dispatchEvent: (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => void,
+): RendererEventDispatcher {
+  return {
+    dispatch: dispatchEvent,
+    change: (componentId, value, bindingPath) =>
+      dispatchEvent({ event: 'onChange', componentId, value, bindingPath }),
+    click: (componentId) => dispatchEvent({ event: 'onClick', componentId }),
+    submit: (componentId) => dispatchEvent({ event: 'onSubmit', componentId }),
+  };
+}
+
+export function bindVueDomListeners(options: {
+  target: HTMLElement;
+  dispatcher: RendererEventDispatcher;
+  rerender: () => void;
+}): () => void {
+  const handler = (event: Event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const source = target.closest('[data-rf-event]');
+    if (!source) return;
+    const eventName = source.getAttribute('data-rf-event') as UIEventName | null;
+    const componentId = source.getAttribute('data-rf-component-id');
+    if (!eventName || !componentId) return;
+    if (eventName === 'onSubmit') event.preventDefault();
+    if (eventName === 'onChange') {
+      const bindingPath = source.getAttribute('data-rf-binding-path') ?? undefined;
+      const value = extractDomValue(target);
+      options.dispatcher.change(componentId, value, bindingPath);
+    } else if (eventName === 'onClick') {
+      options.dispatcher.click(componentId);
+    } else if (eventName === 'onSubmit') {
+      options.dispatcher.submit(componentId);
+    }
+    options.rerender();
+  };
+
+  options.target.addEventListener('change', handler);
+  options.target.addEventListener('click', handler);
+  options.target.addEventListener('submit', handler);
+  return () => {
+    options.target.removeEventListener('change', handler);
+    options.target.removeEventListener('click', handler);
+    options.target.removeEventListener('submit', handler);
+  };
+}
+
+export function hydrateVue(options: {
+  result: RenderPageVueResult;
+  target: HTMLElement | string;
+}): VueHydrationSession {
+  const target = resolveTarget(options.target);
+  if (!target) throw new Error('Hydration target could not be resolved.');
+  target.innerHTML = options.result.html;
+  const rerender = () => {
+    target.innerHTML = options.result.html;
+  };
+  const dispose = bindVueDomListeners({
+    target,
+    dispatcher: options.result.dispatcher,
+    rerender,
+  });
+  return { dispose, rerender, dispatcher: options.result.dispatcher };
+}
+
+function extractDomValue(target: Element): JSONValue {
+  if (target instanceof HTMLInputElement) {
+    if (target.type === 'checkbox') return target.checked;
+    if (target.type === 'number') {
+      const parsed = Number(target.value);
+      return Number.isFinite(parsed) ? parsed : target.value;
+    }
+    return target.value;
+  }
+  if (target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+    return target.value;
+  }
+  return null;
+}
+
+function buildLayoutStyle(node: LayoutNode, localeDirection: 'ltr' | 'rtl' = 'ltr'): string {
+  const props =
+    node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+      ? (node.props as Record<string, JSONValue>)
+      : {};
+  const tokens: string[] = [];
+  const layoutMode = typeof props.layoutMode === 'string' ? props.layoutMode : undefined;
+  const gap = asNumber(props.gap);
+  const direction = typeof props.direction === 'string' ? props.direction : undefined;
+  const wrap = typeof props.wrap === 'boolean' ? props.wrap : undefined;
+
+  if (node.type === 'stack' || layoutMode === 'flex' || layoutMode === 'row' || layoutMode === 'column') {
+    const flexDirection =
+      layoutMode === 'row' || layoutMode === 'column'
+        ? layoutMode
+        : direction ?? 'column';
+    const normalizedDirection =
+      localeDirection === 'rtl' && flexDirection === 'row' ? 'row-reverse' : flexDirection;
+    tokens.push('display:flex');
+    tokens.push(`flex-direction:${normalizedDirection}`);
+    tokens.push(`flex-wrap:${wrap ? 'wrap' : 'nowrap'}`);
+  } else if (node.type === 'grid' || layoutMode === 'nested-grid') {
+    tokens.push('display:grid');
+    const nodeColumns = 'columns' in node && typeof node.columns === 'number' ? node.columns : undefined;
+    const columns = asNumber(props.columns) ?? nodeColumns ?? 1;
+    const minWidth = asNumber(props.minColumnWidth);
+    if (minWidth && minWidth > 0) {
+      tokens.push(`grid-template-columns:repeat(auto-fit,minmax(${minWidth}px,1fr))`);
+    } else {
+      tokens.push(`grid-template-columns:repeat(${Math.max(1, columns)},minmax(0,1fr))`);
+    }
+  }
+
+  const responsiveRows = asNumber(props.responsiveRows);
+  if (responsiveRows && responsiveRows > 0) {
+    tokens.push(`grid-template-rows:repeat(${responsiveRows},minmax(0,auto))`);
+  }
+  if (localeDirection === 'rtl') tokens.push('direction:rtl');
+  if (gap && gap >= 0) tokens.push(`gap:${gap}px`);
+  return tokens.join(';');
+}
+
+function asNumber(value: JSONValue | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function resolveTarget(target: HTMLElement | string | undefined): HTMLElement | null {
   if (!target) return null;
   if (typeof target === 'string') {
@@ -455,6 +639,14 @@ function defaultContext(): ExecutionContext {
     permissions: ['read'],
     featureFlags: {},
   };
+}
+
+function buildLocaleThemeStyle(tokens: Record<string, string | number>): string {
+  const entries = Object.entries(tokens);
+  if (entries.length === 0) return '';
+  return entries
+    .map(([key, value]) => `--rf-locale-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}:${escapeHtml(String(value))}`)
+    .join(';');
 }
 
 function deepClone<T>(value: T): T {

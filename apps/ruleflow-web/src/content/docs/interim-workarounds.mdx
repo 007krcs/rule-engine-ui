@@ -1,0 +1,120 @@
+# Interim Workarounds
+
+This page documents approved interim patterns while upcoming platform capabilities are still under active development.
+
+## 1) Angular/Vue HTML Renderer + Host Hydration
+
+Current Angular/Vue renderers generate HTML and expose hydration helpers. Use this flow:
+
+1. Render schema to HTML.
+2. Inject HTML into host target.
+3. Attach framework-specific hydration listeners.
+4. Use returned dispatcher for host-driven events.
+
+### Angular
+
+```ts
+import { RenderPageAngular, hydrateAngular } from '@platform/angular-renderer';
+
+const result = RenderPageAngular({ uiSchema, data, context, target: '#root' });
+const session = hydrateAngular({ result, target: '#root' });
+
+// Optional host-driven dispatch
+result.dispatcher.click('submitButton');
+
+// Cleanup on unmount
+session.dispose();
+```
+
+### Vue
+
+```ts
+import { RenderPageVue, hydrateVue } from '@platform/vue-renderer';
+
+const result = RenderPageVue({ uiSchema, data, context, target: '#app' });
+const session = hydrateVue({ result, target: '#app' });
+
+result.dispatcher.change('emailInput', 'alice@contoso.com', 'data.user.email');
+session.dispose();
+```
+
+## 2) Date Arithmetic in Host (Until Native Date DSL Expansion)
+
+If a rule depends on `plusDays` or advanced locale parsing, compute in host and pass normalized values into `data` or `context`.
+
+```ts
+function plusDaysIso(baseIso: string, days: number): string {
+  const d = new Date(baseIso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const data = {
+  ...runtimeData,
+  dueDate: plusDaysIso(runtimeData.createdDate, 7),
+};
+```
+
+Best practices:
+- Store canonical dates as `YYYY-MM-DD` or full ISO UTC.
+- Keep locale parsing in host boundary code, not in rules.
+- Persist computed values when audits/replay need deterministic results.
+
+## 3) GraphQL Through REST Wrapper (Compatibility Pattern)
+
+For environments that currently standardize on REST orchestrator mappings:
+
+1. Build a thin backend endpoint (`/api/graphql-proxy/orders`).
+2. Endpoint executes GraphQL query/mutation server-side.
+3. Return REST-shaped JSON to RuleFlow API mappings.
+
+```ts
+// host backend route
+export async function POST(req: Request) {
+  const { variables } = await req.json();
+  const gqlRes = await fetch(process.env.GQL_ENDPOINT!, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'query GetOrders($tenantId: ID!) { orders(tenantId: $tenantId) { id status } }',
+      variables,
+    }),
+  });
+  const payload = await gqlRes.json();
+  return Response.json({ items: payload.data?.orders ?? [] });
+}
+```
+
+Then keep RuleFlow mapping type as REST and point `endpoint` to this wrapper.
+
+## 4) Custom Layout via `adapterHint`
+
+When built-in layout primitives are insufficient, register a custom adapter namespace and reference it with `adapterHint`.
+
+```ts
+import { registerAdapter } from '@platform/react-renderer';
+
+registerAdapter('company.layout.', (component) => {
+  if (component.adapterHint === 'company.layout.responsiveRow') {
+    return <div className="companyResponsiveRow">{/* custom layout */}</div>;
+  }
+  return null;
+});
+```
+
+Schema example:
+
+```json
+{
+  "id": "customerSummaryLayout",
+  "type": "layout.custom",
+  "adapterHint": "company.layout.responsiveRow",
+  "props": { "columns": 3, "collapseAt": 960 }
+}
+```
+
+This allows product teams to bypass temporary layout limitations without forking core runtime.
+
+## 5) Planning Note
+
+Track implementation status in the public roadmap at `/system/roadmap`.

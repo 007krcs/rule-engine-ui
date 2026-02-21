@@ -667,6 +667,7 @@ export class PostgresTenantRepository {
     active: boolean;
     packageId?: string;
     versionId?: string;
+    componentId?: string;
     rulesetKey?: string;
     reason?: string;
   }): Promise<RepoKillSwitch> {
@@ -685,7 +686,7 @@ export class PostgresTenantRepository {
           input.scope,
           input.packageId ?? null,
           input.versionId ?? null,
-          input.rulesetKey ?? null,
+          input.rulesetKey ?? input.componentId ?? null,
           input.active,
           input.reason ?? null,
           session.userName,
@@ -713,7 +714,8 @@ export class PostgresTenantRepository {
           stage: 'kill_switch.upsert',
           packageId: input.packageId,
           versionId: input.versionId,
-          rulesetKey: input.rulesetKey,
+          componentId: input.componentId,
+          rulesetKey: input.rulesetKey ?? input.componentId,
           active: input.active,
         },
       });
@@ -721,7 +723,12 @@ export class PostgresTenantRepository {
     });
   }
 
-  async isVersionKilled(input: { tenantId: string; versionId: string; packageId?: string }): Promise<boolean> {
+  async isVersionKilled(input: {
+    tenantId: string;
+    versionId: string;
+    packageId?: string;
+    componentId?: string;
+  }): Promise<boolean> {
     return await this.withTenantTransaction(input.tenantId, async (client) => {
       const version = await this.loadVersionOrNull(client, input.tenantId, input.versionId);
       if (version?.isKilled) return true;
@@ -731,9 +738,14 @@ export class PostgresTenantRepository {
           FROM kill_switches
           WHERE tenant_id = $1
             AND active = TRUE
-            AND (scope = 'TENANT' OR (scope = 'VERSION' AND version_id = $2) OR (scope = 'RULESET' AND package_id = $3))
+            AND (
+              scope = 'TENANT'
+              OR (scope = 'VERSION' AND version_id = $2)
+              OR (scope = 'RULESET' AND package_id = $3)
+              OR (scope = 'COMPONENT' AND ruleset_key = $4)
+            )
         `,
-        [input.tenantId, input.versionId, input.packageId ?? null],
+        [input.tenantId, input.versionId, input.packageId ?? null, input.componentId ?? null],
       );
       return Number(result.rows[0]?.count ?? '0') > 0;
     });
@@ -1300,6 +1312,7 @@ function mapKillSwitch(row: KillSwitchRow): RepoKillSwitch {
     scope: row.scope,
     packageId: row.package_id ?? undefined,
     versionId: row.version_id ?? undefined,
+    componentId: row.scope === 'COMPONENT' ? row.ruleset_key ?? undefined : undefined,
     rulesetKey: row.ruleset_key ?? undefined,
     active: row.active,
     reason: row.reason ?? undefined,

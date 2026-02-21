@@ -4,20 +4,40 @@ import styles from './roadmap.module.css';
 
 const planned = [
   {
-    title: 'Flow + Rules Editors',
-    detail: 'Extend Builder to edit FlowSchema and RuleSet with field-level validation and trace replay.',
+    title: 'Angular/Vue Hydration Parity',
+    detail:
+      'Harden hydration APIs and close parity gaps with React rendering lifecycle/event behavior. Interim: use HTML render + hydrateAngular/hydrateVue.',
+    horizon: 'Now',
   },
   {
-    title: 'Multi-Page UI Schemas',
-    detail: 'Support editing multiple UISchema pages and wiring them to flow state uiPageId values.',
+    title: 'Visual Flow Builder',
+    detail:
+      'Ship drag-and-drop flow authoring with JSON synchronization and deterministic transition editing. Interim: edit flow JSON in Builder Flow screen.',
+    horizon: 'Now',
   },
   {
-    title: 'Role-Based Guardrails',
-    detail: 'Enforce RBAC in the UI (Author/Approver/Publisher) and block actions with policy explanations.',
+    title: 'Date Parsing and Arithmetic Expansion',
+    detail:
+      'Add richer locale-aware date parsing and native arithmetic transforms. Interim: compute plusDays/date transforms in host and pass normalized ISO values.',
+    horizon: 'Next',
   },
   {
-    title: 'Semantic Diffs',
-    detail: 'Upgrade diff viewer to semantic diffs for UI/flow/rules instead of raw deep JSON diffs.',
+    title: 'GraphQL Orchestration Enhancements',
+    detail:
+      'Improve first-class GraphQL orchestration controls and mapping UX. Interim: wrap GraphQL calls in REST endpoints consumed by current API mappings.',
+    horizon: 'Next',
+  },
+  {
+    title: 'Layout Engine Expansion',
+    detail:
+      'Extend native layouts for deeper nested grids and responsive row/column composition. Interim: use custom layout components registered via adapterHint.',
+    horizon: 'Next',
+  },
+  {
+    title: 'Public Roadmap + Release Signals',
+    detail:
+      'Keep this page updated with status, expected sequencing, and migration notes so teams can plan CI/CD rollouts.',
+    horizon: 'Ongoing',
   },
 ];
 
@@ -54,6 +74,7 @@ export default function RoadmapPage() {
           {planned.map((item) => (
             <div key={item.title} className={styles.plannedItem}>
               <p className={styles.plannedTitle}>{item.title}</p>
+              <p className={styles.plannedHorizon}>{item.horizon}</p>
               <p className={styles.plannedDetail}>{item.detail}</p>
             </div>
           ))}

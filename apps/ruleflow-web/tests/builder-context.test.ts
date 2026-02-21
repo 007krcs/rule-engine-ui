@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BuilderState } from '../src/context/BuilderContext';
 import { builderReducer, builderInitialState } from '../src/context/BuilderContext';
-import { generateBundleFromState } from '../src/lib/generateBundle';
+import { generateBundleFromState, generateChunkedBundleFromState, loadBundleFromChunks } from '../src/lib/generateBundle';
 
 function createScreen(id: string) {
   return {
@@ -63,5 +63,19 @@ describe('BuilderContext reducer', () => {
     expect(bundle.uiSchemas.landing).toBeTruthy();
     expect(bundle.flowSchema.states.landing).toBeTruthy();
     expect(bundle.rules.rules).toHaveLength(0);
+  });
+
+  it('serializes chunked bundle and restores it lazily', async () => {
+    let state = freshState();
+    state = builderReducer(state, { type: 'ADD_SCREEN', id: 'landing', schema: createScreen('landing') });
+    const chunked = generateChunkedBundleFromState(state, { minBytes: 1, chunkIdPrefix: 'test-chunk' });
+    expect(chunked.manifest.chunks.uiSchemas).toBe('test-chunk:uiSchemas');
+
+    const restored = await loadBundleFromChunks({
+      manifest: chunked.manifest,
+      chunkStore: chunked.chunks,
+    });
+    expect(restored.uiSchemas.landing).toBeTruthy();
+    expect(restored.metadata.configId).toBe(state.appId);
   });
 });

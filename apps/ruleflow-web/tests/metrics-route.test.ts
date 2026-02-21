@@ -23,12 +23,20 @@ describe('metrics route exposition', () => {
         "# TYPE flow_transitions_count counter",
         "# HELP api_call_count Total API calls",
         "# TYPE api_call_count counter",
+        "# HELP bundle_load_count Total bundle load operations",
+        "# TYPE bundle_load_count counter",
         "# HELP error_count Total errors",
         "# TYPE error_count counter",
         "# HELP rule_eval_latency_ms Histogram of rule evaluation latency in milliseconds",
         "# TYPE rule_eval_latency_ms histogram",
         "# HELP api_latency_ms Histogram of API latency in milliseconds",
         "# TYPE api_latency_ms histogram",
+        "# HELP bundle_load_latency_ms Histogram of bundle load latency in milliseconds",
+        "# TYPE bundle_load_latency_ms histogram",
+        "# HELP bundle_chunk_load_latency_ms Histogram of bundle chunk load latency in milliseconds",
+        "# TYPE bundle_chunk_load_latency_ms histogram",
+        "# HELP ui_render_latency_ms Histogram of UI render latency in milliseconds",
+        "# TYPE ui_render_latency_ms histogram",
       ]
     `);
   });

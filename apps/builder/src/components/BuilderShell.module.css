@@ -37,6 +37,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.5rem;
+  align-items: flex-end;
 }
 
 .modeTabs {
@@ -337,8 +338,21 @@
   font-size: 0.82rem;
 }
 
+.jsonField {
+  border: 1px solid #cad8ea;
+  border-radius: 0.42rem;
+  background: #ffffff;
+  color: #112b46;
+  padding: 0.43rem 0.5rem;
+  font-size: 0.78rem;
+  min-height: 5.2rem;
+  resize: vertical;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
 .field > input:focus-visible,
 .field > select:focus-visible,
+.jsonField:focus-visible,
 .insertButton:focus-visible,
 .deleteButton:focus-visible,
 .screenButton:focus-visible,

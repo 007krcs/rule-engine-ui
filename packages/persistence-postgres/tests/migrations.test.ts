@@ -87,4 +87,9 @@ describe('postgres migrations', () => {
     expect(migration).toContain("jsonb_set(bundle, '{activeUiPageId}'");
     expect(migration).toContain('DROP FUNCTION app_normalize_ui_pages_bundle(JSONB)');
   });
+
+  it('extends kill scope enum with COMPONENT targeting', async () => {
+    const migration = await readMigration('0004_kill_scope_component.sql');
+    expect(migration).toContain("ALTER TYPE kill_scope ADD VALUE 'COMPONENT'");
+  });
 });

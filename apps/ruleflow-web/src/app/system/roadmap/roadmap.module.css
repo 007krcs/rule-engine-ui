@@ -37,6 +37,15 @@
   font-weight: 850;
 }
 
+.plannedHorizon {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rf-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .plannedDetail {
   margin: 6px 0 0;
   font-size: 14px;

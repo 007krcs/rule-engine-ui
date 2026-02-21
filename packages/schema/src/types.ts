@@ -235,17 +235,37 @@ export interface FlowSchema {
   states: Record<string, FlowState>;
 }
 
+export interface FlowTransitionHistoryCondition {
+  hasVisitedAll?: string[];
+  hasVisitedAny?: string[];
+  notVisited?: string[];
+}
+
+export interface FlowForkConfig {
+  id?: string;
+  branches: string[];
+  joinType?: 'and' | 'or';
+  joinState: string;
+}
+
 export interface FlowState {
   uiPageId: string;
   on: Record<string, FlowTransition>;
+  transitions?: FlowTransition[];
 }
 
 export interface FlowTransition {
   target: string;
+  onEvent?: string;
   guard?: RuleCondition;
   condition?: string | RuleCondition;
   actions?: FlowAction[];
   apiId?: string;
+  priority?: number;
+  weight?: number;
+  delayMs?: number;
+  history?: FlowTransitionHistoryCondition;
+  fork?: FlowForkConfig;
 }
 
 export type FlowAction = 'evaluateRules' | 'callApi' | 'setContext' | 'navigate';
@@ -302,6 +322,10 @@ export type RuleOperator =
   | 'gte'
   | 'lt'
   | 'lte'
+  | 'before'
+  | 'after'
+  | 'on'
+  | 'plusDays'
   | 'dateEq'
   | 'dateBefore'
   | 'dateAfter'

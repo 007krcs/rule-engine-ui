@@ -155,6 +155,22 @@
   margin-top: 0.25rem;
 }
 
+.dragButton {
+  border: 1px solid #c3d3e6;
+  border-radius: 0.4rem;
+  background: #f7fbff;
+  color: #1a456f;
+  padding: 0.3rem 0.42rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: move;
+}
+
+.dragButton:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 2px;
+}
+
 .handleButton {
   border: 1px solid #c3d3e6;
   border-radius: 0.4rem;

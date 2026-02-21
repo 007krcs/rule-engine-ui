@@ -39,6 +39,7 @@ describe('policy engine', () => {
     delete process.env.OPA_URL;
     delete process.env.OPA_PACKAGE;
     delete process.env.OPA_TIMEOUT_MS;
+    delete process.env.RULEFLOW_OPA_MODE;
     vi.unstubAllGlobals();
     clearRegisteredPoliciesForTests();
   });
@@ -47,6 +48,7 @@ describe('policy engine', () => {
     delete process.env.OPA_URL;
     delete process.env.OPA_PACKAGE;
     delete process.env.OPA_TIMEOUT_MS;
+    delete process.env.RULEFLOW_OPA_MODE;
     vi.unstubAllGlobals();
     clearRegisteredPoliciesForTests();
   });
@@ -100,6 +102,7 @@ describe('policy engine', () => {
   it('merges OPA deny decisions when configured', async () => {
     process.env.OPA_URL = 'http://opa.local';
     process.env.OPA_PACKAGE = 'ruleflow/allow';
+    process.env.RULEFLOW_OPA_MODE = 'enforce';
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -131,6 +134,7 @@ describe('policy engine', () => {
 
   it('returns OPA connectivity errors when backend is unreachable', async () => {
     process.env.OPA_URL = 'http://opa.local';
+    process.env.RULEFLOW_OPA_MODE = 'enforce';
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -146,6 +150,26 @@ describe('policy engine', () => {
     );
 
     expect(errors.some((error) => error.code === 'opa_unreachable')).toBe(true);
+  });
+
+  it('runs OPA in shadow mode by default and does not block', async () => {
+    process.env.OPA_URL = 'http://opa.local';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ result: { allow: false, reason: 'shadow deny' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    const errors = await evaluatePolicies(
+      policyInput({
+        stage: 'save',
+        nextBundle: minimalBundle(),
+      }),
+    );
+    expect(errors).toEqual([]);
   });
 
   it('returns explicit RBAC policy error when role is missing', () => {

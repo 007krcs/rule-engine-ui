@@ -32,7 +32,7 @@ const CONFIG_STATUSES = new Set<ConfigStatus>([
 const APPROVAL_STATUSES = new Set<ApprovalStatus>(['PENDING', 'APPROVED', 'CHANGES_REQUESTED']);
 const RISK_LEVELS = new Set<RiskLevel>(['Low', 'Medium', 'High']);
 const AUDIT_SEVERITIES = new Set<AuditSeverity>(['info', 'warning', 'error']);
-const KILL_SCOPES = new Set<KillScope>(['TENANT', 'RULESET', 'VERSION']);
+const KILL_SCOPES = new Set<KillScope>(['TENANT', 'RULESET', 'VERSION', 'COMPONENT']);
 
 export function normalizeGitOpsBundleForPostgres(
   bundle: GitOpsBundle,
@@ -105,7 +105,8 @@ export function normalizeGitOpsBundleForPostgres(
     scope: toKillScope(killSwitch.scope),
     packageId: optionalString(killSwitch.packageId),
     versionId: optionalString(killSwitch.versionId),
-    rulesetKey: optionalString(killSwitch.rulesetKey),
+    componentId: optionalString(killSwitch.componentId),
+    rulesetKey: optionalString(killSwitch.rulesetKey ?? killSwitch.componentId),
     active: Boolean(killSwitch.active),
     reason: optionalString(killSwitch.reason),
     updatedBy: optionalString(killSwitch.updatedBy),
@@ -213,6 +214,7 @@ export function buildGitOpsBundlePayloadFromPostgres(payload: GitOpsPayload): Gi
       scope: killSwitch.scope,
       packageId: killSwitch.packageId,
       versionId: killSwitch.versionId,
+      componentId: killSwitch.componentId,
       rulesetKey: killSwitch.rulesetKey,
       active: killSwitch.active,
       reason: killSwitch.reason,

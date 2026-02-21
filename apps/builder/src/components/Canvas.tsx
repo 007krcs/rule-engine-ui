@@ -1,4 +1,4 @@
-import type { DragEvent, KeyboardEvent, ReactNode } from 'react';
+import React, { type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useState } from 'react';
 import type { LayoutColumnChildNode, LayoutComponentNode, RowNode, SectionNode, UISchema } from '@platform/schema';
 import { ColumnContainer } from './layout/ColumnContainer';
@@ -15,6 +15,8 @@ import styles from './Canvas.module.css';
 export interface CanvasProps {
   schema: UISchema;
   editMode?: boolean;
+  previewBreakpoint?: 'desktop' | 'tablet' | 'mobile';
+  dataMode?: 'mock' | 'real';
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onDropPaletteItem: (target: DropTarget, item: PaletteDragItem) => void;
@@ -23,6 +25,8 @@ export interface CanvasProps {
 export function Canvas({
   schema,
   editMode = true,
+  previewBreakpoint = 'desktop',
+  dataMode = 'mock',
   selectedNodeId,
   onSelectNode,
   onDropPaletteItem,
@@ -86,6 +90,11 @@ export function Canvas({
         <h4>{label}</h4>
         <p>ID: {componentNode.componentId}</p>
         <span>Type: {componentNode.componentType ?? 'unknown'}</span>
+        {editMode ? null : (
+          <small className={styles.previewMeta}>
+            {previewBreakpoint.toUpperCase()} | {dataMode === 'real' ? 'LIVE DATA' : 'MOCK DATA'}
+          </small>
+        )}
       </article>
     );
   };
@@ -104,6 +113,7 @@ export function Canvas({
         key={row.id}
         row={row}
         editMode={editMode}
+        previewBreakpoint={previewBreakpoint}
         selected={selectedNodeId === row.id}
         onSelect={onSelectNode}
       >
@@ -112,6 +122,7 @@ export function Canvas({
             key={column.id}
             column={column}
             editMode={editMode}
+            previewBreakpoint={previewBreakpoint}
             selected={selectedNodeId === column.id}
             defaultSpan={defaultColumnSpan}
             onSelect={onSelectNode}
@@ -134,6 +145,7 @@ export function Canvas({
       key={section.id}
       section={section}
       editMode={editMode}
+      previewBreakpoint={previewBreakpoint}
       selected={selectedNodeId === section.id}
       onSelect={onSelectNode}
       onDropItem={onDropPaletteItem}
@@ -151,7 +163,12 @@ export function Canvas({
         <h2>Canvas</h2>
         <p>Section, Row, and Column containers render from the live schema tree.</p>
       </header>
-      <div className={styles.canvasViewport} role="region" aria-label="Canvas viewport" tabIndex={0}>
+      <div
+        className={[styles.canvasViewport, !editMode ? styles[`preview${capitalize(previewBreakpoint)}`] : ''].join(' ')}
+        role="region"
+        aria-label="Canvas viewport"
+        tabIndex={0}
+      >
         <div className={[styles.layoutTree, editMode ? styles.editMode : styles.previewMode].join(' ')}>
           {editMode ? (
             <div
@@ -184,4 +201,9 @@ export function Canvas({
 function getDefaultColumnSpan(columnCount: number): number {
   const count = Math.max(1, columnCount);
   return Math.max(1, Math.floor(12 / count));
+}
+
+function capitalize(value: string): string {
+  if (!value) return value;
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
 }

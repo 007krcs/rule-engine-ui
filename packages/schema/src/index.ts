@@ -10,6 +10,7 @@ export * from './types';
 export * from './ui';
 export * from './flow';
 export * from './application';
+export * from './ui-migration';
 
 export {
   executionContextSchema,

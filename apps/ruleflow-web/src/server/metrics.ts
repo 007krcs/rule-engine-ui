@@ -9,6 +9,12 @@ type Labels = Record<string, string>;
 
 type CounterMetric = Map<string, { labels: Labels; value: number }>;
 type HistogramMetric = Map<string, { labels: Labels; histogram: Histogram }>;
+type MetricSink = (event: {
+  metric: string;
+  type: 'counter' | 'histogram';
+  labels: Labels;
+  value: number;
+}) => void;
 
 const DEFAULT_BUCKETS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500];
 const MAX_TENANT_LABEL_CARDINALITY = 25;
@@ -52,9 +58,14 @@ const state = {
   flowTransitionCount: createCounterMetric(),
   errorCount: createCounterMetric(),
   apiCalls: createCounterMetric(),
+  bundleLoadCount: createCounterMetric(),
   ruleLatency: createHistogramMetric(),
   apiLatency: createHistogramMetric(),
+  bundleLoadLatency: createHistogramMetric(),
+  bundleChunkLoadLatency: createHistogramMetric(),
+  uiRenderLatency: createHistogramMetric(),
 };
+const metricSinks = new Set<MetricSink>();
 
 export function recordApiCall(
   durationMs: number,
@@ -85,6 +96,63 @@ export function recordApiCall(
       1,
     );
   }
+}
+
+export function registerMetricSink(sink: MetricSink): () => void {
+  metricSinks.add(sink);
+  return () => {
+    metricSinks.delete(sink);
+  };
+}
+
+export function recordBundleLoad(
+  durationMs: number,
+  input?: {
+    tenantId?: string;
+    env?: string;
+    source?: 'demo' | 'postgres' | 'api' | 'client';
+    chunked?: boolean;
+  },
+): void {
+  const labels = {
+    ...normalizeCommonLabels(input),
+    source: input?.source ?? 'api',
+    chunked: input?.chunked ? 'true' : 'false',
+  };
+  incrementCounter(state.bundleLoadCount, labels, 1, 'bundle_load_count');
+  observeHistogram(state.bundleLoadLatency, labels, durationMs, 'bundle_load_latency_ms');
+}
+
+export function recordBundleChunkLoad(
+  durationMs: number,
+  input?: {
+    tenantId?: string;
+    env?: string;
+    source?: 'demo' | 'postgres' | 'api' | 'client';
+    chunkKey?: string;
+  },
+): void {
+  const labels = {
+    ...normalizeCommonLabels(input),
+    source: input?.source ?? 'api',
+    chunk_key: sanitizeLabelValue(input?.chunkKey) || 'unknown',
+  };
+  observeHistogram(state.bundleChunkLoadLatency, labels, durationMs, 'bundle_chunk_load_latency_ms');
+}
+
+export function recordUiRender(
+  durationMs: number,
+  input?: {
+    tenantId?: string;
+    env?: string;
+    surface?: string;
+  },
+): void {
+  const labels = {
+    ...normalizeCommonLabels(input),
+    surface: sanitizeLabelValue(input?.surface) || 'unknown',
+  };
+  observeHistogram(state.uiRenderLatency, labels, durationMs, 'ui_render_latency_ms');
 }
 
 export function recordRuntimeTrace(
@@ -139,9 +207,19 @@ export function renderPrometheusMetrics(): string {
   lines.push(...counterLines('rule_match_count', 'Total matched rules', state.ruleMatchCount));
   lines.push(...counterLines('flow_transitions_count', 'Total flow transitions observed', state.flowTransitionCount));
   lines.push(...counterLines('api_call_count', 'Total API calls', state.apiCalls));
+  lines.push(...counterLines('bundle_load_count', 'Total bundle load operations', state.bundleLoadCount));
   lines.push(...counterLines('error_count', 'Total errors', state.errorCount));
   lines.push(...histogramLines('rule_eval_latency_ms', 'Histogram of rule evaluation latency in milliseconds', state.ruleLatency));
   lines.push(...histogramLines('api_latency_ms', 'Histogram of API latency in milliseconds', state.apiLatency));
+  lines.push(...histogramLines('bundle_load_latency_ms', 'Histogram of bundle load latency in milliseconds', state.bundleLoadLatency));
+  lines.push(
+    ...histogramLines(
+      'bundle_chunk_load_latency_ms',
+      'Histogram of bundle chunk load latency in milliseconds',
+      state.bundleChunkLoadLatency,
+    ),
+  );
+  lines.push(...histogramLines('ui_render_latency_ms', 'Histogram of UI render latency in milliseconds', state.uiRenderLatency));
   return `${lines.join('\n')}\n`;
 }
 
@@ -151,8 +229,13 @@ export function resetMetricsForTests(): void {
   state.flowTransitionCount.clear();
   state.errorCount.clear();
   state.apiCalls.clear();
+  state.bundleLoadCount.clear();
   state.ruleLatency.clear();
   state.apiLatency.clear();
+  state.bundleLoadLatency.clear();
+  state.bundleChunkLoadLatency.clear();
+  state.uiRenderLatency.clear();
+  metricSinks.clear();
   knownTenantLabels.clear();
   knownTenantLabels.add('unknown');
   knownTenantLabels.add('other');
@@ -185,24 +268,27 @@ function histogramLines(name: string, help: string, metric: HistogramMetric): st
   return lines;
 }
 
-function incrementCounter(metric: CounterMetric, labels: Labels, by: number): void {
+function incrementCounter(metric: CounterMetric, labels: Labels, by: number, metricName?: string): void {
   const key = labelKey(labels);
   const existing = metric.get(key);
   if (existing) {
     existing.value += by;
+    emitMetric(metricName, 'counter', labels, by);
     return;
   }
   metric.set(key, {
     labels: { ...labels },
     value: by,
   });
+  emitMetric(metricName, 'counter', labels, by);
 }
 
-function observeHistogram(metric: HistogramMetric, labels: Labels, valueMs: number): void {
+function observeHistogram(metric: HistogramMetric, labels: Labels, valueMs: number, metricName?: string): void {
   const key = labelKey(labels);
   const existing = metric.get(key);
   if (existing) {
     observe(existing.histogram, valueMs);
+    emitMetric(metricName, 'histogram', labels, valueMs);
     return;
   }
   const histogram = createHistogram();
@@ -211,6 +297,7 @@ function observeHistogram(metric: HistogramMetric, labels: Labels, valueMs: numb
     labels: { ...labels },
     histogram,
   });
+  emitMetric(metricName, 'histogram', labels, valueMs);
 }
 
 function normalizeCommonLabels(input?: { tenantId?: string; env?: string }): Labels {
@@ -282,4 +369,16 @@ function readString(value: unknown): string | null {
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   return null;
+}
+
+function emitMetric(metricName: string | undefined, type: 'counter' | 'histogram', labels: Labels, value: number): void {
+  if (!metricName || metricSinks.size === 0) return;
+  for (const sink of metricSinks) {
+    sink({
+      metric: metricName,
+      type,
+      labels: { ...labels },
+      value,
+    });
+  }
 }

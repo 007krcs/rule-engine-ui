@@ -43,7 +43,7 @@ export function validateUISchema(value: UISchema): ValidationResult {
 }
 
 export function validateFlowSchema(value: FlowSchema): ValidationResult {
-  return validateWithSchema(validators.flow, value);
+  return mergeResults(validateWithSchema(validators.flow, value), validateFlowAdvanced(value));
 }
 
 export function validateRulesSchema(value: RuleSet): ValidationResult {
@@ -394,6 +394,59 @@ function validateDateOperators(value: RuleSet): ValidationResult {
   return { valid: issues.length === 0, issues };
 }
 
+function validateFlowAdvanced(value: FlowSchema): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!value || typeof value !== 'object' || !value.states) {
+    return { valid: true, issues };
+  }
+
+  for (const [stateId, state] of Object.entries(value.states)) {
+    for (const [eventName, transition] of Object.entries(state.on ?? {})) {
+      validateFlowTransition(stateId, `on.${eventName}`, transition, value, issues);
+    }
+    (state.transitions ?? []).forEach((transition, index) => {
+      validateFlowTransition(stateId, `transitions.${index}`, transition, value, issues);
+    });
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+function validateFlowTransition(
+  stateId: string,
+  path: string,
+  transition: { target: string; fork?: { branches: string[]; joinState: string } },
+  flow: FlowSchema,
+  issues: ValidationIssue[],
+): void {
+  if (!flow.states[transition.target]) {
+    issues.push({
+      path: `states.${stateId}.${path}.target`,
+      message: `target state "${transition.target}" does not exist`,
+      severity: 'error',
+    });
+  }
+
+  const fork = transition.fork;
+  if (!fork) return;
+  if (!flow.states[fork.joinState]) {
+    issues.push({
+      path: `states.${stateId}.${path}.fork.joinState`,
+      message: `joinState "${fork.joinState}" does not exist`,
+      severity: 'error',
+    });
+  }
+  for (const branch of fork.branches ?? []) {
+    if (!flow.states[branch]) {
+      issues.push({
+        path: `states.${stateId}.${path}.fork.branches`,
+        message: `branch state "${branch}" does not exist`,
+        severity: 'error',
+      });
+    }
+  }
+}
+
 function collectDateIssues(condition: unknown, path: string, issues: ValidationIssue[]): void {
   if (!condition || typeof condition !== 'object') return;
   const rec = condition as Record<string, unknown>;
@@ -411,7 +464,18 @@ function collectDateIssues(condition: unknown, path: string, issues: ValidationI
   }
 
   const op = rec.op;
-  if (op !== 'dateEq' && op !== 'dateBefore' && op !== 'dateAfter' && op !== 'dateBetween') return;
+  if (
+    op !== 'dateEq' &&
+    op !== 'dateBefore' &&
+    op !== 'dateAfter' &&
+    op !== 'dateBetween' &&
+    op !== 'before' &&
+    op !== 'after' &&
+    op !== 'on' &&
+    op !== 'plusDays'
+  ) {
+    return;
+  }
   const left = rec.left as Record<string, unknown> | undefined;
   const right = rec.right as Record<string, unknown> | undefined;
 
@@ -424,9 +488,11 @@ function collectDateIssues(condition: unknown, path: string, issues: ValidationI
     issues.push({ path: `${path}.left`, message: 'date operands must be a path or ISO date string', severity: 'error' });
   }
 
-  if (!isValidDateOperand(right, op === 'dateBetween')) {
+  if (!isValidDateOperand(right, op === 'dateBetween' || op === 'plusDays')) {
     const message = op === 'dateBetween'
       ? 'dateBetween requires a path or [start, end] ISO date array'
+      : op === 'plusDays'
+      ? 'plusDays requires a path or { date, days } / [date, days] value'
       : 'date operands must be a path or ISO date string';
     issues.push({ path: `${path}.right`, message, severity: 'error' });
   }
@@ -443,6 +509,11 @@ function isValidDateOperand(operand: Record<string, unknown> | undefined, allowR
     if (value.length < 2) return false;
     return isValidDateLiteral(value[0] as JSONValue) && isValidDateLiteral(value[1] as JSONValue);
   }
+  if (allowRange && value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, JSONValue>;
+    if (record.date === undefined || record.days === undefined) return false;
+    return isValidDateLiteral(record.date) && typeof record.days === 'number' && Number.isFinite(record.days);
+  }
   return isValidDateLiteral(value);
 }
 
@@ -455,5 +526,6 @@ function isValidDateLiteral(value: JSONValue): boolean {
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return true;
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) return true;
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(trimmed)) return true;
+  if (/^\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}$/.test(trimmed)) return true;
   return false;
 }

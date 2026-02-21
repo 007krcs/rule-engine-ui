@@ -27,17 +27,22 @@ export async function POST(request: Request) {
       active?: boolean;
       packageId?: string;
       versionId?: string;
+      componentId?: string;
       rulesetKey?: string;
       reason?: string;
     };
     if (!body || typeof body.scope !== 'string' || typeof body.active !== 'boolean') {
       return noStoreJson({ ok: false, error: 'scope and active are required' }, 400);
     }
+    if (body.scope === 'COMPONENT' && typeof body.componentId !== 'string' && typeof body.rulesetKey !== 'string') {
+      return noStoreJson({ ok: false, error: 'componentId is required for COMPONENT scope' }, 400);
+    }
     const result = await upsertKillSwitch({
       scope: body.scope,
       active: body.active,
       packageId: body.packageId,
       versionId: body.versionId,
+      componentId: body.componentId,
       rulesetKey: body.rulesetKey,
       reason: body.reason,
     });

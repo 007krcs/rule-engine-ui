@@ -40,6 +40,20 @@
   padding: 0.9rem;
 }
 
+.previewDesktop {
+  max-width: 100%;
+}
+
+.previewTablet {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.previewMobile {
+  max-width: 430px;
+  margin: 0 auto;
+}
+
 .canvasViewport:focus-visible {
   outline: 2px solid #1f6feb;
   outline-offset: -2px;
@@ -111,6 +125,13 @@
   margin: 0;
   font-size: 0.76rem;
   color: #4a6785;
+}
+
+.previewMeta {
+  color: #37506a;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .componentCard:focus-visible {

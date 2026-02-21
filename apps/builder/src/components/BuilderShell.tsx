@@ -25,6 +25,7 @@ import {
   rebindBuilderScreenPage,
   removeBuilderScreen,
   renameBuilderScreen,
+  updateBuilderScreenPosition,
   updateBuilderTransition,
   type BuilderFlowState,
 } from '../lib/flow-engine';
@@ -63,6 +64,8 @@ import {
 import styles from './BuilderShell.module.css';
 
 type BuilderMode = 'layout' | 'flow';
+type PreviewBreakpoint = 'desktop' | 'tablet' | 'mobile';
+type PreviewDataMode = 'mock' | 'real';
 
 const DEFAULT_CONFIG_ID = 'ruleflow-builder-config';
 const DEFAULT_TENANT_ID = 'tenant-default';
@@ -103,6 +106,9 @@ export function BuilderShell({
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [editMode, setEditMode] = useState(true);
   const [builderMode, setBuilderMode] = useState<BuilderMode>('layout');
+  const [previewBreakpoint, setPreviewBreakpoint] = useState<PreviewBreakpoint>('desktop');
+  const [previewDataMode, setPreviewDataMode] = useState<PreviewDataMode>('mock');
+  const [skipValidationInDev, setSkipValidationInDev] = useState(false);
   const [flowGraph, setFlowGraph] = useState(initialFlowState.flow);
   const [schemasByScreenId, setSchemasByScreenId] = useState<Record<string, UISchema>>(
     initialFlowState.schemasByScreenId,
@@ -334,9 +340,14 @@ export function BuilderShell({
     ],
   );
 
+  const developmentMode = process.env.NODE_ENV !== 'production';
   const validationResult = useMemo(
-    () => validateApplicationBundle(applicationBundle, componentContracts),
-    [applicationBundle, componentContracts],
+    () =>
+      validateApplicationBundle(applicationBundle, componentContracts, {
+        developmentMode,
+        skipA11yI18nInDev: skipValidationInDev,
+      }),
+    [applicationBundle, componentContracts, developmentMode, skipValidationInDev],
   );
   const validationErrors = validationResult.issues.filter((issue) => issue.severity === 'error');
   const validationWarnings = validationResult.issues.filter((issue) => issue.severity === 'warning');
@@ -388,7 +399,9 @@ export function BuilderShell({
     activeVersion?.status === 'ARCHIVED';
 
   const buildAuditEntry = (
-    entry: Omit<AuditLogEntry, 'id' | 'timestamp'> & Partial<Pick<AuditLogEntry, 'packageId' | 'versionId'>>,
+    entry:
+      Omit<AuditLogEntry, 'id' | 'timestamp' | 'packageId' | 'versionId'> &
+      Partial<Pick<AuditLogEntry, 'packageId' | 'versionId'>>,
   ): AuditLogEntry => ({
     id: createAuditId(),
     packageId: entry.packageId ?? activePackage?.id ?? bundleConfigId,
@@ -505,6 +518,7 @@ export function BuilderShell({
     className?: string | undefined;
     span?: number | undefined;
     componentSpan?: number | undefined;
+    props?: Record<string, JSONValue> | undefined;
   }) => {
     if (!activeScreen || !selectedLayoutNodeId) return;
     const currentSchema = schemasByScreenId[activeScreen.id] ?? createInitialBuilderSchema(activeScreen.uiPageId);
@@ -527,7 +541,10 @@ export function BuilderShell({
     pushAuditEntry({
       action: 'component.prop.update',
       summary: `Updated ${selectedComponent.type} ${propKey}`,
-      metadata: { componentId: selectedComponent.id, propKey, value },
+      metadata:
+        value === undefined
+          ? { componentId: selectedComponent.id, propKey }
+          : { componentId: selectedComponent.id, propKey, value },
     });
   };
 
@@ -542,6 +559,22 @@ export function BuilderShell({
       updateSelectedLayoutNode({ [field]: Number.isFinite(rawValue) ? rawValue : undefined });
     };
 
+  const handleLayoutPropsChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const raw = event.target.value.trim();
+    if (raw.length === 0) {
+      updateSelectedLayoutNode({ props: undefined });
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        updateSelectedLayoutNode({ props: parsed as Record<string, JSONValue> });
+      }
+    } catch {
+      // Ignore invalid JSON while typing.
+    }
+  };
+
   const handleFlowConnectionCreate = (input: { from: string; to: string }) => {
     const result = addBuilderTransition(flowGraph, { from: input.from, to: input.to, onEvent: 'next' });
     setFlowGraph(result.flow);
@@ -552,6 +585,10 @@ export function BuilderShell({
       summary: `Added transition ${input.from} -> ${input.to}`,
       metadata: { from: input.from, to: input.to },
     });
+  };
+
+  const handleFlowScreenMove = (input: { screenId: string; position: { x: number; y: number } }) => {
+    setFlowGraph((current) => updateBuilderScreenPosition(current, input.screenId, input.position));
   };
 
   const handleAddTransitionFromForm = () => {
@@ -579,7 +616,10 @@ export function BuilderShell({
     pushAuditEntry({
       action: 'flow.transition.update',
       summary: `Updated transition ${transitionId}`,
-      metadata: patch,
+      metadata: {
+        transitionId,
+        patchKeys: Object.keys(patch),
+      },
     });
   };
 
@@ -850,7 +890,10 @@ export function BuilderShell({
         setImportMessage('Bundle is missing flowSchema or uiSchemas.');
         return;
       }
-      const validation = validateApplicationBundle(bundle, componentContracts);
+      const validation = validateApplicationBundle(bundle, componentContracts, {
+        developmentMode,
+        skipA11yI18nInDev: skipValidationInDev,
+      });
       if (validation.issues.some((issue) => issue.severity === 'error')) {
         setImportMessage(`Import rejected: ${validation.issues.filter((issue) => issue.severity === 'error').length} errors found.`);
         return;
@@ -966,6 +1009,40 @@ export function BuilderShell({
           >
             {editMode ? 'Switch To Preview' : 'Switch To Edit'}
           </Button>
+          {!editMode ? (
+            <Select
+              id="preview-breakpoint"
+              label="Breakpoint"
+              value={previewBreakpoint}
+              size="sm"
+              onChange={(event) => setPreviewBreakpoint(event.target.value as PreviewBreakpoint)}
+              options={[
+                { value: 'desktop', label: 'Desktop' },
+                { value: 'tablet', label: 'Tablet' },
+                { value: 'mobile', label: 'Mobile' },
+              ]}
+            />
+          ) : null}
+          {!editMode ? (
+            <Select
+              id="preview-data-mode"
+              label="Data"
+              value={previewDataMode}
+              size="sm"
+              onChange={(event) => setPreviewDataMode(event.target.value as PreviewDataMode)}
+              options={[
+                { value: 'mock', label: 'Mock Data' },
+                { value: 'real', label: 'Real Data' },
+              ]}
+            />
+          ) : null}
+          {developmentMode ? (
+            <Checkbox
+              label="Dev Skip A11y/i18n"
+              checked={skipValidationInDev}
+              onChange={(event) => setSkipValidationInDev(event.target.checked)}
+            />
+          ) : null}
           <Button type="button" variant="primary" size="sm" onClick={handleExportBundle}>
             Export Bundle JSON
           </Button>
@@ -1057,6 +1134,8 @@ export function BuilderShell({
             <Canvas
               schema={activeSchema}
               editMode={editMode}
+              previewBreakpoint={previewBreakpoint}
+              dataMode={previewDataMode}
               selectedNodeId={selectedLayoutNodeId}
               onSelectNode={handleSelectLayoutNode}
               onDropPaletteItem={handlePaletteDrop}
@@ -1082,6 +1161,7 @@ export function BuilderShell({
                 if (transition) setSelectedFlowScreenId(transition.to);
               }}
               onCreateTransition={handleFlowConnectionCreate}
+              onMoveScreen={handleFlowScreenMove}
             />
           )}
         </main>
@@ -1226,6 +1306,9 @@ export function BuilderShell({
 
             <div className={styles.propertyPanel}>
               <h3>Validation</h3>
+              {developmentMode && skipValidationInDev ? (
+                <p className={styles.notice}>Development mode is downgrading accessibility/i18n errors to warnings.</p>
+              ) : null}
               {validationResult.issues.length === 0 ? (
                 <p className={styles.emptyNotice}>No validation issues found.</p>
               ) : (
@@ -1276,6 +1359,7 @@ export function BuilderShell({
                     node={selectedLayoutNode}
                     onTextFieldChange={handleLayoutTextFieldChange}
                     onNumberFieldChange={handleLayoutNumberFieldChange}
+                    onPropsChange={handleLayoutPropsChange}
                   />
                 ) : (
                   <p className={styles.emptyNotice}>Select a section, row, column, or component node.</p>
@@ -1500,9 +1584,10 @@ interface LayoutPropertyFieldsProps {
   node: LayoutTreeNode;
   onTextFieldChange: (field: 'title' | 'label' | 'className') => (event: ChangeEvent<HTMLInputElement>) => void;
   onNumberFieldChange: (field: 'span' | 'componentSpan') => (event: ChangeEvent<HTMLInputElement>) => void;
+  onPropsChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 }
 
-function LayoutPropertyFields({ node, onTextFieldChange, onNumberFieldChange }: LayoutPropertyFieldsProps) {
+function LayoutPropertyFields({ node, onTextFieldChange, onNumberFieldChange, onPropsChange }: LayoutPropertyFieldsProps) {
   return (
     <div className={styles.fieldGroup}>
       <div className={styles.field}>
@@ -1550,6 +1635,16 @@ function LayoutPropertyFields({ node, onTextFieldChange, onNumberFieldChange }: 
           />
         </div>
       ) : null}
+      <div className={styles.field}>
+        <label htmlFor={`layout-props-${node.id}`}>Props JSON</label>
+        <textarea
+          id={`layout-props-${node.id}`}
+          className={styles.jsonField}
+          defaultValue={JSON.stringify(node.props ?? {}, null, 2)}
+          onBlur={onPropsChange}
+          placeholder='{"columnsTablet": 6, "cssVars": {"--section-bg": "#f5f9ff"}}'
+        />
+      </div>
     </div>
   );
 }

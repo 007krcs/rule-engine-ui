@@ -8,6 +8,9 @@ Resolve translation keys with fallback behavior and per-tenant overrides.
 Exports
 - `createI18nProvider` and `createProviderFromBundles`
 - `createMemoryCache`, `createMockTenantLoader`, `createHttpBundleLoader`
+- `createDynamicImportBundleLoader` for lazy locale/namespace imports
+- `createDevelopmentMachineTranslator` for development/staging prefill workflows
+- `resolveLocalizedTheme` for per-locale token overrides
 
 When to modify
 Add new loader types or adjust fallback strategy.

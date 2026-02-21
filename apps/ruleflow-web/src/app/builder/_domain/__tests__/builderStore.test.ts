@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createUISchema } from '@platform/schema';
 import { useBuilderStore } from '../builderStore';
 import { generateApplicationBundle } from '../generators/generateBundle';
+import { selectCanvasStats, selectRulesList } from '../selectors';
 
 describe('builderStore', () => {
   it('addScreen adds entry and sets active', () => {
@@ -35,5 +36,17 @@ describe('builderStore', () => {
     expect(bundle.screens.a).toBeTruthy();
     expect(bundle.flow).toBeTruthy();
     expect(Array.isArray(bundle.rules)).toBe(true);
+  });
+
+  it('memoized selectors reuse values for unchanged state objects', () => {
+    useBuilderStore.setState(useBuilderStore.getState(), true);
+    useBuilderStore.getState().addScreen('a');
+    const snapshot = useBuilderStore.getState();
+    const statsA = selectCanvasStats(snapshot);
+    const statsB = selectCanvasStats(snapshot);
+    const rulesA = selectRulesList(snapshot);
+    const rulesB = selectRulesList(snapshot);
+    expect(statsA).toBe(statsB);
+    expect(rulesA).toBe(rulesB);
   });
 });

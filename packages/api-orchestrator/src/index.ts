@@ -5,12 +5,29 @@
   MappingSource,
 } from '@platform/schema';
 import type { ApiTrace } from '@platform/observability';
+import {
+  emitBusinessMetric,
+  withExternalCallInstrumentation,
+} from '@platform/observability';
 
 export interface CallApiInput {
   mapping: ApiMapping;
   context: ExecutionContext;
   data: Record<string, JSONValue>;
   fetchFn?: typeof fetch;
+  options?: {
+    resolveSecret?: (input: { secretRef: string; tenantId: string; context: ExecutionContext }) => Promise<string | undefined> | string | undefined;
+    requestFilter?: (input: {
+      body?: Record<string, JSONValue>;
+      query?: Record<string, JSONValue>;
+      headers?: Record<string, JSONValue>;
+    }) => {
+      body?: Record<string, JSONValue>;
+      query?: Record<string, JSONValue>;
+      headers?: Record<string, JSONValue>;
+    };
+    correlationId?: string;
+  };
 }
 
 export interface CallApiResult {
@@ -35,17 +52,37 @@ export async function callApi(input: CallApiInput): Promise<CallApiResult> {
   };
 
   try {
-    const request = buildRequest(input.mapping, data, context);
-    trace.request = request;
+    const request = await buildRequest(
+      input.mapping,
+      data,
+      context,
+      input.options?.resolveSecret ?? resolveSecretFromEnv,
+      input.options?.requestFilter ?? defaultRequestFilter,
+    );
+    trace.request = request.traceRequest;
 
-    const url = appendQuery(input.mapping.endpoint, request.query);
-    const response = await fetchFn(url, {
-      method: input.mapping.method,
-      headers: {
-        'content-type': 'application/json',
-        ...(request.headers ?? {}),
-      } as Record<string, string>,
-      body: request.body && input.mapping.method !== 'GET' ? JSON.stringify(request.body) : undefined,
+    const url = appendQuery(input.mapping.endpoint, request.transport.query);
+    const response = await withExternalCallInstrumentation({
+      name: `http.${input.mapping.method.toLowerCase()}.${input.mapping.apiId}`,
+      module: 'api-orchestrator',
+      tenantId: input.context.tenantId,
+      correlationId: input.options?.correlationId,
+      attributes: {
+        endpoint: input.mapping.endpoint,
+        api_id: input.mapping.apiId,
+      },
+      fn: async () =>
+        await fetchFn(url, {
+          method: input.mapping.method,
+          headers: {
+            'content-type': 'application/json',
+            ...(request.transport.headers ?? {}),
+          } as Record<string, string>,
+          body:
+            request.transport.body && input.mapping.method !== 'GET'
+              ? JSON.stringify(request.transport.body)
+              : undefined,
+        }),
     });
 
     const contentType = response.headers.get('content-type') ?? '';
@@ -67,39 +104,82 @@ export async function callApi(input: CallApiInput): Promise<CallApiResult> {
   }
 
   trace.durationMs = Date.now() - started;
+  emitBusinessMetric({
+    name: 'api.call.duration_ms',
+    value: trace.durationMs,
+    unit: 'ms',
+    attributes: {
+      tenant_id: input.context.tenantId,
+      api_id: input.mapping.apiId,
+      method: input.mapping.method,
+      success: !trace.error,
+      status: trace.response?.status ?? 0,
+    },
+  });
 
   return { data, context, trace };
 }
 
-function buildRequest(
+async function buildRequest(
   mapping: ApiMapping,
   data: Record<string, JSONValue>,
   context: ExecutionContext,
-): {
-  body?: Record<string, JSONValue>;
-  query?: Record<string, JSONValue>;
-  headers?: Record<string, JSONValue>;
-} {
-  const body = resolveMap(mapping.requestMap.body, data, context);
-  const query = resolveMap(mapping.requestMap.query, data, context);
-  const headers = resolveMap(mapping.requestMap.headers, data, context);
-
-  return {
+  resolveSecret: (input: { secretRef: string; tenantId: string; context: ExecutionContext }) => Promise<string | undefined> | string | undefined,
+  requestFilter: (input: {
+    body?: Record<string, JSONValue>;
+    query?: Record<string, JSONValue>;
+    headers?: Record<string, JSONValue>;
+  }) => {
+    body?: Record<string, JSONValue>;
+    query?: Record<string, JSONValue>;
+    headers?: Record<string, JSONValue>;
+  },
+): Promise<{
+  transport: {
+    body?: Record<string, JSONValue>;
+    query?: Record<string, JSONValue>;
+    headers?: Record<string, JSONValue>;
+  };
+  traceRequest: {
+    body?: Record<string, JSONValue>;
+    query?: Record<string, JSONValue>;
+    headers?: Record<string, JSONValue>;
+  };
+}> {
+  const body = await resolveMap(mapping.requestMap.body, data, context, resolveSecret);
+  const query = await resolveMap(mapping.requestMap.query, data, context, resolveSecret);
+  const headers = await resolveMap(mapping.requestMap.headers, data, context, resolveSecret);
+  const filtered = requestFilter({
     body: Object.keys(body).length ? body : undefined,
     query: Object.keys(query).length ? query : undefined,
     headers: Object.keys(headers).length ? headers : undefined,
+  });
+  const traceHeaders = redactHeaders(filtered.headers);
+
+  return {
+    transport: {
+      body: filtered.body,
+      query: filtered.query,
+      headers: filtered.headers,
+    },
+    traceRequest: {
+      body: filtered.body,
+      query: filtered.query,
+      headers: traceHeaders,
+    },
   };
 }
 
-function resolveMap(
+async function resolveMap(
   map: Record<string, MappingSource> | undefined,
   data: Record<string, JSONValue>,
   context: ExecutionContext,
-): Record<string, JSONValue> {
+  resolveSecret: (input: { secretRef: string; tenantId: string; context: ExecutionContext }) => Promise<string | undefined> | string | undefined,
+): Promise<Record<string, JSONValue>> {
   if (!map) return {};
   const result: Record<string, JSONValue> = {};
   for (const [key, source] of Object.entries(map)) {
-    const resolved = resolveSource(source, data, context);
+    const resolved = await resolveSource(source, data, context, resolveSecret);
     if (resolved !== undefined) {
       result[key] = resolved;
     }
@@ -107,14 +187,23 @@ function resolveMap(
   return result;
 }
 
-function resolveSource(
+async function resolveSource(
   source: MappingSource,
   data: Record<string, JSONValue>,
   context: ExecutionContext,
-): JSONValue | undefined {
+  resolveSecret: (input: { secretRef: string; tenantId: string; context: ExecutionContext }) => Promise<string | undefined> | string | undefined,
+): Promise<JSONValue | undefined> {
   let value: JSONValue | undefined;
   if (source.from.startsWith('literal:')) {
     value = source.from.slice('literal:'.length);
+  } else if (source.from.startsWith('secret:')) {
+    const secretRef = source.from.slice('secret:'.length).trim();
+    const secret = await resolveSecret({
+      secretRef,
+      tenantId: context.tenantId,
+      context,
+    });
+    value = secret;
   } else if (source.from.startsWith('data.')) {
     value = getPath(data, source.from.slice('data.'.length));
   } else if (source.from.startsWith('context.')) {
@@ -132,6 +221,87 @@ function resolveSource(
   }
 
   return value;
+}
+
+function resolveSecretFromEnv(input: { secretRef: string; tenantId: string }): string | undefined {
+  const key = normalizeSecretKey(input.secretRef);
+  const tenant = normalizeSecretKey(input.tenantId);
+  const tenantScoped = process.env[`RULEFLOW_SECRET_${tenant}_${key}`];
+  if (tenantScoped) return tenantScoped;
+  return process.env[`RULEFLOW_SECRET_${key}`];
+}
+
+function normalizeSecretKey(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+}
+
+function defaultRequestFilter(input: {
+  body?: Record<string, JSONValue>;
+  query?: Record<string, JSONValue>;
+  headers?: Record<string, JSONValue>;
+}): {
+  body?: Record<string, JSONValue>;
+  query?: Record<string, JSONValue>;
+  headers?: Record<string, JSONValue>;
+} {
+  return {
+    body: sanitizeObject(input.body),
+    query: sanitizeObject(input.query),
+    headers: sanitizeHeaders(input.headers),
+  };
+}
+
+function sanitizeHeaders(headers: Record<string, JSONValue> | undefined): Record<string, JSONValue> | undefined {
+  if (!headers) return undefined;
+  const out: Record<string, JSONValue> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lower = key.trim().toLowerCase();
+    if (!lower || isUnsafeKey(lower)) continue;
+    out[lower] = sanitizeValue(value, 0);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function sanitizeObject(obj: Record<string, JSONValue> | undefined): Record<string, JSONValue> | undefined {
+  if (!obj) return undefined;
+  const out: Record<string, JSONValue> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (!key || isUnsafeKey(key)) continue;
+    out[key] = sanitizeValue(value, 0);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function sanitizeValue(value: JSONValue | undefined, depth: number): JSONValue {
+  if (depth > 12) return null;
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[\u0000-\u001F\u007F]/g, '');
+    return cleaned.length > 4096 ? cleaned.slice(0, 4096) : cleaned;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.slice(0, 256).map((entry) => sanitizeValue(entry, depth + 1));
+  const rec = value as Record<string, JSONValue>;
+  const out: Record<string, JSONValue> = {};
+  for (const [k, v] of Object.entries(rec)) {
+    if (!k || isUnsafeKey(k)) continue;
+    out[k] = sanitizeValue(v, depth + 1);
+  }
+  return out;
+}
+
+function redactHeaders(headers: Record<string, JSONValue> | undefined): Record<string, JSONValue> | undefined {
+  if (!headers) return undefined;
+  const out: Record<string, JSONValue> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lower = key.toLowerCase();
+    if (lower.includes('authorization') || lower.includes('token') || lower.includes('secret') || lower.includes('certificate')) {
+      out[key] = '[REDACTED]';
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 function applyResponseMap(

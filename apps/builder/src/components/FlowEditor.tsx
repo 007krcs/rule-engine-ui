@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { FlowGraphSchema, FlowScreenNode, FlowTransitionEdge } from '@platform/schema';
 import styles from './FlowEditor.module.css';
 
@@ -15,6 +15,11 @@ interface DraftConnection {
   pointer: CanvasPoint;
 }
 
+interface DraftNodeDrag {
+  screenId: string;
+  pointerOffset: CanvasPoint;
+}
+
 export interface FlowEditorProps {
   flow: FlowGraphSchema;
   activeScreenId: string;
@@ -24,6 +29,7 @@ export interface FlowEditorProps {
   onSetActiveScreen: (screenId: string) => void;
   onSelectTransition: (transitionId: string) => void;
   onCreateTransition: (input: { from: string; to: string }) => void;
+  onMoveScreen: (input: { screenId: string; position: CanvasPoint }) => void;
 }
 
 export function FlowEditor({
@@ -35,9 +41,11 @@ export function FlowEditor({
   onSetActiveScreen,
   onSelectTransition,
   onCreateTransition,
+  onMoveScreen,
 }: FlowEditorProps) {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [draftConnection, setDraftConnection] = useState<DraftConnection | null>(null);
+  const [draftNodeDrag, setDraftNodeDrag] = useState<DraftNodeDrag | null>(null);
 
   const screenLayout = useMemo(
     () =>
@@ -57,24 +65,39 @@ export function FlowEditor({
   }, [screenLayout]);
 
   useEffect(() => {
-    if (!draftConnection) {
+    if (!draftConnection && !draftNodeDrag) {
       return;
     }
 
     const handleMouseMove = (event: globalThis.MouseEvent) => {
-      setDraftConnection((current) => {
-        if (!current) return null;
-        const nextPointer = toCanvasPoint(boardRef.current, event.clientX, event.clientY);
-        if (!nextPointer) return current;
-        return {
-          ...current,
-          pointer: nextPointer,
-        };
-      });
+      if (draftConnection) {
+        setDraftConnection((current) => {
+          if (!current) return null;
+          const nextPointer = toCanvasPoint(boardRef.current, event.clientX, event.clientY);
+          if (!nextPointer) return current;
+          return {
+            ...current,
+            pointer: nextPointer,
+          };
+        });
+      }
+
+      if (draftNodeDrag) {
+        const pointer = toCanvasPoint(boardRef.current, event.clientX, event.clientY);
+        if (!pointer) return;
+        onMoveScreen({
+          screenId: draftNodeDrag.screenId,
+          position: {
+            x: pointer.x - draftNodeDrag.pointerOffset.x,
+            y: pointer.y - draftNodeDrag.pointerOffset.y,
+          },
+        });
+      }
     };
 
     const handleMouseUp = () => {
       setDraftConnection(null);
+      setDraftNodeDrag(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -83,7 +106,7 @@ export function FlowEditor({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draftConnection]);
+  }, [draftConnection, draftNodeDrag, onMoveScreen]);
 
   const canvasWidth = Math.max(920, ...screenLayout.map((layout) => layout.position.x + NODE_WIDTH + 120));
   const canvasHeight = Math.max(560, ...screenLayout.map((layout) => layout.position.y + NODE_HEIGHT + 120));
@@ -117,6 +140,21 @@ export function FlowEditor({
     onCreateTransition({
       from: fromScreenId,
       to: targetScreenId,
+    });
+  };
+
+  const handleScreenDragStart = (screenId: string) => (event: MouseEvent<HTMLElement>) => {
+    const boardPoint = toCanvasPoint(boardRef.current, event.clientX, event.clientY);
+    const screen = screenById.get(screenId);
+    if (!boardPoint || !screen) return;
+    event.preventDefault();
+    const pointerOffset = {
+      x: boardPoint.x - screen.position.x,
+      y: boardPoint.y - screen.position.y,
+    };
+    setDraftNodeDrag({
+      screenId,
+      pointerOffset,
     });
   };
 
@@ -180,6 +218,14 @@ export function FlowEditor({
                 </header>
                 <p>{screen.id}</p>
                 <small>{screen.uiPageId}</small>
+                <button
+                  type="button"
+                  className={styles.dragButton}
+                  onMouseDown={handleScreenDragStart(screen.id)}
+                  aria-label={`Drag ${screen.title} to reposition`}
+                >
+                  Drag
+                </button>
                 <div className={styles.nodeActions}>
                   <button
                     type="button"

@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionContext, Rule } from '@platform/schema';
-import { evaluateRules, evaluateCondition } from '../src/index';
+import {
+  clearRuleActionHandlers,
+  configureRulesEngine,
+  createMemoizedConditionEvaluator,
+  evaluateCondition,
+  evaluateRules,
+  registerRuleActionHandler,
+  resetRulesEngineConfig,
+} from '../src/index';
 
 const baseContext: ExecutionContext = {
   tenantId: 'tenant-a',
@@ -16,6 +24,182 @@ const baseContext: ExecutionContext = {
 };
 
 describe('rules-engine', () => {
+  it('supports locale-aware date aliases and plusDays', () => {
+    const context: ExecutionContext = { ...baseContext, locale: 'en-US' };
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'DATE_ON',
+          when: { op: 'on', left: { value: '12/31/2024' }, right: { value: '2024-12-31' } },
+          actions: [{ type: 'setField', path: 'data.on', value: true }],
+        },
+        {
+          ruleId: 'DATE_BEFORE_ALIAS',
+          when: { op: 'before', left: { value: '12/01/2024' }, right: { value: '2024-12-15' } },
+          actions: [{ type: 'setField', path: 'data.beforeAlias', value: true }],
+        },
+        {
+          ruleId: 'DATE_PLUS_DAYS',
+          when: { op: 'plusDays', left: { value: '2024-01-08' }, right: { value: { date: '2024-01-01', days: 7 } } },
+          actions: [{ type: 'setField', path: 'data.plusDays', value: true }],
+        },
+      ],
+      context,
+      data: {},
+    });
+    expect(result.data.on).toBe(true);
+    expect(result.data.beforeAlias).toBe(true);
+    expect(result.data.plusDays).toBe(true);
+  });
+
+  it('supports safe transform operands', () => {
+    expect(
+      evaluateCondition(
+        {
+          op: 'eq',
+          left: { value: { $transform: 'add', args: [2, 3, { $path: 'data.offset' }] } },
+          right: { value: 10 },
+        },
+        baseContext,
+        { offset: 5 },
+      ),
+    ).toBe(true);
+
+    expect(
+      evaluateCondition(
+        {
+          op: 'eq',
+          left: { value: { $transform: 'lower', args: [' AbC '] } },
+          right: { value: 'abc' },
+        },
+        baseContext,
+        {},
+      ),
+    ).toBe(false);
+
+    expect(
+      evaluateCondition(
+        {
+          op: 'eq',
+          left: { value: { $transform: 'trim', args: [' AbC '] } },
+          right: { value: 'AbC' },
+        },
+        baseContext,
+        {},
+      ),
+    ).toBe(true);
+  });
+
+  it('allows secure custom actions via whitelist and registry', () => {
+    resetRulesEngineConfig();
+    clearRuleActionHandlers();
+    registerRuleActionHandler('setAuditFlag', (action, ctx) => {
+      const value = (action as { value?: unknown }).value;
+      ctx.data.audit = value === undefined ? true : (value as never);
+    });
+
+    configureRulesEngine({
+      actionPolicy: { allowCustomActions: true, allowedActionTypes: ['setAuditFlag'] },
+    });
+
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'CUSTOM_ACTION',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'setAuditFlag', value: 'ok' } as Rule['actions'][number]],
+        },
+      ],
+      context: baseContext,
+      data: {},
+    });
+
+    expect(result.data.audit).toBe('ok');
+    expect(result.trace.errors).toHaveLength(0);
+
+    resetRulesEngineConfig();
+    clearRuleActionHandlers();
+  });
+
+  it('rejects custom actions that are not whitelisted', () => {
+    resetRulesEngineConfig();
+    clearRuleActionHandlers();
+    registerRuleActionHandler('customThing', () => undefined);
+    configureRulesEngine({
+      actionPolicy: { allowCustomActions: true, allowedActionTypes: ['anotherAction'] },
+    });
+
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'CUSTOM_ACTION_BLOCKED',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'customThing' } as Rule['actions'][number]],
+        },
+      ],
+      context: baseContext,
+      data: {},
+    });
+
+    expect(result.trace.errors.some((error) => error.message.includes('Action not allowed by policy'))).toBe(true);
+
+    resetRulesEngineConfig();
+    clearRuleActionHandlers();
+  });
+
+  it('supports configurable limits through runtime config', () => {
+    resetRulesEngineConfig();
+    configureRulesEngine({ limits: { maxRules: 1 } });
+    const result = evaluateRules({
+      rules: [
+        { ruleId: 'ONE', when: { op: 'eq', left: { value: true }, right: { value: true } } },
+        { ruleId: 'TWO', when: { op: 'eq', left: { value: true }, right: { value: true } } },
+      ],
+      context: baseContext,
+      data: {},
+    });
+
+    expect(result.trace.errors.some((error) => error.message.includes('Max rules limit reached'))).toBe(true);
+    resetRulesEngineConfig();
+  });
+
+  it('supports configurable limits through environment variables', () => {
+    resetRulesEngineConfig();
+    const previous = process.env.RULEFLOW_RULES_MAX_RULES;
+    process.env.RULEFLOW_RULES_MAX_RULES = '1';
+    const result = evaluateRules({
+      rules: [
+        { ruleId: 'ONE', when: { op: 'eq', left: { value: true }, right: { value: true } } },
+        { ruleId: 'TWO', when: { op: 'eq', left: { value: true }, right: { value: true } } },
+      ],
+      context: baseContext,
+      data: {},
+    });
+    expect(result.trace.errors.some((error) => error.message.includes('Max rules limit reached'))).toBe(true);
+    process.env.RULEFLOW_RULES_MAX_RULES = previous;
+    resetRulesEngineConfig();
+  });
+
+  it('supports configurable performance policy through environment variables', () => {
+    resetRulesEngineConfig();
+    const prevPathCache = process.env.RULEFLOW_RULES_PATH_CACHE_SIZE;
+    const prevMemo = process.env.RULEFLOW_RULES_CONDITION_MEMO_SIZE;
+    const prevMemoEnabled = process.env.RULEFLOW_RULES_MEMOIZE_CONDITIONS;
+    process.env.RULEFLOW_RULES_PATH_CACHE_SIZE = '64';
+    process.env.RULEFLOW_RULES_CONDITION_MEMO_SIZE = '128';
+    process.env.RULEFLOW_RULES_MEMOIZE_CONDITIONS = '1';
+    const result = evaluateRules({
+      rules: [{ ruleId: 'ONE', when: { op: 'eq', left: { value: true }, right: { value: true } } }],
+      context: baseContext,
+      data: {},
+    });
+    expect(result.trace.rulesMatched).toContain('ONE');
+    process.env.RULEFLOW_RULES_PATH_CACHE_SIZE = prevPathCache;
+    process.env.RULEFLOW_RULES_CONDITION_MEMO_SIZE = prevMemo;
+    process.env.RULEFLOW_RULES_MEMOIZE_CONDITIONS = prevMemoEnabled;
+    resetRulesEngineConfig();
+  });
+
   it('applies scoped rules in deterministic order', () => {
     const rules: Rule[] = [
       {
@@ -85,6 +269,42 @@ describe('rules-engine', () => {
 
     const result = evaluateCondition(condition, baseContext, { ok: true });
     expect(result).toBe(true);
+  });
+
+  it('memoized condition evaluator returns stable results', () => {
+    const evalMemo = createMemoizedConditionEvaluator({ cacheSize: 16 });
+    const condition = {
+      op: 'eq',
+      left: { path: 'data.status' },
+      right: { value: 'ok' },
+    } as const;
+    expect(evalMemo(condition, baseContext, { status: 'ok' })).toBe(true);
+    expect(evalMemo(condition, baseContext, { status: 'ok' })).toBe(true);
+    expect(evalMemo(condition, baseContext, { status: 'nope' })).toBe(false);
+  });
+
+  it('invalidates rule condition memo between mutating actions', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'SET_FLAG',
+          priority: 2,
+          when: { op: 'eq', left: { path: 'data.flag' }, right: { value: false } },
+          actions: [{ type: 'setField', path: 'data.flag', value: true }],
+        },
+        {
+          ruleId: 'SHOULD_SKIP',
+          priority: 1,
+          when: { op: 'eq', left: { path: 'data.flag' }, right: { value: false } },
+          actions: [{ type: 'setField', path: 'data.shouldSkip', value: true }],
+        },
+      ],
+      context: baseContext,
+      data: { flag: false },
+      options: { memoizeConditionEvaluations: true },
+    });
+    expect(result.data.flag).toBe(true);
+    expect(result.data.shouldSkip).toBeUndefined();
   });
 
   it('records depth errors for overly nested conditions', () => {

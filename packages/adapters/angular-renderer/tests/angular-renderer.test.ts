@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionContext, JSONValue, UISchema } from '@platform/schema';
+import { createProviderFromBundles } from '@platform/i18n';
 import {
   RenderPageAngular,
   createAdapterRegistry,
+  hydrateAngular,
   isAdapterRegistered,
   listRegisteredAdapterPrefixes,
   renderAngular,
@@ -222,6 +224,132 @@ describe('angular-renderer', () => {
 
     expect(() => renderAngular({ uiSchema: badSchema, data: {}, context })).toThrow(
       'ariaLabelKey is required',
+    );
+  });
+
+  it('hydrates rendered html and auto-binds dom listeners', () => {
+    class FakeElement {
+      constructor(private readonly attrs: Record<string, string>) {}
+      getAttribute(name: string) {
+        return this.attrs[name] ?? null;
+      }
+      closest() {
+        return this;
+      }
+    }
+    class FakeTarget {
+      innerHTML = '';
+      private listeners = new Map<string, (event: Event) => void>();
+      addEventListener(type: string, handler: (event: Event) => void) {
+        this.listeners.set(type, handler);
+      }
+      removeEventListener(type: string) {
+        this.listeners.delete(type);
+      }
+      emit(type: string, event: Event) {
+        this.listeners.get(type)?.(event);
+      }
+    }
+
+    const prevElement = (globalThis as any).Element;
+    (globalThis as any).Element = FakeElement;
+    const target = new FakeTarget() as unknown as HTMLElement;
+    const onEvent = vi.fn();
+    const result = RenderPageAngular({
+      uiSchema: schema,
+      data: buildData(),
+      context,
+      onEvent,
+    });
+    const session = hydrateAngular({ result, target });
+    expect((target as any).innerHTML).toContain('portable-page');
+
+    const eventTarget = new FakeElement({
+      'data-rf-event': 'onClick',
+      'data-rf-component-id': 'saveButton',
+    });
+    (target as any).emit('click', {
+      target: eventTarget,
+      preventDefault: () => undefined,
+    } as unknown as Event);
+    expect(onEvent).toHaveBeenCalled();
+    session.dispose();
+    (globalThis as any).Element = prevElement;
+  });
+
+  it('renders flex and nested grid layouts with responsive hints', () => {
+    const layoutSchema: UISchema = {
+      version: '1.0.0',
+      pageId: 'layout-page',
+      layout: {
+        id: 'root',
+        type: 'stack',
+        props: { layoutMode: 'row', wrap: true, gap: 12 },
+        children: [
+          {
+            id: 'nested',
+            type: 'grid',
+            props: { layoutMode: 'nested-grid', minColumnWidth: 220, responsiveRows: 2, gap: 8 },
+            componentIds: ['saveButton'],
+          },
+        ],
+      },
+      components: schema.components.filter((component) => component.id === 'saveButton'),
+    };
+    const html = renderAngular({ uiSchema: layoutSchema, data: buildData(), context });
+    expect(html).toContain('display:flex');
+    expect(html).toContain('grid-template-columns:repeat(auto-fit,minmax(220px,1fr))');
+    expect(html).toContain('grid-template-rows:repeat(2,minmax(0,auto))');
+  });
+
+  it('renders RTL direction and flips row layout for RTL locales', () => {
+    const rtlI18n = createProviderFromBundles({
+      locale: 'ar',
+      bundles: [
+        {
+          locale: 'ar',
+          namespace: 'runtime',
+          messages: {
+            'runtime.customer.save.aria': 'حفظ',
+          },
+        },
+      ],
+      localeThemes: {
+        base: { 'font.size.base': 14 },
+        byLocale: { ar: { 'font.size.base': 16 } },
+      },
+    });
+    const layoutSchema: UISchema = {
+      version: '1.0.0',
+      pageId: 'rtl-page',
+      layout: {
+        id: 'root',
+        type: 'stack',
+        props: { layoutMode: 'row', gap: 8 },
+        componentIds: ['saveButton'],
+      },
+      components: schema.components.filter((component) => component.id === 'saveButton'),
+    };
+    const html = renderAngular({ uiSchema: layoutSchema, data: buildData(), context: { ...context, locale: 'ar' }, i18n: rtlI18n });
+    expect(html).toContain('dir="rtl"');
+    expect(html).toContain('flex-direction:row-reverse');
+    expect(html).toContain('direction:rtl');
+    expect(html).toContain('--rf-locale-font-size-base:16');
+  });
+
+  it('reports render metrics callback', () => {
+    const onRenderMetrics = vi.fn();
+    renderAngular({
+      uiSchema: schema,
+      data: buildData(),
+      context,
+      onRenderMetrics,
+    });
+    expect(onRenderMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        durationMs: expect.any(Number),
+        componentCount: schema.components.length,
+      }),
     );
   });
 });

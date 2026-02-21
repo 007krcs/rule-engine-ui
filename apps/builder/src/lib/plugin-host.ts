@@ -16,6 +16,8 @@ export type BuilderRendererRegistration = RendererRegistration;
 const pluginRegistry = createPluginRegistry<BuilderComponentImplementation, BuilderRendererRegistration>();
 registerPlugins(pluginRegistry, builderPlugins as Array<PlatformPlugin<BuilderComponentImplementation, BuilderRendererRegistration>>);
 let dynamicPluginsLoaded = false;
+let adapterComponentsLoaded = false;
+const registeredAdapterComponentTypes = new Set<string>();
 
 type BuilderPluginModule =
   | PlatformPlugin<BuilderComponentImplementation, BuilderRendererRegistration>
@@ -32,12 +34,14 @@ const dynamicPluginLoaders: Record<string, () => Promise<BuilderPluginModule>> =
 };
 
 export function getBuilderComponentCatalog(): ComponentContract[] {
+  registerAdapterComponentsFromGlobals();
   const core = getDefaultComponentCatalog();
   const pluginContracts = pluginRegistry.listComponents().map((entry) => entry.contract);
   return mergeComponentContracts(core, pluginContracts);
 }
 
 export function getBuilderComponentRegistry() {
+  registerAdapterComponentsFromGlobals();
   const registry = createDefaultComponentRegistry();
   for (const entry of pluginRegistry.listComponents()) {
     registry.register(entry.contract, entry.implementation);
@@ -46,10 +50,12 @@ export function getBuilderComponentRegistry() {
 }
 
 export function getBuilderRenderers(): BuilderRendererRegistration[] {
+  registerAdapterComponentsFromGlobals();
   return pluginRegistry.listRenderers();
 }
 
 export function getBuilderPlugins() {
+  registerAdapterComponentsFromGlobals();
   return pluginRegistry.listPlugins();
 }
 
@@ -58,17 +64,17 @@ export async function loadBuilderPlugins(): Promise<void> {
   dynamicPluginsLoaded = true;
 
   const requested = resolveDynamicPluginIds();
-  if (requested.length === 0) return;
-
   const loadedPlugins: Array<PlatformPlugin<BuilderComponentImplementation, BuilderRendererRegistration>> = [];
-  for (const id of requested) {
-    const loader = dynamicPluginLoaders[id];
-    if (!loader) continue;
-    const module = await loader();
-    if (Array.isArray(module)) {
-      loadedPlugins.push(...module);
-    } else {
-      loadedPlugins.push(module);
+  if (requested.length > 0) {
+    for (const id of requested) {
+      const loader = dynamicPluginLoaders[id];
+      if (!loader) continue;
+      const module = await loader();
+      if (Array.isArray(module)) {
+        loadedPlugins.push(...module);
+      } else {
+        loadedPlugins.push(module);
+      }
     }
   }
 
@@ -77,6 +83,26 @@ export async function loadBuilderPlugins(): Promise<void> {
       pluginRegistry,
       loadedPlugins as Array<PlatformPlugin<BuilderComponentImplementation, BuilderRendererRegistration>>,
     );
+  }
+
+  registerAdapterComponentsFromGlobals();
+}
+
+export function registerBuilderAdapterComponent(
+  component: ComponentPluginInterface,
+): void {
+  if (registeredAdapterComponentTypes.has(component.type)) {
+    return;
+  }
+  pluginRegistry.registerComponent(component);
+  registeredAdapterComponentTypes.add(component.type);
+}
+
+export function registerBuilderAdapterComponents(
+  components: ReadonlyArray<ComponentPluginInterface>,
+): void {
+  for (const component of components) {
+    registerBuilderAdapterComponent(component);
   }
 }
 
@@ -116,6 +142,30 @@ function resolveDynamicPluginIds(): string[] {
   }
 
   return Array.from(ids.values());
+}
+
+function registerAdapterComponentsFromGlobals(): void {
+  if (adapterComponentsLoaded) return;
+  adapterComponentsLoaded = true;
+
+  const globals = globalThis as {
+    __RULEFLOW_BUILDER_ADAPTER_COMPONENTS__?: Array<ComponentPluginInterface>;
+    __RULEFLOW_BUILDER_ADAPTERS__?: Array<{ components?: Array<ComponentPluginInterface> }>;
+  };
+  const entries = globals.__RULEFLOW_BUILDER_ADAPTER_COMPONENTS__;
+  if (Array.isArray(entries)) {
+    const valid = entries.filter(isComponentPluginInterface);
+    if (valid.length > 0) {
+      registerBuilderAdapterComponents(valid);
+    }
+  }
+
+  const adapters = globals.__RULEFLOW_BUILDER_ADAPTERS__;
+  if (!Array.isArray(adapters)) return;
+  for (const adapter of adapters) {
+    if (!adapter || !Array.isArray(adapter.components)) continue;
+    registerBuilderAdapterComponents(adapter.components.filter(isComponentPluginInterface));
+  }
 }
 
 function isComponentPluginInterface(value: unknown): value is ComponentPluginInterface {

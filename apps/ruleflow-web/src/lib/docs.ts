@@ -79,6 +79,12 @@ export const docs: DocEntry[] = [
     body: 'React renderer, Angular/Vue HTML renderers, adapter registration, host integration checklist.',
   },
   {
+    slug: 'interim-workarounds',
+    title: 'Interim Workarounds',
+    description: 'Practical patterns while advanced renderer and orchestration features are in progress.',
+    body: 'Angular/Vue HTML hydration flow, host-side date arithmetic, GraphQL REST wrappers, and custom layout adapters.',
+  },
+  {
     slug: 'tutorial-theming',
     title: 'Tutorial: Theming + CSS Variables',
     description: 'Override design tokens safely and keep styling pluggable via adapters.',
@@ -125,6 +131,12 @@ export const docs: DocEntry[] = [
     title: 'Deployment',
     description: 'Build and deploy RuleFlow across environments.',
     body: 'Build pipelines, GitOps export, promotion workflow.',
+  },
+  {
+    slug: 'feature-roadmap',
+    title: 'Feature Roadmap',
+    description: 'Public roadmap and planning assumptions for upcoming platform features.',
+    body: 'Angular/Vue hydration, visual flow builder, date parsing improvements, GraphQL orchestration, and layout expansion.',
   },
   {
     slug: 'release-checklist',

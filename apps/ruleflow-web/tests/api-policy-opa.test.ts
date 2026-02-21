@@ -28,6 +28,7 @@ describe('api policy guard with OPA', () => {
     process.env.OPA_URL = 'http://opa.local';
     process.env.OPA_PACKAGE = 'ruleflow/allow';
     process.env.OPA_TIMEOUT_MS = '500';
+    process.env.RULEFLOW_OPA_MODE = 'enforce';
 
     vi.stubGlobal(
       'fetch',
@@ -52,6 +53,7 @@ describe('api policy guard with OPA', () => {
     delete process.env.OPA_URL;
     delete process.env.OPA_PACKAGE;
     delete process.env.OPA_TIMEOUT_MS;
+    delete process.env.RULEFLOW_OPA_MODE;
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });

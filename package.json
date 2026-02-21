@@ -22,7 +22,11 @@
     "lint:docs": "node scripts/lint-docs.js",
     "lint:docs:todo": "node scripts/lint-docs-todo.js",
     "demo:react": "tsx apps/demo-host-react/scripts/run-demo.ts",
-    "validate:configs": "tsx scripts/validate-configs.ts"
+    "validate:configs": "tsx scripts/validate-configs.ts",
+    "i18n:manage": "tsx scripts/i18n-manage.ts",
+    "bundle:analyze": "tsx scripts/bundle-analyze.ts",
+    "migrate:ui-schema": "tsx scripts/migrate-ui-schema.ts",
+    "governance:cicd": "tsx scripts/cicd-governance.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",

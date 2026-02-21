@@ -88,9 +88,10 @@ export type FeatureFlag = {
 export type KillSwitch = {
   id: string;
   tenantId: string;
-  scope: 'TENANT' | 'RULESET' | 'VERSION';
+  scope: 'TENANT' | 'RULESET' | 'VERSION' | 'COMPONENT';
   packageId?: string;
   versionId?: string;
+  componentId?: string;
   rulesetKey?: string;
   active: boolean;
   reason?: string;

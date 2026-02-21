@@ -10,7 +10,7 @@ import type {
   UISetValueWhenRule,
 } from '@platform/schema';
 import type { ValidationIssue } from '@platform/validator';
-import { evaluateCondition } from '@platform/rules-engine';
+import { createMemoizedConditionEvaluator } from '@platform/rules-engine';
 import { AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react';
 import {
   PFCalendar,
@@ -141,10 +141,11 @@ function evaluatePreviewCondition(
   condition: RuleCondition | undefined,
   previewData: Record<string, JSONValue> | undefined,
   previewContext: ExecutionContext | undefined,
+  evaluate: (condition: RuleCondition, context: ExecutionContext, data: Record<string, JSONValue>) => boolean,
 ): boolean | null {
   if (!condition || !previewData || !previewContext) return null;
   try {
-    return evaluateCondition(condition, previewContext, previewData);
+    return evaluate(condition, previewContext, previewData);
   } catch {
     return false;
   }
@@ -541,6 +542,10 @@ export function ComponentEditor({
   const [composeRightValue, setComposeRightValue] = useState('1000');
   const [composeSetValuePath, setComposeSetValuePath] = useState('data.orderTotal');
   const [composeSetValue, setComposeSetValue] = useState('1200');
+  const memoizedRuleEvaluator = useMemo(
+    () => createMemoizedConditionEvaluator({ cacheSize: 256 }),
+    [],
+  );
 
   useEffect(() => {
     // When switching components, always reset the JSON editor.
@@ -717,12 +722,17 @@ export function ComponentEditor({
   };
 
   const rulePreview = useMemo(() => {
-    const visible = evaluatePreviewCondition(component.rules?.visibleWhen, previewData, previewContext);
-    const disabled = evaluatePreviewCondition(component.rules?.disabledWhen, previewData, previewContext);
-    const required = evaluatePreviewCondition(component.rules?.requiredWhen, previewData, previewContext);
-    const setValueMatches = evaluatePreviewCondition(component.rules?.setValueWhen?.when, previewData, previewContext);
+    const visible = evaluatePreviewCondition(component.rules?.visibleWhen, previewData, previewContext, memoizedRuleEvaluator);
+    const disabled = evaluatePreviewCondition(component.rules?.disabledWhen, previewData, previewContext, memoizedRuleEvaluator);
+    const required = evaluatePreviewCondition(component.rules?.requiredWhen, previewData, previewContext, memoizedRuleEvaluator);
+    const setValueMatches = evaluatePreviewCondition(
+      component.rules?.setValueWhen?.when,
+      previewData,
+      previewContext,
+      memoizedRuleEvaluator,
+    );
     return { visible, disabled, required, setValueMatches };
-  }, [component.rules, previewContext, previewData]);
+  }, [component.rules, memoizedRuleEvaluator, previewContext, previewData]);
 
   return (
     <Card className={cn(hasIssues ? styles.cardIssues : undefined)}>

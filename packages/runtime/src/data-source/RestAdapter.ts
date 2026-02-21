@@ -1,16 +1,20 @@
-import type { DataSourceAdapter } from './DataSourceAdapter';
+import type { DataSourceAdapter, DispatchRequest, RequestResiliencePolicy } from './DataSourceAdapter';
+import { executeWithResilience } from './resilience';
+import { parseResponseByType } from './response-parsers';
+import { applySafeTransform } from './safe-transform';
 
 export class RestAdapter implements DataSourceAdapter {
   constructor(
     private readonly endpoint: string,
     private readonly init?: RequestInit,
+    private readonly resilience?: RequestResiliencePolicy,
   ) {}
 
   async connect(): Promise<void> {
     return Promise.resolve();
   }
 
-  async fetch(query: any): Promise<any> {
+  async fetch(query: DispatchRequest): Promise<any> {
     const endpoint = typeof query?.endpoint === 'string' ? query.endpoint : this.endpoint;
     const method = typeof query?.method === 'string' ? query.method.toUpperCase() : 'GET';
     const headers = {
@@ -27,16 +31,26 @@ export class RestAdapter implements DataSourceAdapter {
       body:
         method === 'GET' || method === 'HEAD'
           ? undefined
-          : query?.body !== undefined
-            ? JSON.stringify(query.body)
+          : query?.body !== undefined || query?.payload !== undefined
+            ? JSON.stringify(query.body ?? query.payload)
             : undefined,
     };
 
-    const response = await fetch(targetUrl, requestInit);
-    if (!response.ok) {
-      throw new Error(`REST data source request failed (${response.status}) for ${targetUrl}`);
-    }
-    return response.json();
+    const response = await executeWithResilience(
+      `rest:${endpoint}:${method}`,
+      () => fetch(targetUrl, requestInit),
+      query?.resilience ?? this.resilience,
+    );
+    if (!response.ok) throw new Error(`REST data source request failed (${response.status}) for ${targetUrl}`);
+    const parsed = await parseResponseByType(response, query);
+    return applySafeTransform(parsed, {
+      template: query?.transformTemplate,
+      selector: query?.selector,
+    });
+  }
+
+  async dispatch(request: DispatchRequest): Promise<unknown> {
+    return this.fetch(request);
   }
 }
 
