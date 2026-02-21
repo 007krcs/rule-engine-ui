@@ -1,7 +1,7 @@
 {
   "name": "@ecr-platform/core",
   "version": "0.1.0",
-  "description": "Enterprise Configuration Runtime (ECR) - A schema-driven UI, flow and rules execution platform.",
+  "description": "Enterprise Configuration Runtime (ECR) – A schema-driven UI, flow and rules execution platform.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
