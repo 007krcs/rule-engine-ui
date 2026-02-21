@@ -1,7 +1,8 @@
-﻿import React from 'react';
+import React from 'react';
 import type { UIComponent } from '@platform/schema';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
+import { eventBus } from '@platform/runtime';
 
 let registered = false;
 
@@ -11,7 +12,7 @@ export function registerHighchartsAdapter(): void {
   registerAdapter('highcharts.', (component, ctx) => renderChart(component, ctx));
 }
 
-function renderChart(component: UIComponent, ctx: AdapterContext): React.ReactElement {
+export function renderChart(component: UIComponent, ctx: AdapterContext): React.ReactElement {
   const ariaLabel = ctx.i18n.t(component.accessibility.ariaLabelKey);
   const label = component.i18n?.labelKey
     ? ctx.i18n.t(component.i18n.labelKey)
@@ -47,6 +48,13 @@ function renderChart(component: UIComponent, ctx: AdapterContext): React.ReactEl
               height={bar.height}
               rx={3}
               fill="#60a5fa"
+              onClick={() =>
+                eventBus.publish('onDataPointClick', {
+                  componentId: component.id,
+                  index,
+                  value: bar.value,
+                })
+              }
             />
           ))}
         </svg>
@@ -75,6 +83,6 @@ function buildBars(series: number[], width: number, height: number, padding: num
     const barHeight = normalized * (height - padding * 2);
     const x = padding + index * barWidth + barWidth * 0.1;
     const y = height - padding - barHeight;
-    return { x, y, width: barWidth * 0.8, height: barHeight };
+    return { x, y, width: barWidth * 0.8, height: barHeight, value };
   });
 }

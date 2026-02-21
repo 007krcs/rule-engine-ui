@@ -34,6 +34,7 @@ import {
 } from '@platform/ui-kit';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
+import { eventBus } from '@platform/runtime';
 import type { JSONValue, UIComponent } from '@platform/schema';
 import { platformComponentMap } from './component-map';
 export { getPlatformComponent, platformComponentMap } from './component-map';
@@ -296,7 +297,15 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           required={Boolean(component.validations?.required)}
           disabled={Boolean(component.props?.disabled)}
           aria-label={ariaLabel}
-          onChange={(event) => ctx.events.onChange?.(event.target.value, valueBindingPath)}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            ctx.events.onChange?.(nextValue, valueBindingPath);
+            eventBus.publish('filterChanged', {
+              componentId: component.id,
+              field: resolveFilterField(component),
+              value: nextValue,
+            });
+          }}
         />
       );
     }
@@ -309,7 +318,15 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
           options={options}
           value={value}
           placeholder={asString(component.props?.placeholder, '')}
-          onChange={(event) => ctx.events.onChange?.(event.target.value, valueBindingPath)}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            ctx.events.onChange?.(nextValue, valueBindingPath);
+            eventBus.publish('filterChanged', {
+              componentId: component.id,
+              field: resolveFilterField(component),
+              value: nextValue,
+            });
+          }}
         />
       );
     }
@@ -519,6 +536,14 @@ export function renderPlatformComponent(component: UIComponent, ctx: AdapterCont
 
 function resolveDataBindingPath(component: UIComponent): string {
   return component.bindings?.data?.valuePath ?? component.bindings?.data?.value ?? `data.${component.id}`;
+}
+
+function resolveFilterField(component: UIComponent): string | undefined {
+  const bindingPath = component.bindings?.data?.valuePath ?? component.bindings?.data?.value;
+  if (!bindingPath || typeof bindingPath !== 'string') return undefined;
+  const normalized = bindingPath.startsWith('data.') ? bindingPath.slice('data.'.length) : bindingPath;
+  const segments = normalized.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+  return segments[segments.length - 1];
 }
 
 function resolveBindingValue(

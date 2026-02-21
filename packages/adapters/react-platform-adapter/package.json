@@ -8,6 +8,7 @@
   "dependencies": {
     "@platform/component-registry": "workspace:*",
     "@platform/react-renderer": "workspace:*",
+    "@platform/runtime": "workspace:*",
     "@platform/schema": "workspace:*",
     "@platform/ui-kit": "workspace:*"
   },

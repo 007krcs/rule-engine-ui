@@ -1,10 +1,11 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { builtinComponentDefinitions } from '@platform/component-registry';
 import type { ComponentDefinition } from '@platform/component-registry';
 import type { AdapterContext } from '@platform/react-renderer';
 import type { ExecutionContext, JSONValue, UIComponent } from '@platform/schema';
+import { eventBus } from '@platform/runtime';
 import { getImplementedComponentIds, getPlatformComponent, renderPlatformComponent } from '../src/index';
 
 const context: ExecutionContext = {
@@ -189,5 +190,34 @@ describe('react-platform-adapter', () => {
     const Unknown = getPlatformComponent('platform.unknownWidget');
     const html = renderToStaticMarkup(<Unknown />);
     expect(html).toContain('Component not enabled');
+  });
+
+  it('publishes filterChanged for platform.textField changes', () => {
+    const onChange = vi.fn();
+    const received = vi.fn();
+    eventBus.subscribe('filterChanged', received);
+
+    const node = renderPlatformComponent(
+      createComponent({
+        id: 'customerFilter',
+        type: 'input',
+        adapterHint: 'platform.textField',
+        bindings: { data: { valuePath: 'data.orders.filters.search' } },
+      }),
+      {
+        ...createAdapterContext({ orders: { filters: { search: '' } } }),
+        events: { onChange, onClick: () => undefined, onSubmit: () => undefined },
+      },
+    );
+
+    node.props.onChange({ target: { value: 'ACME' } });
+
+    expect(onChange).toHaveBeenCalledWith('ACME', 'data.orders.filters.search');
+    expect(received).toHaveBeenCalledWith({
+      componentId: 'customerFilter',
+      field: 'search',
+      value: 'ACME',
+    });
+    eventBus.unsubscribe('filterChanged', received);
   });
 });

@@ -1,10 +1,11 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ExecutionContext, UISchema } from '@platform/schema';
+import type { ExecutionContext, JSONValue, UIComponent } from '@platform/schema';
+import type { AdapterContext } from '@platform/react-renderer';
 import { createFallbackI18nProvider } from '@platform/i18n';
-import { RenderPage } from '@platform/react-renderer';
-import { registerHighchartsAdapter } from '../src/index';
+import { eventBus } from '@platform/runtime';
+import { registerHighchartsAdapter, renderChart } from '../src/index';
 
 const context: ExecutionContext = {
   tenantId: 'tenant-1',
@@ -22,25 +23,51 @@ const context: ExecutionContext = {
 describe('react-highcharts-adapter', () => {
   it('renders inline bar chart', () => {
     registerHighchartsAdapter();
-    const schema: UISchema = {
-      version: '1.0.0',
-      pageId: 'chart',
-      layout: { id: 'root', type: 'section', componentIds: ['chart'] },
-      components: [
-        {
-          id: 'chart',
-          type: 'chart',
-          adapterHint: 'highcharts.chart',
-          props: { series: [12, 8, 20] },
-          accessibility: { ariaLabelKey: 'runtime.revenue.chart.aria', keyboardNav: true, focusOrder: 1 },
-        },
-      ],
+    const component: UIComponent = {
+      id: 'chart',
+      type: 'chart',
+      adapterHint: 'highcharts.chart',
+      props: { series: [12, 8, 20] },
+      accessibility: { ariaLabelKey: 'runtime.revenue.chart.aria', keyboardNav: true, focusOrder: 1 },
     };
-
-    const html = renderToStaticMarkup(
-      <RenderPage uiSchema={schema} data={{}} context={context} i18n={createFallbackI18nProvider()} />,
-    );
+    const html = renderToStaticMarkup(renderChart(component, createAdapterContext({})));
 
     expect(html).toContain('<svg');
   });
+
+  it('publishes onDataPointClick when a bar is clicked', () => {
+    const handler = vi.fn();
+    eventBus.subscribe('onDataPointClick', handler);
+
+    const component: UIComponent = {
+      id: 'chart',
+      type: 'chart',
+      adapterHint: 'highcharts.chart',
+      props: { series: [12, 8, 20] },
+      accessibility: { ariaLabelKey: 'runtime.revenue.chart.aria', keyboardNav: true, focusOrder: 1 },
+    };
+
+    const ctx = createAdapterContext({});
+
+    const element = renderChart(component, ctx);
+    const rootChildren = React.Children.toArray(element.props.children);
+    const svg = rootChildren[2] as React.ReactElement;
+    const bars = React.Children.toArray(svg.props.children);
+    const firstBar = bars[0] as React.ReactElement;
+
+    firstBar.props.onClick?.();
+
+    expect(handler).toHaveBeenCalledWith({ componentId: 'chart', index: 0, value: 12 });
+    eventBus.unsubscribe('onDataPointClick', handler);
+  });
 });
+
+function createAdapterContext(data: Record<string, JSONValue>): AdapterContext {
+  return {
+    data,
+    context,
+    i18n: createFallbackI18nProvider(),
+    bindings: { data: {}, context: {}, computed: {} },
+    events: { onChange: () => undefined, onClick: () => undefined, onSubmit: () => undefined },
+  };
+}
