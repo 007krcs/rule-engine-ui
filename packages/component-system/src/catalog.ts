@@ -73,6 +73,21 @@ type TableProps = {
   columns?: Array<{ key: string; title: string; sortable?: boolean }>;
   data?: Array<Record<string, unknown>>;
   pageSize?: number;
+  grouping?: {
+    enabled?: boolean;
+    keys?: string[];
+  };
+  pivot?: {
+    enabled?: boolean;
+    rowKey?: string;
+    pivotKey?: string;
+    valueKey?: string;
+    aggregation?: 'sum' | 'avg' | 'min' | 'max' | 'count';
+  };
+  aggregation?: {
+    enabled?: boolean;
+    config?: Record<string, 'sum' | 'avg' | 'min' | 'max' | 'count'>;
+  };
   ariaLabel?: string;
 };
 
@@ -80,6 +95,44 @@ type ChartProps = {
   type?: string;
   data?: Array<{ x: string | number; y: number }>;
   showGrid?: boolean;
+  ariaLabel?: string;
+  indicators?: Array<{
+    type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'BOLLINGER';
+    period?: number;
+    fastPeriod?: number;
+    slowPeriod?: number;
+    signalPeriod?: number;
+    stdDev?: number;
+  }>;
+  multiAxis?: {
+    enabled?: boolean;
+    leftTitle?: string;
+    rightTitle?: string;
+  };
+  overlays?: Array<{
+    id: string;
+    type: 'line' | 'area' | 'band';
+    axis?: 'left' | 'right';
+    color?: string;
+  }>;
+};
+
+type MapProps = {
+  mapLayers?: Array<{
+    id: string;
+    type: 'vector' | 'geojson' | 'heatmap' | 'route';
+    source: string;
+    visible?: boolean;
+  }>;
+  clusterEnabled?: boolean;
+  animationSpeed?: number;
+  projection?: 'mercator' | 'globe';
+  ariaLabel?: string;
+};
+
+type MlDashboardProps = {
+  modelId?: string;
+  explanationMode?: 'local' | 'global';
   ariaLabel?: string;
 };
 
@@ -591,6 +644,27 @@ const defaultCatalog: ComponentCatalogEntry[] = [
         min: 1,
         defaultValue: 10,
       },
+      grouping: {
+        kind: 'json',
+        label: 'Grouping',
+        description: 'Enable/disable row grouping and group keys.',
+        editable: false,
+        defaultValue: { enabled: false, keys: [] },
+      },
+      pivot: {
+        kind: 'json',
+        label: 'Pivot',
+        description: 'Enable pivot mode and configure row/pivot/value fields.',
+        editable: false,
+        defaultValue: { enabled: false },
+      },
+      aggregation: {
+        kind: 'json',
+        label: 'Aggregation',
+        description: 'Enable summary aggregations (sum/avg/min/max/count).',
+        editable: false,
+        defaultValue: { enabled: false, config: {} },
+      },
       ariaLabel: {
         kind: 'string',
         label: 'ARIA Label',
@@ -608,6 +682,9 @@ const defaultCatalog: ComponentCatalogEntry[] = [
         { name: 'Globex', status: 'Pending' },
       ],
       pageSize: 10,
+      grouping: { enabled: false, keys: [] },
+      pivot: { enabled: false },
+      aggregation: { enabled: false, config: {} },
     } satisfies Partial<TableProps>,
     bindings: [],
     events: [
@@ -622,6 +699,90 @@ const defaultCatalog: ComponentCatalogEntry[] = [
     },
     documentation: {
       summary: 'Displays structured data with optional sorting.',
+    },
+  },
+  {
+    type: 'display.dataGrid',
+    displayName: 'Advanced Data Grid',
+    category: 'Data Display',
+    description: 'Virtualized grid with grouping, pivot, aggregation, and server-side mode.',
+    icon: 'table',
+    adapterHint: 'native.display.dataGrid',
+    props: {
+      columns: {
+        kind: 'json',
+        label: 'Columns',
+        description: 'Column definitions for the grid.',
+        editable: false,
+        defaultValue: [
+          { key: 'region', title: 'Region' },
+          { key: 'revenue', title: 'Revenue' },
+        ],
+      },
+      data: {
+        kind: 'json',
+        label: 'Rows',
+        description: 'Row data for the grid.',
+        editable: false,
+        defaultValue: [
+          { region: 'NA', revenue: 42 },
+          { region: 'EU', revenue: 31 },
+        ],
+      },
+      grouping: {
+        kind: 'json',
+        label: 'Grouping',
+        description: 'Enable/disable row grouping and group keys.',
+        editable: false,
+        defaultValue: { enabled: false, keys: [] },
+      },
+      pivot: {
+        kind: 'json',
+        label: 'Pivot',
+        description: 'Enable pivot mode and configure row/pivot/value fields.',
+        editable: false,
+        defaultValue: { enabled: false },
+      },
+      aggregation: {
+        kind: 'json',
+        label: 'Aggregation',
+        description: 'Enable summary aggregations (sum/avg/min/max/count).',
+        editable: false,
+        defaultValue: { enabled: false, config: {} },
+      },
+      ariaLabel: {
+        kind: 'string',
+        label: 'ARIA Label',
+        description: 'Assistive label for the data grid.',
+        defaultValue: '',
+      },
+    },
+    defaultProps: {
+      columns: [
+        { key: 'region', title: 'Region' },
+        { key: 'revenue', title: 'Revenue' },
+      ],
+      data: [
+        { region: 'NA', revenue: 42 },
+        { region: 'EU', revenue: 31 },
+      ],
+      grouping: { enabled: false, keys: [] },
+      pivot: { enabled: false },
+      aggregation: { enabled: false, config: {} },
+    } satisfies Partial<TableProps>,
+    bindings: [],
+    events: [
+      {
+        name: 'onRowClick',
+        description: 'Emitted when a row is clicked.',
+      },
+    ],
+    accessibility: {
+      role: 'grid',
+      recommendedProps: ['ariaLabel'],
+    },
+    documentation: {
+      summary: 'Enterprise data grid with advanced analytical features.',
     },
   },
   {
@@ -660,6 +821,27 @@ const defaultCatalog: ComponentCatalogEntry[] = [
         description: 'Show baseline/grid for orientation.',
         defaultValue: true,
       },
+      indicators: {
+        kind: 'json',
+        label: 'Indicators',
+        description: 'Financial indicator settings (SMA/EMA/RSI/MACD/Bollinger).',
+        editable: false,
+        defaultValue: [{ type: 'SMA', period: 3 }],
+      },
+      multiAxis: {
+        kind: 'json',
+        label: 'Multi Axis',
+        description: 'Configure left/right axis settings.',
+        editable: false,
+        defaultValue: { enabled: false },
+      },
+      overlays: {
+        kind: 'json',
+        label: 'Overlays',
+        description: 'Overlay layers and styles.',
+        editable: false,
+        defaultValue: [],
+      },
       ariaLabel: {
         kind: 'string',
         label: 'ARIA Label',
@@ -676,6 +858,9 @@ const defaultCatalog: ComponentCatalogEntry[] = [
         { x: 'Q3', y: 55 },
         { x: 'Q4', y: 75 },
       ],
+      indicators: [{ type: 'SMA', period: 3 }],
+      multiAxis: { enabled: false },
+      overlays: [],
     } satisfies Partial<ChartProps>,
     bindings: [],
     events: [],
@@ -685,6 +870,117 @@ const defaultCatalog: ComponentCatalogEntry[] = [
     },
     documentation: {
       summary: 'Lightweight charting for dashboards and summaries.',
+    },
+  },
+  {
+    type: 'display.map',
+    displayName: 'Map',
+    category: 'Data Display',
+    description: 'Map visualization with layers, clustering, and route animation controls.',
+    icon: 'map',
+    adapterHint: 'native.display.map',
+    props: {
+      mapLayers: {
+        kind: 'json',
+        label: 'Map Layers',
+        description: 'Layer config for vector/geojson/heatmap/route layers.',
+        editable: false,
+        defaultValue: [{ id: 'base', type: 'vector', source: 'world', visible: true }],
+      },
+      clusterEnabled: {
+        kind: 'boolean',
+        label: 'Cluster Markers',
+        description: 'Enable marker clustering.',
+        defaultValue: true,
+      },
+      animationSpeed: {
+        kind: 'number',
+        label: 'Animation Speed',
+        description: 'Route animation speed multiplier.',
+        min: 0.1,
+        defaultValue: 1,
+      },
+      projection: {
+        kind: 'enum',
+        label: 'Projection',
+        description: 'Map projection mode.',
+        options: [
+          { value: 'mercator', label: 'Mercator' },
+          { value: 'globe', label: 'Globe' },
+        ],
+        defaultValue: 'mercator',
+      },
+      ariaLabel: {
+        kind: 'string',
+        label: 'ARIA Label',
+        description: 'Assistive label for the map.',
+        defaultValue: '',
+      },
+    },
+    defaultProps: {
+      mapLayers: [{ id: 'base', type: 'vector', source: 'world', visible: true }],
+      clusterEnabled: true,
+      animationSpeed: 1,
+      projection: 'mercator',
+    } satisfies Partial<MapProps>,
+    bindings: [],
+    events: [
+      {
+        name: 'onMarkerClick',
+        description: 'Emitted when a map marker is selected.',
+      },
+    ],
+    accessibility: {
+      role: 'img',
+      recommendedProps: ['ariaLabel'],
+    },
+    documentation: {
+      summary: 'Supports geo layers and animated routes for geospatial dashboards.',
+    },
+  },
+  {
+    type: 'display.mlDashboard',
+    displayName: 'ML Dashboard',
+    category: 'Data Display',
+    description: 'Model explainability view with local/global contribution analysis.',
+    icon: 'chart',
+    adapterHint: 'native.display.mlDashboard',
+    props: {
+      modelId: {
+        kind: 'string',
+        label: 'Model Id',
+        description: 'Model registry identifier to bind metadata and traces.',
+        defaultValue: 'credit-risk-v1',
+      },
+      explanationMode: {
+        kind: 'enum',
+        label: 'Explanation Mode',
+        description: 'Choose local or global explanation.',
+        options: [
+          { value: 'local', label: 'Local' },
+          { value: 'global', label: 'Global' },
+        ],
+        defaultValue: 'local',
+      },
+      ariaLabel: {
+        kind: 'string',
+        label: 'ARIA Label',
+        description: 'Assistive label for the explainability dashboard.',
+        defaultValue: '',
+      },
+    },
+    defaultProps: {
+      modelId: 'credit-risk-v1',
+      explanationMode: 'local',
+    } satisfies Partial<MlDashboardProps>,
+    bindings: [],
+    events: [],
+    accessibility: {
+      role: 'region',
+      recommendedProps: ['ariaLabel'],
+    },
+    documentation: {
+      summary: 'Surfaces contribution waterfalls and bias indicators for a selected model.',
     },
   },
   {

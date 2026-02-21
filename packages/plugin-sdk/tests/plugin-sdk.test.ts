@@ -57,4 +57,29 @@ describe('plugin-sdk', () => {
     expect(registry.listThemes()).toHaveLength(1);
     expect(registry.listRenderers()).toHaveLength(1);
   });
+
+  it('supports external registerComponent interface shape', () => {
+    const registry = createPluginRegistry();
+    const ExternalWidget = () => null;
+    registry.registerComponent({
+      type: 'external.widget',
+      renderer: ExternalWidget,
+      contract: {
+        type: 'object',
+        properties: {
+          label: { type: 'string', title: 'Label' },
+          value: { type: 'number', title: 'Value' },
+        },
+      },
+      capabilities: ['data-binding', 'events'],
+      displayName: 'External Widget',
+      category: 'Data Display',
+    });
+
+    const components = registry.listComponents();
+    expect(components).toHaveLength(1);
+    expect(components[0]?.contract.type).toBe('external.widget');
+    expect(components[0]?.implementation).toBe(ExternalWidget);
+    expect(components[0]?.capabilities).toEqual(['data-binding', 'events']);
+  });
 });

@@ -1,4 +1,5 @@
 import React from 'react';
+import { createChartRenderer, type IndicatorConfig } from '@platform/chart-engine';
 import type { UIComponent } from '@platform/schema';
 import type { AdapterContext } from '@platform/react-renderer';
 import { registerAdapter } from '@platform/react-renderer';
@@ -18,10 +19,17 @@ export function renderChart(component: UIComponent, ctx: AdapterContext): React.
     ? ctx.i18n.t(component.i18n.labelKey)
     : String(component.props?.title ?? component.id);
   const series = resolveSeries(component, ctx);
+  const indicators = resolveIndicators(component.props?.indicators);
+  const chartEngine = createChartRenderer({
+    chartId: component.id,
+    series,
+    indicators,
+  });
+  const displaySeries = chartEngine.baseSeries;
   const width = 260;
   const height = 140;
   const padding = 16;
-  const bars = buildBars(series, width, height, padding);
+  const bars = buildBars(displaySeries, width, height, padding);
   return (
     <div
       aria-label={ariaLabel}
@@ -49,12 +57,16 @@ export function renderChart(component: UIComponent, ctx: AdapterContext): React.
               rx={3}
               fill="#60a5fa"
               onClick={() =>
-                eventBus.publish('onDataPointClick', {
-                  componentId: component.id,
-                  index,
-                  value: bar.value,
-                })
+                (() => {
+                  eventBus.publish('onDataPointClick', {
+                    componentId: component.id,
+                    index,
+                    value: bar.value,
+                  });
+                  chartEngine.emitDrillDown(index);
+                })()
               }
+              onPointerMove={() => chartEngine.emitCrosshairMove(index)}
             />
           ))}
         </svg>
@@ -73,6 +85,39 @@ function resolveSeries(component: UIComponent, ctx: AdapterContext): number[] {
     return fallback.map((value) => Number(value)).filter((value) => Number.isFinite(value));
   }
   return [];
+}
+
+function resolveIndicators(raw: unknown): IndicatorConfig[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const indicators: IndicatorConfig[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const record = entry as Record<string, unknown>;
+    const type = record.type;
+    if (
+      type !== 'SMA' &&
+      type !== 'EMA' &&
+      type !== 'RSI' &&
+      type !== 'MACD' &&
+      type !== 'BOLLINGER'
+    ) {
+      continue;
+    }
+    indicators.push({
+      type,
+      period: asNumber(record.period),
+      fastPeriod: asNumber(record.fastPeriod),
+      slowPeriod: asNumber(record.slowPeriod),
+      signalPeriod: asNumber(record.signalPeriod),
+      stdDev: asNumber(record.stdDev),
+    });
+  }
+  return indicators.length > 0 ? indicators : undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return value;
 }
 
 function buildBars(series: number[], width: number, height: number, padding: number) {

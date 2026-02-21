@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "dependencies": {
-    "@platform/component-contract": "workspace:*"
+    "@platform/component-contract": "workspace:*",
+    "@platform/data-grid": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",

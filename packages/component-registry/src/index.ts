@@ -461,7 +461,30 @@ const CATALOG_SEEDS: SeedComponent[] = [
         id: stringSchema('Id'),
         header: stringSchema('Header'),
       })),
+      grouping: objectSchema('Grouping', {
+        enabled: booleanSchema('Enabled'),
+        keys: arraySchema('Keys', stringSchema('Key')),
+      }),
+      pivot: objectSchema('Pivot', {
+        enabled: booleanSchema('Enabled'),
+        rowKey: stringSchema('Row Key'),
+        pivotKey: stringSchema('Pivot Key'),
+        valueKey: stringSchema('Value Key'),
+        aggregation: stringEnumSchema('Aggregation', ['sum', 'avg', 'min', 'max', 'count']),
+      }),
+      aggregation: objectSchema('Aggregation', {
+        enabled: booleanSchema('Enabled'),
+        config: objectSchema('Config', {
+          field: stringSchema('Field'),
+          type: stringEnumSchema('Type', ['sum', 'avg', 'min', 'max', 'count']),
+        }),
+      }),
     }),
+    defaultProps: {
+      grouping: { enabled: false, keys: [] },
+      pivot: { enabled: false },
+      aggregation: { enabled: false, config: {} },
+    },
     bindings: { data: ['rows'] },
     tokensUsed: ['--pf-table-bg', '--pf-table-border', '--pf-table-header-bg'],
   }),
@@ -479,6 +502,39 @@ const CATALOG_SEEDS: SeedComponent[] = [
     tokensUsed: ['--pf-font-size-md', '--pf-line-height-normal'],
   }),
   seed('platform.imageList', 'ImageList', 'Data Display', 'Responsive grid of images with captions.', 'planned'),
+  seed('platform.map', 'Map', 'Data Display', 'Map component with layer controls and clustering.', 'beta', {
+    propsSchema: objectSchema('Map', {
+      mapLayers: arraySchema('Map Layers', objectSchema('Layer', {
+        id: stringSchema('Id'),
+        type: stringEnumSchema('Type', ['vector', 'geojson', 'heatmap', 'route']),
+        source: stringSchema('Source'),
+        visible: booleanSchema('Visible'),
+      })),
+      clusterEnabled: booleanSchema('Cluster Markers'),
+      animationSpeed: numberSchema('Animation Speed', 0.1),
+      projection: stringEnumSchema('Projection', ['mercator', 'globe']),
+    }),
+    defaultProps: {
+      mapLayers: [{ id: 'base', type: 'vector', source: 'world', visible: true }],
+      clusterEnabled: true,
+      animationSpeed: 1,
+      projection: 'mercator',
+    },
+    bindings: { data: ['markers', 'routes', 'geojson'] },
+    tokensUsed: ['--pf-surface-layer', '--pf-color-primary-500'],
+  }),
+  seed('platform.mlDashboard', 'ML Dashboard', 'Data Display', 'Model explainability surface with local/global contribution views.', 'beta', {
+    propsSchema: objectSchema('ML Dashboard', {
+      modelId: stringSchema('Model Id'),
+      explanationMode: stringEnumSchema('Explanation Mode', ['local', 'global']),
+    }),
+    defaultProps: {
+      modelId: 'credit-risk-v1',
+      explanationMode: 'local',
+    },
+    bindings: { data: ['predictionTraces', 'modelMetadata'] },
+    tokensUsed: ['--pf-surface-layer', '--pf-color-primary-500'],
+  }),
 
   // Feedback
   seed('platform.alert', 'Alert', 'Feedback', 'Inline alert for status messaging.', 'stable', {
@@ -767,8 +823,33 @@ const CATALOG_SEEDS: SeedComponent[] = [
     propsSchema: objectSchema('Chart', {
       title: stringSchema('Title', 'Chart title.'),
       series: arraySchema('Series', numberSchema('Point')),
+      indicators: arraySchema('Indicators', objectSchema('Indicator', {
+        type: stringEnumSchema('Type', ['SMA', 'EMA', 'RSI', 'MACD', 'BOLLINGER']),
+        period: numberSchema('Period', 1),
+        fastPeriod: numberSchema('Fast Period', 1),
+        slowPeriod: numberSchema('Slow Period', 1),
+        signalPeriod: numberSchema('Signal Period', 1),
+        stdDev: numberSchema('Std Dev', 1),
+      })),
+      multiAxis: objectSchema('Multi-axis', {
+        enabled: booleanSchema('Enabled'),
+        leftTitle: stringSchema('Left Axis Title'),
+        rightTitle: stringSchema('Right Axis Title'),
+      }),
+      overlays: arraySchema('Overlays', objectSchema('Overlay', {
+        id: stringSchema('Id'),
+        type: stringEnumSchema('Type', ['line', 'area', 'band']),
+        axis: stringEnumSchema('Axis', ['left', 'right']),
+        color: stringSchema('Color'),
+      })),
     }),
-    defaultProps: { title: 'Revenue', series: [2, 7, 4, 9] },
+    defaultProps: {
+      title: 'Revenue',
+      series: [2, 7, 4, 9],
+      indicators: [{ type: 'SMA', period: 3 }],
+      multiAxis: { enabled: false },
+      overlays: [],
+    },
     bindings: { data: ['series'] },
     tokensUsed: ['--pf-color-primary-500'],
   }),

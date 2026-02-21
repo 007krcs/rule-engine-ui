@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { BuilderShell } from '../../../components/BuilderShell';
-import { getBuilderComponentCatalog } from '../../../lib/plugin-host';
+import { getBuilderComponentCatalog, loadBuilderPlugins } from '../../../lib/plugin-host';
 import { summarizeBuilderWorkspace } from '../../../lib/builder-modules';
 import { createInitialBuilderFlowState } from '../../../lib/flow-engine';
 import { WorkspaceHeader } from '../../../components/WorkspaceHeader';
@@ -11,7 +11,18 @@ import type { BuilderPaletteEntry } from '../../../components/BuilderShell';
 
 export default function LegacyBuilderPage() {
   const initialFlowState = useMemo(() => createInitialBuilderFlowState(), []);
-  const componentContracts = useMemo(() => getBuilderComponentCatalog(), []);
+  const [componentContracts, setComponentContracts] = React.useState(() => getBuilderComponentCatalog());
+
+  React.useEffect(() => {
+    let active = true;
+    void loadBuilderPlugins().then(() => {
+      if (!active) return;
+      setComponentContracts(getBuilderComponentCatalog());
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const summary = useMemo(
     () =>

@@ -7,6 +7,7 @@
   "files": ["dist"],
   "dependencies": {
     "@platform/i18n": "workspace:*",
+    "@platform/runtime": "workspace:*",
     "@platform/rules-engine": "workspace:*",
     "@platform/schema": "workspace:*",
     "@platform/ui-kit": "workspace:*"

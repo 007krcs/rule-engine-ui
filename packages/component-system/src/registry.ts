@@ -4,11 +4,13 @@ import { Button } from './Button';
 import { Chart } from './Chart';
 import { CurrencyInput } from './CurrencyInput';
 import { DatePicker } from './DatePicker';
+import { DataGrid } from './DataGrid';
 import { IBANInput } from './IBANInput';
 import { Input } from './Input';
 import { OTPInput } from './OTPInput';
 import { Stepper } from './Stepper';
 import { Table } from './Table';
+import { Timeline } from './Timeline';
 import { defaultCatalog } from './catalog';
 
 export type ComponentImplementation = ComponentType<any>;
@@ -22,6 +24,8 @@ const defaultImplementationMap: Record<string, ComponentImplementation> = {
   'input.iban': IBANInput,
   'navigation.stepper': Stepper,
   'display.table': Table,
+  'display.dataGrid': DataGrid,
+  'display.timeline': Timeline,
   'display.chart': Chart,
 };
 

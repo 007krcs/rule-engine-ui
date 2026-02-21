@@ -1,20 +1,15 @@
 .tableWrap {
   width: 100%;
-  overflow-x: auto;
   border: 1px solid var(--rf-color-border, #c6d2e1);
   border-radius: var(--rf-radius-md, 10px);
   background: var(--rf-color-surface, #ffffff);
   box-shadow: var(--rf-shadow-sm, 0 1px 2px rgba(16, 36, 63, 0.08));
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--rf-font-size-sm, 0.8125rem);
+  overflow: hidden;
 }
 
 .headerRow {
   background: var(--rf-color-surface-subtle, #f7f9fc);
+  border-bottom: 1px solid var(--rf-color-border, #c6d2e1);
 }
 
 .th,
@@ -27,6 +22,7 @@
 .th {
   font-weight: 600;
   color: var(--rf-color-text, #13283d);
+  font-size: var(--rf-font-size-sm, 0.8125rem);
 }
 
 .sortButton {

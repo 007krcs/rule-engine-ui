@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @platform/schema --filter @platform/component-system --filter @platform/core-runtime build",
-    "prebuild": "pnpm --filter @platform/schema --filter @platform/component-system --filter @platform/core-runtime build",
+    "predev": "pnpm --filter @platform/schema --filter @platform/data-grid --filter @platform/map-engine --filter @platform/ml-dashboard --filter @platform/component-system --filter @platform/core-runtime build",
+    "prebuild": "pnpm --filter @platform/schema --filter @platform/data-grid --filter @platform/map-engine --filter @platform/ml-dashboard --filter @platform/component-system --filter @platform/core-runtime build",
     "dev": "next dev --port 3201",
     "build": "next build",
     "start": "next start --port 3201",

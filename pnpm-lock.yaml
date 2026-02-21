@@ -545,6 +545,9 @@ importers:
 
   packages/adapters/react-highcharts-adapter:
     dependencies:
+      '@platform/chart-engine':
+        specifier: workspace:*
+        version: link:../../chart-engine
       '@platform/react-renderer':
         specifier: workspace:*
         version: link:../react-renderer
@@ -567,6 +570,9 @@ importers:
 
   packages/adapters/react-highcharts-real:
     dependencies:
+      '@platform/chart-engine':
+        specifier: workspace:*
+        version: link:../../chart-engine
       '@platform/react-renderer':
         specifier: workspace:*
         version: link:../react-renderer
@@ -589,6 +595,9 @@ importers:
 
   packages/adapters/react-highcharts-real-adapter:
     dependencies:
+      '@platform/chart-engine':
+        specifier: workspace:*
+        version: link:../../chart-engine
       '@platform/react-renderer':
         specifier: workspace:*
         version: link:../react-renderer
@@ -670,6 +679,9 @@ importers:
       '@platform/rules-engine':
         specifier: workspace:*
         version: link:../../rules-engine
+      '@platform/runtime':
+        specifier: workspace:*
+        version: link:../../runtime
       '@platform/schema':
         specifier: workspace:*
         version: link:../../schema
@@ -722,6 +734,12 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
+  packages/chart-engine:
+    dependencies:
+      '@platform/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
   packages/component-contract: {}
 
   packages/component-registry:
@@ -738,6 +756,9 @@ importers:
       '@platform/component-contract':
         specifier: workspace:*
         version: link:../component-contract
+      '@platform/data-grid':
+        specifier: workspace:*
+        version: link:../data-grid
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.4
@@ -782,6 +803,8 @@ importers:
         specifier: workspace:*
         version: link:../validator
 
+  packages/data-grid: {}
+
   packages/design-tokens: {}
 
   packages/flow-engine:
@@ -801,6 +824,18 @@ importers:
       intl-messageformat:
         specifier: ^10.7.8
         version: 10.7.18
+
+  packages/map-engine:
+    dependencies:
+      '@platform/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
+  packages/ml-dashboard:
+    dependencies:
+      '@platform/chart-engine':
+        specifier: workspace:*
+        version: link:../chart-engine
 
   packages/observability:
     dependencies:
@@ -822,6 +857,9 @@ importers:
       '@platform/schema':
         specifier: workspace:*
         version: link:../schema
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.4
 
   packages/rules-engine:
     dependencies:

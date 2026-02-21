@@ -120,4 +120,31 @@ describe('validator', () => {
     expect(result.issues.some((issue) => issue.message.includes('minDate'))).toBe(true);
     expect(result.issues.some((issue) => issue.message.includes('minTime'))).toBe(true);
   });
+
+  it('accepts component dataSource config', () => {
+    const schema: UISchema = {
+      version: '1.0.0',
+      pageId: 'data-source',
+      layout: { id: 'root', type: 'section', componentIds: ['ordersTable'] },
+      components: [
+        {
+          id: 'ordersTable',
+          type: 'table',
+          adapterHint: 'aggrid.table',
+          dataSource: {
+            type: 'rest',
+            endpoint: 'https://api.example.com/orders',
+          },
+          accessibility: {
+            ariaLabelKey: 'runtime.orders.table.aria',
+            keyboardNav: true,
+            focusOrder: 1,
+          },
+        },
+      ],
+    };
+
+    const result = validateUISchema(schema);
+    expect(result.valid).toBe(true);
+  });
 });

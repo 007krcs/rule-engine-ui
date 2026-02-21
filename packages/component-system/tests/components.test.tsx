@@ -36,7 +36,7 @@ describe('component-system UI primitives', () => {
     );
 
     const input = getByLabelText('Amount') as HTMLInputElement;
-    expect(input.value).toMatch(/\\$/);
+    expect(input.value).toMatch(/\$/);
 
     fireEvent.focus(input);
     expect(input.value).toBe('1234.5');

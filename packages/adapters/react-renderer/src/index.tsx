@@ -4,11 +4,13 @@ import React, { useEffect, useState } from 'react';
 import type { I18nProvider } from '@platform/i18n';
 import { createFallbackI18nProvider } from '@platform/i18n';
 import { evaluateCondition } from '@platform/rules-engine';
+import { createDataSourceAdapter, type DataSourceAdapter } from '@platform/runtime';
 import { UnsupportedComponentPlaceholder } from '@platform/ui-kit';
 import type {
   ExecutionContext,
   JSONValue,
   UIComponent,
+  UIComponentDataSource,
   UIEventAction,
   UIGridItem,
   UISchema,
@@ -46,6 +48,8 @@ export interface RendererProps {
   uiSchema: UISchema;
   data: Record<string, JSONValue>;
   context: ExecutionContext;
+  dataSourceAdapter?: DataSourceAdapter;
+  dataSourceAdapterFactory?: (config: UIComponentDataSource) => DataSourceAdapter;
   adapterRegistry?: AdapterRegistry;
   i18n?: I18nProvider;
   onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
@@ -164,6 +168,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
   const mode = props.mode ?? 'controlled';
   const [localData, setLocalData] = useState(props.data);
   const [localContext, setLocalContext] = useState(props.context);
+  const [componentDataById, setComponentDataById] = useState<Record<string, JSONValue>>({});
 
   useEffect(() => {
     if (mode !== 'internal') return;
@@ -174,6 +179,46 @@ export function RenderPage(props: RendererProps): React.ReactElement {
     if (mode !== 'internal') return;
     setLocalContext(props.context);
   }, [mode, props.context]);
+
+  useEffect(() => {
+    const componentsWithDataSource = props.uiSchema.components.filter((component) => component.dataSource);
+    if (componentsWithDataSource.length === 0) {
+      setComponentDataById({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadComponentData = async () => {
+      const next: Record<string, JSONValue> = {};
+      await Promise.all(
+        componentsWithDataSource.map(async (component) => {
+          const dataSource = component.dataSource;
+          if (!dataSource) return;
+          try {
+            const adapter = resolveDataSourceAdapter(dataSource, props);
+            await adapter.connect();
+            const payload = await adapter.fetch({
+              endpoint: dataSource.endpoint,
+              query: dataSource.query,
+              componentId: component.id,
+              type: dataSource.type,
+            });
+            next[component.id] = toJSONValue(payload);
+          } catch {
+            // Backward compatibility: silently ignore failed remote loads.
+          }
+        }),
+      );
+
+      if (cancelled) return;
+      setComponentDataById(next);
+    };
+
+    void loadComponentData();
+    return () => {
+      cancelled = true;
+    };
+  }, [props.dataSourceAdapter, props.dataSourceAdapterFactory, props.uiSchema.components]);
 
   const currentData = mode === 'internal' ? localData : props.data;
   const currentContext = mode === 'internal' ? localContext : props.context;
@@ -244,7 +289,12 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       },
     };
 
-    const bindings = resolveBindings(componentForAdapter, renderData, renderContext);
+    const componentData = resolveDataForComponent(
+      renderData,
+      componentForAdapter,
+      componentDataById[component.id],
+    );
+    const bindings = resolveBindings(componentForAdapter, componentData, renderContext);
     const events = buildEvents(componentForAdapter, {
       onEvent: props.onEvent,
       onAdapterEvent: props.onAdapterEvent,
@@ -257,7 +307,7 @@ export function RenderPage(props: RendererProps): React.ReactElement {
     const rendered = (
       <div data-component-id={component.id}>
         {adapter(componentForAdapter, {
-          data: renderData,
+          data: componentData,
           context: renderContext,
           events,
           i18n,
@@ -390,6 +440,75 @@ export function RenderPage(props: RendererProps): React.ReactElement {
       {renderLayout(props.uiSchema.layout)}
     </div>
   );
+}
+
+function resolveDataSourceAdapter(
+  dataSource: UIComponentDataSource,
+  props: RendererProps,
+): DataSourceAdapter {
+  if (props.dataSourceAdapterFactory) {
+    return props.dataSourceAdapterFactory(dataSource);
+  }
+  if (props.dataSourceAdapter) {
+    return props.dataSourceAdapter;
+  }
+  return createDataSourceAdapter(dataSource);
+}
+
+function resolveDataForComponent(
+  baseData: Record<string, JSONValue>,
+  component: UIComponent,
+  sourcedData: JSONValue | undefined,
+): Record<string, JSONValue> {
+  if (sourcedData === undefined) return baseData;
+
+  const withComponentScope: Record<string, JSONValue> = {
+    ...baseData,
+    [component.id]: sourcedData,
+  };
+
+  const valueBinding = component.bindings?.data?.valuePath ?? component.bindings?.data?.value;
+  if (typeof valueBinding === 'string' && valueBinding.trim().length > 0) {
+    const parsed = parseBindingPath(normalizeBindingPath(valueBinding, 'data'), 'data');
+    if (parsed?.target === 'data') {
+      return setPath(withComponentScope, parsed.path, sourcedData);
+    }
+  }
+
+  if (isRecordValue(sourcedData)) {
+    return {
+      ...withComponentScope,
+      ...sourcedData,
+    };
+  }
+
+  return withComponentScope;
+}
+
+function toJSONValue(value: unknown): JSONValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => toJSONValue(entry));
+  }
+  if (value && typeof value === 'object') {
+    const next: Record<string, JSONValue> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      next[key] = toJSONValue(entry);
+    }
+    return next;
+  }
+  return String(value);
+}
+
+function isRecordValue(value: JSONValue): value is Record<string, JSONValue> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function mergeComponent(

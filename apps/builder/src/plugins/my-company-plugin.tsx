@@ -48,7 +48,7 @@ export function RatingStar({
   );
 }
 
-const ratingStarContract: ComponentContract<RatingStarProps> = {
+const ratingStarContract: ComponentContract = {
   type: 'myco.ratingStar',
   displayName: 'Rating Star',
   category: 'Form Controls',

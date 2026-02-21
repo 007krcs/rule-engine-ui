@@ -1,12 +1,20 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@platform/component-system';
-import { getBuilderComponentCatalog } from '../../lib/plugin-host';
+import { getBuilderComponentCatalog, loadBuilderPlugins } from '../../lib/plugin-host';
 import styles from '../../components/studio/Studio.module.css';
 
-const catalog = getBuilderComponentCatalog();
-const groupedCatalog = groupByCategory(catalog);
-
 export default function ComponentStudioHome() {
+  const [catalog, setCatalog] = useState(() => getBuilderComponentCatalog());
+  useEffect(() => {
+    void loadBuilderPlugins().then(() => {
+      setCatalog(getBuilderComponentCatalog());
+    });
+  }, []);
+  const groupedCatalog = useMemo(() => groupByCategory(catalog), [catalog]);
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>

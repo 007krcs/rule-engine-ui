@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/design-tokens build",
-    "prebuild": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/core-runtime --filter @platform/design-tokens build",
+    "predev": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/data-grid --filter @platform/map-engine --filter @platform/ml-dashboard --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/design-tokens build",
+    "prebuild": "pnpm --filter @platform/schema --filter @platform/component-contract --filter @platform/data-grid --filter @platform/map-engine --filter @platform/ml-dashboard --filter @platform/component-system --filter @platform/plugin-sdk --filter @platform/core-runtime --filter @platform/design-tokens build",
     "dev": "next dev --port 3200",
     "build": "next build",
     "start": "next start --port 3200",

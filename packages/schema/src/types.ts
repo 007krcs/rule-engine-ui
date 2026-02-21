@@ -145,6 +145,7 @@ export interface UIComponent {
   type: string;
   adapterHint: string;
   props?: Record<string, JSONValue>;
+  dataSource?: UIComponentDataSource;
   bindings?: BindingSpec;
   validations?: ValidationSpec;
   i18n?: I18nSpec;
@@ -152,6 +153,12 @@ export interface UIComponent {
   responsive?: ResponsiveSpec;
   events?: EventHandlers;
   rules?: UIComponentRules;
+}
+
+export interface UIComponentDataSource {
+  type: 'rest' | 'graphql' | 'websocket';
+  endpoint: string;
+  query?: string;
 }
 
 export interface BindingSpec {

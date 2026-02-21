@@ -275,6 +275,7 @@
         "type": { "type": "string", "minLength": 1 },
         "adapterHint": { "type": "string", "minLength": 1 },
         "props": { "type": "object", "additionalProperties": true },
+        "dataSource": { "$ref": "#/$defs/componentDataSource" },
         "bindings": { "$ref": "#/$defs/bindings" },
         "validations": { "$ref": "#/$defs/validations" },
         "i18n": { "$ref": "#/$defs/i18n" },
@@ -282,6 +283,16 @@
         "responsive": { "$ref": "#/$defs/responsive" },
         "events": { "$ref": "#/$defs/events" },
         "rules": { "$ref": "#/$defs/componentRules" }
+      }
+    },
+    "componentDataSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "endpoint"],
+      "properties": {
+        "type": { "type": "string", "enum": ["rest", "graphql", "websocket"] },
+        "endpoint": { "type": "string", "minLength": 1 },
+        "query": { "type": "string", "minLength": 1 }
       }
     },
     "i18n": {

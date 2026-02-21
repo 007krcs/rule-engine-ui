@@ -1,4 +1,5 @@
 import styles from './Chart.module.css';
+import { buildDummyChartPoints } from './dummy-data';
 
 export type ChartType = 'bar' | 'line';
 
@@ -14,6 +15,7 @@ export interface ChartProps {
   height?: number;
   ariaLabel?: string;
   showGrid?: boolean;
+  useDummyDataWhenEmpty?: boolean;
 }
 
 export function Chart({
@@ -23,8 +25,11 @@ export function Chart({
   height = 240,
   ariaLabel,
   showGrid = true,
+  useDummyDataWhenEmpty = true,
 }: ChartProps) {
-  if (!data.length) {
+  const resolvedData = data.length > 0 || !useDummyDataWhenEmpty ? data : buildDummyChartPoints(8);
+
+  if (!resolvedData.length) {
     return (
       <div className={styles.chart} role="img" aria-label={ariaLabel ?? 'Empty chart'}>
         <div className={styles.empty}>No data available</div>
@@ -32,19 +37,19 @@ export function Chart({
     );
   }
 
-  const summary = ariaLabel ?? buildSummary(type, data);
+  const summary = ariaLabel ?? buildSummary(type, resolvedData);
   const padding = 24;
-  const maxY = Math.max(0, ...data.map((point) => point.y));
-  const minY = Math.min(0, ...data.map((point) => point.y));
+  const maxY = Math.max(0, ...resolvedData.map((point) => point.y));
+  const minY = Math.min(0, ...resolvedData.map((point) => point.y));
   const range = maxY - minY || 1;
   const plotWidth = width - padding * 2;
   const plotHeight = height - padding * 2;
 
   const scaleX = (index: number) =>
-    padding + (data.length === 1 ? plotWidth / 2 : (index / (data.length - 1)) * plotWidth);
+    padding + (resolvedData.length === 1 ? plotWidth / 2 : (index / (resolvedData.length - 1)) * plotWidth);
   const scaleY = (value: number) => height - padding - ((value - minY) / range) * plotHeight;
 
-  const path = data
+  const path = resolvedData
     .map((point, index) => `${index === 0 ? 'M' : 'L'}${scaleX(index)},${scaleY(point.y)}`)
     .join(' ');
 
@@ -65,10 +70,10 @@ export function Chart({
             className={styles.gridLine}
           />
         ) : null}
-        {type === 'bar' ? renderBars(data, scaleX, scaleY, plotWidth, padding, height) : null}
+        {type === 'bar' ? renderBars(resolvedData, scaleX, scaleY, plotWidth, padding, height) : null}
         {type === 'line' ? <path d={path} className={styles.line} /> : null}
         {type === 'line'
-          ? data.map((point, index) => (
+          ? resolvedData.map((point, index) => (
               <circle
                 key={`${point.x}-${index}`}
                 cx={scaleX(index)}

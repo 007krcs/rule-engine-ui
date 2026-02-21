@@ -26,6 +26,7 @@ import {
   getBuilderComponentCatalog,
   getBuilderComponentRegistry,
   getBuilderRenderers,
+  loadBuilderPlugins,
 } from '../../../lib/plugin-host';
 import styles from '../../../components/studio/Studio.module.css';
 
@@ -38,9 +39,22 @@ type PropState = Record<string, ComponentPropValue>;
 export default function ComponentStudioDetail({ params }: StudioPageProps) {
   const router = useRouter();
   const componentType = decodeURIComponent(params.componentType);
-  const catalog = useMemo(() => getBuilderComponentCatalog(), []);
-  const registry = useMemo(() => getBuilderComponentRegistry(), []);
-  const renderers = useMemo(() => getBuilderRenderers(), []);
+  const [catalog, setCatalog] = useState(() => getBuilderComponentCatalog());
+  const [registry, setRegistry] = useState(() => getBuilderComponentRegistry());
+  const [renderers, setRenderers] = useState(() => getBuilderRenderers());
+
+  useEffect(() => {
+    let active = true;
+    void loadBuilderPlugins().then(() => {
+      if (!active) return;
+      setCatalog(getBuilderComponentCatalog());
+      setRegistry(getBuilderComponentRegistry());
+      setRenderers(getBuilderRenderers());
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const contract = useMemo(() => {
     return registry.getContract(componentType) ?? catalog.find((entry) => entry.type === componentType);
