@@ -444,7 +444,7 @@ export function ComponentLiveExample({ slug }: { slug: string }) {
           appBar={
             <PFAppBar position="static">
               <PFToolbar>
-                <PFTypography variant="h3">RuleFlow</PFTypography>
+                <PFTypography variant="h3">ECR</PFTypography>
               </PFToolbar>
             </PFAppBar>
           }

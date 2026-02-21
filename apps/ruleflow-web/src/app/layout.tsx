@@ -12,8 +12,8 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-sans', display: 
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 export const metadata = {
-  title: 'RuleFlow Platform',
-  description: 'Enterprise-grade headless UI + Flow + Rules platform',
+  title: 'Enterprise Configuration Runtime (ECR)',
+  description: 'Enterprise-grade schema-driven UI + Flow + Rules platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

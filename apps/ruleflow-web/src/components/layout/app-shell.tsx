@@ -319,11 +319,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <Link href="/" className={styles.logoLink}>
               <div className={styles.logoMark} aria-hidden="true">
-                RF
+                ECR
               </div>
               <div className={styles.logoText}>
-                <p className={styles.logoTitle}>RuleFlow Platform</p>
-                <p className={styles.logoSubtitle}>Enterprise Configuration Runtime</p>
+                <p className={styles.logoTitle}>Enterprise Configuration Runtime</p>
+                <p className={styles.logoSubtitle}>ECR</p>
               </div>
             </Link>
           </div>

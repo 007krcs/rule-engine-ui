@@ -696,7 +696,7 @@ function renderPreview(
           <PFCardContent>
             <PFAppBar position="static">
               <PFToolbar className={styles.toolbar}>
-                <PFTypography variant="h6">RuleFlow Workspace</PFTypography>
+                <PFTypography variant="h6">ECR Workspace</PFTypography>
                 <PFStack direction="row" gap={8}>
                   <PFButton size="sm" variant="ghost" intent="neutral">Docs</PFButton>
                   <PFButton size="sm">Deploy</PFButton>

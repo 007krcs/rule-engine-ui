@@ -32,7 +32,7 @@ export default function HomePage() {
 
         <div className={styles.heroInner}>
           <Badge variant="default">Enterprise-grade Headless Platform</Badge>
-          <h2 className={styles.heroTitle}>RuleFlow: Configuration-driven UI + Flow + Rules for regulated enterprises</h2>
+          <h2 className={styles.heroTitle}>ECR: Configuration-driven UI + Flow + Rules for regulated enterprises</h2>
           <p className={styles.heroText}>
             Empower business users to build apps without UI development while maintaining auditability, accessibility,
             and security. Ship controlled configuration versions across tenants with confidence.
@@ -98,4 +98,3 @@ export default function HomePage() {
     </div>
   );
 }
-
