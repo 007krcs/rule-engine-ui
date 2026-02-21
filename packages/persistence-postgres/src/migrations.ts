@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlPool } from './sql-client';
@@ -35,8 +36,8 @@ function defaultMigrationsDir(): string {
 async function listMigrationFiles(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
-    .map((entry) => entry.name)
+    .filter((entry: Dirent) => entry.isFile() && entry.name.endsWith('.sql'))
+    .map((entry: Dirent) => entry.name)
     .sort(compareMigrationFileNames);
 }
 
