@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { ExecutionContext, Rule } from '@platform/schema';
-import { evaluateRules, evaluateCondition } from '../src/index';
+import {
+  evaluateRules,
+  evaluateCondition,
+  configureRulesEngine,
+  getRulesEngineConfig,
+  resetRulesEngineConfig,
+  createActionHandlerRegistry,
+} from '../src/index';
 
 const baseContext: ExecutionContext = {
   tenantId: 'tenant-a',
@@ -223,5 +230,268 @@ describe('rules-engine', () => {
         {},
       ),
     ).toBe(false);
+  });
+});
+
+describe('configurable-limits', () => {
+  afterEach(() => {
+    resetRulesEngineConfig();
+  });
+
+  it('allows configuring default timeout', () => {
+    configureRulesEngine({ timeoutMs: 100 });
+    const config = getRulesEngineConfig();
+    expect(config.timeoutMs).toBe(100);
+  });
+
+  it('allows configuring max rules', () => {
+    configureRulesEngine({ maxRules: 500 });
+    const config = getRulesEngineConfig();
+    expect(config.maxRules).toBe(500);
+  });
+
+  it('allows configuring max depth', () => {
+    configureRulesEngine({ maxDepth: 5 });
+    const config = getRulesEngineConfig();
+    expect(config.maxDepth).toBe(5);
+  });
+
+  it('resets configuration to defaults', () => {
+    configureRulesEngine({ timeoutMs: 100, maxRules: 500, maxDepth: 5 });
+    resetRulesEngineConfig();
+    const config = getRulesEngineConfig();
+    expect(config.timeoutMs).toBe(50);
+    expect(config.maxRules).toBe(1000);
+    expect(config.maxDepth).toBe(10);
+  });
+});
+
+describe('new-operators', () => {
+  it('evaluates isEmpty operator', () => {
+    expect(evaluateCondition({ op: 'isEmpty', left: { value: '' } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'isEmpty', left: { value: [] } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'isEmpty', left: { value: {} } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'isEmpty', left: { value: null } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'isEmpty', left: { value: 'text' } }, baseContext, {})).toBe(false);
+    expect(evaluateCondition({ op: 'isEmpty', left: { value: [1] } }, baseContext, {})).toBe(false);
+  });
+
+  it('evaluates isNotEmpty operator', () => {
+    expect(evaluateCondition({ op: 'isNotEmpty', left: { value: 'text' } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'isNotEmpty', left: { value: [1, 2] } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'isNotEmpty', left: { value: '' } }, baseContext, {})).toBe(false);
+    expect(evaluateCondition({ op: 'isNotEmpty', left: { value: [] } }, baseContext, {})).toBe(false);
+  });
+
+  it('evaluates matches operator with regex', () => {
+    expect(evaluateCondition({ op: 'matches', left: { value: 'hello123' }, right: { value: '^hello\\d+$' } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'matches', left: { value: 'hello' }, right: { value: '^hello\\d+$' } }, baseContext, {})).toBe(false);
+    expect(evaluateCondition({ op: 'matches', left: { value: 'test@example.com' }, right: { value: '.*@.*\\.com$' } }, baseContext, {})).toBe(true);
+  });
+
+  it('evaluates length operator', () => {
+    expect(evaluateCondition({ op: 'length', left: { value: 'hello' }, right: { value: 5 } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'length', left: { value: [1, 2, 3] }, right: { value: 3 } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'length', left: { value: 'hi' }, right: { value: 5 } }, baseContext, {})).toBe(false);
+  });
+
+  it('evaluates dateOn operator for same day comparison', () => {
+    expect(evaluateCondition({ op: 'dateOn', left: { value: '2024-06-15' }, right: { value: '2024-06-15' } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'dateOn', left: { value: '2024-06-15T10:00:00Z' }, right: { value: '2024-06-15T23:59:59Z' } }, baseContext, {})).toBe(true);
+    expect(evaluateCondition({ op: 'dateOn', left: { value: '2024-06-15' }, right: { value: '2024-06-16' } }, baseContext, {})).toBe(false);
+  });
+});
+
+describe('transform-actions', () => {
+  it('applies math transform - add', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'MATH_ADD',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'transform', path: 'data.value', transform: { type: 'math', expression: 'add', args: { a: 10 } } }],
+        },
+      ],
+      context: baseContext,
+      data: { value: 5 },
+    });
+    expect(result.data.value).toBe(15);
+  });
+
+  it('applies math transform - multiply', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'MATH_MULT',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'transform', path: 'data.value', transform: { type: 'math', expression: 'multiply', args: { a: 3 } } }],
+        },
+      ],
+      context: baseContext,
+      data: { value: 7 },
+    });
+    expect(result.data.value).toBe(21);
+  });
+
+  it('applies string transform - upper', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'STRING_UPPER',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'transform', path: 'data.name', transform: { type: 'string', expression: 'upper' } }],
+        },
+      ],
+      context: baseContext,
+      data: { name: 'hello' },
+    });
+    expect(result.data.name).toBe('HELLO');
+  });
+
+  it('applies string transform - concat', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'STRING_CONCAT',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'transform', path: 'data.greeting', transform: { type: 'string', expression: 'concat', args: { a: ' World!' } } }],
+        },
+      ],
+      context: baseContext,
+      data: { greeting: 'Hello' },
+    });
+    expect(result.data.greeting).toBe('Hello World!');
+  });
+
+  it('applies date transform - addDays', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'DATE_ADD',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'transform', path: 'data.dueDate', transform: { type: 'date', expression: 'addDays', args: { days: 7 } } }],
+        },
+      ],
+      context: baseContext,
+      data: { dueDate: '2024-01-01' },
+    });
+    expect(result.data.dueDate).toContain('2024-01-08');
+  });
+
+  it('applies template transform', () => {
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'TEMPLATE',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'transform', path: 'data.message', transform: { type: 'template', expression: 'Hello {{name}}!', args: { name: 'Alice' } } }],
+        },
+      ],
+      context: baseContext,
+      data: { message: '' },
+    });
+    expect(result.data.message).toBe('Hello Alice!');
+  });
+});
+
+describe('action-extensibility', () => {
+  it('creates custom action handler registry', () => {
+    const registry = createActionHandlerRegistry();
+    expect(registry.list()).toEqual([]);
+  });
+
+  it('registers and invokes custom action handlers', () => {
+    const registry = createActionHandlerRegistry();
+    const handler = vi.fn();
+    registry.register('customAction', handler);
+
+    expect(registry.has('customAction')).toBe(true);
+    expect(registry.list()).toContain('customAction');
+
+    const result = evaluateRules({
+      rules: [
+        {
+          ruleId: 'CUSTOM',
+          when: { op: 'eq', left: { value: true }, right: { value: true } },
+          actions: [{ type: 'custom', handler: 'customAction', args: { foo: 'bar' } }],
+        },
+      ],
+      context: baseContext,
+      data: {},
+      options: { actionHandlers: registry },
+    });
+
+    expect(handler).toHaveBeenCalled();
+    expect(result.trace.actionsApplied.length).toBe(1);
+  });
+
+  it('prevents overriding built-in actions', () => {
+    const registry = createActionHandlerRegistry();
+    expect(() => registry.register('setField', vi.fn())).toThrow('Cannot override built-in action type');
+    expect(() => registry.register('emitEvent', vi.fn())).toThrow('Cannot override built-in action type');
+  });
+
+  it('validates action type names', () => {
+    const registry = createActionHandlerRegistry();
+    expect(() => registry.register('123invalid', vi.fn())).toThrow('Invalid action type name');
+    expect(() => registry.register('valid_action', vi.fn())).not.toThrow();
+  });
+});
+
+describe('performance-stress-tests', () => {
+  it('handles large rule sets efficiently', () => {
+    const rules: Rule[] = Array.from({ length: 500 }, (_, i) => ({
+      ruleId: `RULE_${i}`,
+      priority: i,
+      when: { op: 'eq', left: { value: true }, right: { value: true } },
+      actions: [{ type: 'setField', path: `data.field_${i}`, value: i }],
+    }));
+
+    const start = Date.now();
+    const result = evaluateRules({
+      rules,
+      context: baseContext,
+      data: {},
+      options: { timeoutMs: 5000, maxRules: 500 },
+    });
+    const duration = Date.now() - start;
+
+    expect(result.trace.rulesMatched.length).toBe(500);
+    expect(duration).toBeLessThan(1000);
+  });
+
+  it('respects timeout limits', () => {
+    const rules: Rule[] = Array.from({ length: 10000 }, (_, i) => ({
+      ruleId: `RULE_${i}`,
+      when: { op: 'eq', left: { value: true }, right: { value: true } },
+      actions: [{ type: 'setField', path: `data.field_${i}`, value: i }],
+    }));
+
+    const result = evaluateRules({
+      rules,
+      context: baseContext,
+      data: {},
+      options: { timeoutMs: 10, maxRules: 10000 },
+    });
+
+    expect(result.trace.errors.some((e) => e.message.includes('timeout'))).toBe(true);
+  });
+
+  it('respects max rules limit', () => {
+    const rules: Rule[] = Array.from({ length: 100 }, (_, i) => ({
+      ruleId: `RULE_${i}`,
+      when: { op: 'eq', left: { value: true }, right: { value: true } },
+      actions: [{ type: 'setField', path: `data.field_${i}`, value: i }],
+    }));
+
+    const result = evaluateRules({
+      rules,
+      context: baseContext,
+      data: {},
+      options: { timeoutMs: 5000, maxRules: 50 },
+    });
+
+    expect(result.trace.rulesMatched.length).toBe(50);
+    expect(result.trace.errors.some((e) => e.message.includes('Max rules limit'))).toBe(true);
   });
 });
