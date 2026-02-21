@@ -18,7 +18,6 @@ const nav = [
 
 export default function ScreensPage() {
   const screens = useBuilderStore((s) => s.screens);
-  const activeScreenId = useBuilderStore((s) => s.activeScreenId);
   const addScreenToStore = useBuilderStore((s) => s.addScreen);
   const setActiveScreen = useBuilderStore((s) => s.setActiveScreen);
   const flow = useBuilderStore((s) => s.flow);

@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { produce } from 'immer';
 import type { FlowSchema, Rule, UISchema } from '@platform/schema';
 import { createUISchema } from '@platform/schema';
-import type { BuilderState, FlowEdge, FlowNode } from './types';
+import type { BuilderState, FlowEdge } from './types';
 
 type BuilderActions = {
   addScreen: (id?: string, schema?: UISchema) => void;
@@ -35,12 +35,21 @@ const initialState: BuilderState = {
   },
 };
 
-export const useBuilderStore = create<BuilderState & BuilderActions>((set, get) => ({
+export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
   ...initialState,
+  ...createActions(set),
+}));
 
-  addScreen: (id, schema) =>
-    set(
-      produce((draft: BuilderState) => {
+function createActions(
+  set: (fn: (state: BuilderState & BuilderActions) => BuilderState & BuilderActions) => void,
+): BuilderActions {
+  const applyDraft = (recipe: (draft: BuilderState) => void) => {
+    set((state) => produce(state, (draft) => recipe(draft as unknown as BuilderState)));
+  };
+
+  return {
+    addScreen: (id, schema) =>
+      applyDraft((draft) => {
         const nextId = id?.trim() || `screen-${Object.keys(draft.screens).length + 1}`;
         if (draft.screens[nextId]) return;
         const uiSchema = schema ?? createUISchema({ pageId: nextId });
@@ -50,16 +59,15 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set, get) 
         draft.flow.schema = upsertFlowState(draft.flow.schema, nextId);
         if (!draft.flow.startNodeId) draft.flow.startNodeId = nextId;
       }),
-    ),
 
-  removeScreen: (id) =>
-    set(
-      produce((draft: BuilderState) => {
+    removeScreen: (id) =>
+      applyDraft((draft) => {
         delete draft.screens[id];
         draft.flow.nodes = draft.flow.nodes.filter((n) => n.id !== id);
         draft.flow.edges = draft.flow.edges.filter((e) => e.from !== id && e.to !== id);
         if (draft.flow.schema) {
-          const { [id]: _, ...rest } = draft.flow.schema.states;
+          const rest = { ...draft.flow.schema.states };
+          delete rest[id];
           draft.flow.schema.states = rest;
           if (draft.flow.schema.initialState === id) {
             draft.flow.schema.initialState = Object.keys(rest)[0] ?? '';
@@ -69,61 +77,47 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set, get) 
           draft.activeScreenId = Object.keys(draft.screens)[0] ?? null;
         }
       }),
-    ),
 
-  updateScreen: (id, schema) =>
-    set(
-      produce((draft: BuilderState) => {
+    updateScreen: (id, schema) =>
+      applyDraft((draft) => {
         draft.screens[id] = schema;
       }),
-    ),
 
-  setActiveScreen: (id) =>
-    set(
-      produce((draft: BuilderState) => {
+    setActiveScreen: (id) =>
+      applyDraft((draft) => {
         draft.activeScreenId = id;
       }),
-    ),
 
-  updateFlow: (updater) =>
-    set(
-      produce((draft: BuilderState) => {
+    updateFlow: (updater) =>
+      applyDraft((draft) => {
         draft.flow = updater(draft.flow);
       }),
-    ),
 
-  setFlowSchema: (schema: FlowSchema) =>
-    set(
-      produce((draft: BuilderState) => {
+    setFlowSchema: (schema: FlowSchema) =>
+      applyDraft((draft) => {
         draft.flow.schema = schema;
         draft.flow.startNodeId = schema.initialState || draft.flow.startNodeId;
         syncNodesFromSchema(draft.flow, schema);
       }),
-    ),
 
-  addRule: (rule) =>
-    set(
-      produce((draft: BuilderState) => {
+    addRule: (rule) =>
+      applyDraft((draft) => {
         draft.rules[rule.ruleId] = rule;
       }),
-    ),
 
-  updateRule: (ruleId, patch) =>
-    set(
-      produce((draft: BuilderState) => {
+    updateRule: (ruleId, patch) =>
+      applyDraft((draft) => {
         const current = draft.rules[ruleId];
         if (!current) return;
         draft.rules[ruleId] = { ...current, ...patch };
       }),
-    ),
 
-  setRules: (rules) =>
-    set(
-      produce((draft: BuilderState) => {
+    setRules: (rules) =>
+      applyDraft((draft) => {
         draft.rules = rules;
       }),
-    ),
-}));
+  };
+}
 
 function upsertFlowState(schema: FlowSchema | undefined, id: string): FlowSchema {
   const base: FlowSchema =

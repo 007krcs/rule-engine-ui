@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import type { RuleAction, JSONValue } from '@platform/schema';
 
 export type ExplainOperand =
@@ -573,19 +572,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function generateTraceId(): string {
-  return crypto.randomBytes(16).toString('hex');
+  return randomHex(16);
 }
 
 function generateSpanId(): string {
-  return crypto.randomBytes(8).toString('hex');
+  return randomHex(8);
 }
 
 function generateCorrelationId(): string {
-  return crypto.randomUUID();
+  const webCrypto = getWebCrypto();
+  if (webCrypto?.randomUUID) return webCrypto.randomUUID();
+  return `${randomHex(4)}-${randomHex(2)}-${randomHex(2)}-${randomHex(2)}-${randomHex(6)}`;
 }
 
 function correlationToTraceId(correlationId: string): string {
-  return crypto.createHash('sha256').update(correlationId, 'utf8').digest('hex').slice(0, 32);
+  // Stable non-cryptographic hash for trace correlation across runtimes.
+  return fnv1aHex(correlationId, 32);
 }
 
 function toUnixNano(ms: number): string {
@@ -601,4 +603,37 @@ function attrsToOtel(attributes: Record<string, string | number | boolean> | und
     if (Number.isInteger(value)) return { key, value: { intValue: String(value) } };
     return { key, value: { doubleValue: value } };
   });
+}
+
+function getWebCrypto(): Crypto | undefined {
+  return typeof globalThis !== 'undefined' && 'crypto' in globalThis
+    ? (globalThis.crypto as Crypto)
+    : undefined;
+}
+
+function randomHex(bytes: number): string {
+  const webCrypto = getWebCrypto();
+  if (webCrypto?.getRandomValues) {
+    const arr = new Uint8Array(bytes);
+    webCrypto.getRandomValues(arr);
+    return Array.from(arr, (v) => v.toString(16).padStart(2, '0')).join('');
+  }
+  let out = '';
+  for (let i = 0; i < bytes; i += 1) {
+    out += Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+  }
+  return out;
+}
+
+function fnv1aHex(input: string, length: number): string {
+  const seed = [0x811c9dc5, 0x1234567, 0x9e3779b9, 0x85ebca6b];
+  const hashes = seed.map((start) => {
+    let h = start >>> 0;
+    for (let i = 0; i < input.length; i += 1) {
+      h ^= input.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  }).join('');
+  return hashes.slice(0, length).padEnd(length, '0');
 }

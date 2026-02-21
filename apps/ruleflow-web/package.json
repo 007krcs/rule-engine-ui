@@ -23,8 +23,8 @@
     "@platform/adapter-registry": "workspace:*",
     "@platform/angular-renderer": "workspace:*",
     "@platform/api-orchestrator": "workspace:*",
-    "@platform/core-runtime": "workspace:*",
     "@platform/component-registry": "workspace:*",
+    "@platform/core-runtime": "workspace:*",
     "@platform/i18n": "workspace:*",
     "@platform/observability": "workspace:*",
     "@platform/persistence-postgres": "workspace:*",
@@ -40,13 +40,14 @@
     "@platform/ui-kit": "workspace:*",
     "@platform/validator": "workspace:*",
     "@platform/vue-renderer": "workspace:*",
-    "zustand": "^4.5.2",
     "clsx": "^2.1.1",
+    "immer": "^10.1.1",
     "lucide-react": "^0.469.0",
     "lunr": "^2.3.9",
     "next": "^15.1.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/lunr": "^2.3.7",
