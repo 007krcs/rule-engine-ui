@@ -4,11 +4,15 @@
 
 - `GAP_REPORT.md`
 
-## 2) Updated Repo Tree Snapshot
+## 2) Product Limitations
+
+- `LIMITATIONS.md`
+
+## 3) Updated Repo Tree Snapshot
 
 - `tree.txt`
 
-## 3) Source Code (Changed/New)
+## 4) Source Code (Changed/New)
 
 All changed/new source is in the repo. Key entry points:
 
@@ -21,7 +25,7 @@ All changed/new source is in the repo. Key entry points:
 - Component Registry UI + API: `apps/ruleflow-web/src/app/component-registry/page.tsx`, `apps/ruleflow-web/src/app/api/component-registry/route.ts`
 - Demo persistence + lifecycle + validation gates: `apps/ruleflow-web/src/server/demo/repository.ts`
 
-## 4) Documentation Content
+## 5) Documentation Content
 
 - Docs hub: `/docs` -> `apps/ruleflow-web/src/app/docs/page.tsx`
 - Docs content: `apps/ruleflow-web/src/content/docs/*.mdx`
@@ -45,11 +49,11 @@ Package README coverage:
 - Adapters folder overview: `packages/adapters/README.md`
 - Each package: `packages/*/README.md`
 
-## 5) New User Walkthrough Script
+## 6) New User Walkthrough Script
 
 - `NEW_USER_WALKTHROUGH.md`
 
-## 6) Verification
+## 7) Verification
 
 Commands run:
 

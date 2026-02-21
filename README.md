@@ -258,3 +258,10 @@ Check `trace.flow.reason` and `trace.flow.errorMessage` in the runtime response.
 - Accessibility validated (`validateUISchema`)
 - I18n keys validated (`validateI18nCoverage`)
 - Traces captured for flow, rules, and API
+
+**Additional Resources**
+
+- [Product Limitations](./LIMITATIONS.md) - Comprehensive list of current platform constraints and workarounds
+- [Gap Report](./GAP_REPORT.md) - Status of feature gaps vs requirements
+- [Enterprise Rollout Guide](./ENTERPRISE_ROLLOUT_GUIDE.md) - Production deployment guidance
+- [New User Walkthrough](./NEW_USER_WALKTHROUGH.md) - Step-by-step onboarding guide
