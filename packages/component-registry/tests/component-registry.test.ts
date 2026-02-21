@@ -63,12 +63,13 @@ describe('@platform/component-registry', () => {
     const implemented = listImplemented(definitions);
     expect(implemented.length).toBeGreaterThan(0);
     expect(isImplemented('platform.chip', definitions)).toBe(true);
-    expect(isImplemented('platform.svgIcon', definitions)).toBe(false);
+    expect(isImplemented('platform.svgIcon', definitions)).toBe(true);
+    expect(isImplemented('platform.imageList', definitions)).toBe(true);
   });
 
   it('marks planned entries as non-draggable by default', () => {
     const definitions = builtinComponentDefinitions();
-    const planned = definitions.find((definition) => definition.adapterHint === 'platform.svgIcon');
+    const planned = definitions.find((definition) => definition.adapterHint === 'platform.transitionGrow');
     expect(planned).toBeTruthy();
     expect(planned?.availability).toBe('planned');
     expect(planned?.supportsDrag).toBe(false);
@@ -111,5 +112,31 @@ describe('@platform/component-registry', () => {
     const result = validateComponentRegistryManifest(manifest);
     expect(result.valid).toBe(false);
     expect(result.issues.some((issue) => issue.path.endsWith('availability'))).toBe(true);
+  });
+
+  it('ships dummy defaults for upgraded platform previews', () => {
+    const definitions = builtinComponentDefinitions();
+    const upgradedHints = [
+      'platform.svgIcon',
+      'platform.imageList',
+      'platform.paper',
+      'platform.bottomNavigation',
+      'platform.speedDial',
+      'platform.link',
+      'platform.masonry',
+      'platform.noSsr',
+      'platform.portal',
+      'platform.clickAwayListener',
+      'platform.popper',
+      'platform.transitionFade',
+    ];
+    upgradedHints.forEach((hint) => {
+      const definition = definitions.find((entry) => entry.adapterHint === hint);
+      expect(definition).toBeTruthy();
+      expect(definition?.availability).toBe('implemented');
+      expect(definition?.supportsDrag).toBe(true);
+      expect(definition?.defaultProps).toBeTruthy();
+      expect(definition?.examples?.length ?? 0).toBeGreaterThan(0);
+    });
   });
 });

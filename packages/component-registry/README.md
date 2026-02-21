@@ -9,3 +9,7 @@ This package defines:
 
 The registry is intentionally framework-agnostic. React/Angular/Vue adapters consume the same `adapterHint` values.
 
+## Preview Defaults
+
+Built-in platform components can include `defaultProps` so Builder and UI Kit preview pages render immediately with dummy values.
+These defaults are only seed data for design-time preview and automated tests. Runtime integrations should replace them with tenant data bindings.

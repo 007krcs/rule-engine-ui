@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { ComponentDefinition } from '@platform/component-registry';
 import {
   PFAccordion,
@@ -481,6 +481,56 @@ function renderPreview(
           </PFCardContent>
         </PFCard>
       );
+    case 'platform.svgIcon':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">SVG Icon</PFTypography>
+          </PFCardHeader>
+          <PFCardContent className={styles.row}>
+            <div className={styles.iconPreview} aria-label={stringValue(values.name, 'Icon preview')}>
+              <svg
+                width={numberValue(values.size, 24)}
+                height={numberValue(values.size, 24)}
+                viewBox="0 0 24 24"
+                fill={stringValue(values.color, '#2e7d32')}
+                role="img"
+              >
+                <path d={stringValue(values.path, 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1 14-4-4 1.4-1.4L11 13.2l5.6-5.6L18 9z')} />
+              </svg>
+            </div>
+            <PFTypography variant="body2" muted>
+              {stringValue(values.name, 'checkCircle')}
+            </PFTypography>
+          </PFCardContent>
+        </PFCard>
+      );
+    case 'platform.imageList': {
+      const images = readImageItems(values.images);
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Image List</PFTypography>
+          </PFCardHeader>
+          <PFCardContent>
+            <div
+              className={styles.imageList}
+              style={{
+                gridTemplateColumns: `repeat(${numberValue(values.columns, 3)}, minmax(0, 1fr))`,
+                gap: `${numberValue(values.gap, 10)}px`,
+              }}
+            >
+              {images.map((image) => (
+                <figure key={`${image.src}-${image.title}`} className={styles.imageTile}>
+                  <img src={image.src} alt={image.alt} />
+                  <figcaption>{image.title}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </PFCardContent>
+        </PFCard>
+      );
+    }
     case 'platform.table':
       return (
         <PFCard>
@@ -670,6 +720,26 @@ function renderPreview(
           </PFCardContent>
         </PFCard>
       );
+    case 'platform.paper':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Paper Surface</PFTypography>
+          </PFCardHeader>
+          <PFCardContent>
+            <div
+              className={styles.paperDemo}
+              style={{
+                padding: `${numberValue(values.padding, 16)}px`,
+                boxShadow: numberValue(values.elevation, 1) > 0 ? '0 8px 18px rgba(20, 22, 31, 0.08)' : 'none',
+                borderStyle: booleanValue(values.outlined, true) ? 'solid' : 'none',
+              }}
+            >
+              <PFTypography variant="body2">Paper is a generic surface container for grouped content.</PFTypography>
+            </div>
+          </PFCardContent>
+        </PFCard>
+      );
     case 'platform.backdrop':
       return (
         <PFCard>
@@ -757,6 +827,61 @@ function renderPreview(
           onPageChange={() => undefined}
         />
       );
+    case 'platform.bottomNavigation': {
+      const items = readNavigationItems(values.items);
+      const active = stringValue(values.value, items[0]?.value ?? 'home');
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Bottom Navigation</PFTypography>
+          </PFCardHeader>
+          <PFCardContent>
+            <nav className={styles.bottomNav} aria-label="Bottom navigation preview">
+              {items.map((item) => (
+                <button key={item.value} type="button" className={active === item.value ? styles.bottomNavActive : ''}>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </PFCardContent>
+        </PFCard>
+      );
+    }
+    case 'platform.link':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Link</PFTypography>
+          </PFCardHeader>
+          <PFCardContent>
+            <a
+              className={styles.linkDemo}
+              href={stringValue(values.href, '/docs/tutorial-builder')}
+              target={stringValue(values.target, '_self')}
+              rel={stringValue(values.target, '_self') === '_blank' ? 'noreferrer' : undefined}
+            >
+              {stringValue(values.label, 'Open deployment runbook')}
+            </a>
+          </PFCardContent>
+        </PFCard>
+      );
+    case 'platform.speedDial': {
+      const actions = readSpeedDialActions(values.actions);
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Speed Dial</PFTypography>
+          </PFCardHeader>
+          <PFCardContent className={styles.speedDialPreview}>
+            {actions.map((action) => (
+              <PFButton key={action.id} size="sm" variant="outline" intent="neutral">
+                {action.label}
+              </PFButton>
+            ))}
+          </PFCardContent>
+        </PFCard>
+      );
+    }
     case 'platform.stepper':
       return (
         <PFStepper
@@ -815,6 +940,58 @@ function renderPreview(
           <PFAlert intent="primary" title="Second">Consistent spacing between children.</PFAlert>
         </PFStack>
       );
+    case 'platform.masonry': {
+      const items = readMasonryItems(values.items);
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Masonry</PFTypography>
+          </PFCardHeader>
+          <PFCardContent>
+            <div
+              className={styles.masonry}
+              style={{
+                columns: numberValue(values.columns, 3),
+                columnGap: `${numberValue(values.gap, 12)}px`,
+              }}
+            >
+              {items.map((item) => (
+                <article key={item.id} className={styles.masonryItem} style={{ minHeight: `${item.height}px` }}>
+                  <PFTypography variant="label">{item.title}</PFTypography>
+                  <PFTypography variant="body2" muted>{item.description}</PFTypography>
+                </article>
+              ))}
+            </div>
+          </PFCardContent>
+        </PFCard>
+      );
+    }
+    case 'platform.noSsr':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">NoSSR</PFTypography>
+          </PFCardHeader>
+          <PFCardContent className={styles.formContent}>
+            <PFTypography variant="body2" muted>{stringValue(values.fallbackText, 'Loading client-only content...')}</PFTypography>
+            <PFTypography variant="body2">{stringValue(values.contentText, 'Client metrics panel ready.')}</PFTypography>
+          </PFCardContent>
+        </PFCard>
+      );
+    case 'platform.portal':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">{stringValue(values.title, 'Portal Demo')}</PFTypography>
+          </PFCardHeader>
+          <PFCardContent className={styles.formContent}>
+            <PFTypography variant="body2" muted>Portal target: {stringValue(values.target, '#overlay-root')}</PFTypography>
+            <PFAlert intent="neutral" title="Overlay Content">
+              {stringValue(values.content, 'Overlay content rendered outside the layout tree.')}
+            </PFAlert>
+          </PFCardContent>
+        </PFCard>
+      );
     case 'platform.popover':
       return (
         <PFCard>
@@ -842,6 +1019,61 @@ function renderPreview(
           >
             <PFTypography variant="body2">Popover content anchored to toolbar button.</PFTypography>
           </PFPopover>
+        </PFCard>
+      );
+    case 'platform.clickAwayListener':
+      return (
+        <PFCard>
+          <PFCardHeader className={styles.cardToolbar}>
+            <PFTypography variant="h5">Click Away Listener</PFTypography>
+            <PFButton size="sm" onClick={() => context.setMenuOpen(!context.menuOpen)}>
+              {context.menuOpen ? 'Hide panel' : 'Show panel'}
+            </PFButton>
+          </PFCardHeader>
+          <PFCardContent className={styles.formContent}>
+            <PFTypography variant="body2" muted>{stringValue(values.message, 'Click outside the panel to dismiss.')}</PFTypography>
+            {context.menuOpen ? (
+              <div className={styles.clickAwayPanel}>
+                <PFTypography variant="body2">Preview panel is open. Click the button again to simulate dismissal.</PFTypography>
+              </div>
+            ) : null}
+          </PFCardContent>
+        </PFCard>
+      );
+    case 'platform.popper':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Popper</PFTypography>
+          </PFCardHeader>
+          <PFCardContent className={styles.formContent}>
+            <PFButton size="sm" variant="outline" intent="neutral">Anchor element</PFButton>
+            {booleanValue(values.open, true) ? (
+              <div className={styles.popperDemo}>
+                <PFTypography variant="caption" muted>{placementValue(values.placement).toUpperCase()}</PFTypography>
+                <PFTypography variant="body2">{stringValue(values.content, 'Contextual actions for selected row.')}</PFTypography>
+              </div>
+            ) : null}
+          </PFCardContent>
+        </PFCard>
+      );
+    case 'platform.transitionFade':
+      return (
+        <PFCard>
+          <PFCardHeader>
+            <PFTypography variant="h5">Transition Fade</PFTypography>
+          </PFCardHeader>
+          <PFCardContent>
+            <div
+              className={styles.fadeDemo}
+              style={{
+                opacity: booleanValue(values.in, true) ? 1 : 0.25,
+                transitionDuration: `${numberValue(values.durationMs, 240)}ms`,
+              }}
+            >
+              {stringValue(values.label, 'Faded content block')}
+            </div>
+          </PFCardContent>
         </PFCard>
       );
     default:
@@ -900,6 +1132,98 @@ function readOptions(value: unknown): Array<{ value: string; label: string }> {
     { value: 'author', label: 'Author' },
     { value: 'approver', label: 'Approver' },
     { value: 'publisher', label: 'Publisher' },
+  ];
+}
+
+function readImageItems(value: unknown): Array<{ src: string; alt: string; title: string }> {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => {
+        if (typeof entry !== 'object' || entry === null) return null;
+        const record = entry as { src?: unknown; alt?: unknown; title?: unknown };
+        if (typeof record.src !== 'string') return null;
+        return {
+          src: record.src,
+          alt: typeof record.alt === 'string' ? record.alt : 'Preview image',
+          title: typeof record.title === 'string' ? record.title : 'Image item',
+        };
+      })
+      .filter((entry): entry is { src: string; alt: string; title: string } => Boolean(entry));
+    if (normalized.length > 0) return normalized;
+  }
+  return [
+    { src: 'https://picsum.photos/seed/ruleflow-1/360/220', alt: 'Server rack', title: 'Runtime cluster' },
+    { src: 'https://picsum.photos/seed/ruleflow-2/360/220', alt: 'Data dashboard', title: 'Ops dashboard' },
+    { src: 'https://picsum.photos/seed/ruleflow-3/360/220', alt: 'Team review', title: 'Release review' },
+  ];
+}
+
+function readNavigationItems(value: unknown): Array<{ value: string; label: string }> {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => {
+        if (typeof entry !== 'object' || entry === null) return null;
+        const record = entry as { value?: unknown; label?: unknown };
+        if (typeof record.value !== 'string') return null;
+        return {
+          value: record.value,
+          label: typeof record.label === 'string' ? record.label : record.value,
+        };
+      })
+      .filter((entry): entry is { value: string; label: string } => Boolean(entry));
+    if (normalized.length > 0) return normalized;
+  }
+  return [
+    { value: 'home', label: 'Home' },
+    { value: 'flows', label: 'Flows' },
+    { value: 'alerts', label: 'Alerts' },
+  ];
+}
+
+function readSpeedDialActions(value: unknown): Array<{ id: string; label: string }> {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => {
+        if (typeof entry !== 'object' || entry === null) return null;
+        const record = entry as { id?: unknown; label?: unknown };
+        if (typeof record.id !== 'string') return null;
+        return {
+          id: record.id,
+          label: typeof record.label === 'string' ? record.label : record.id,
+        };
+      })
+      .filter((entry): entry is { id: string; label: string } => Boolean(entry));
+    if (normalized.length > 0) return normalized;
+  }
+  return [
+    { id: 'new-rule', label: 'New Rule' },
+    { id: 'clone-screen', label: 'Clone Screen' },
+    { id: 'export-json', label: 'Export JSON' },
+  ];
+}
+
+function readMasonryItems(value: unknown): Array<{ id: string; title: string; description: string; height: number }> {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => {
+        if (typeof entry !== 'object' || entry === null) return null;
+        const record = entry as { id?: unknown; title?: unknown; description?: unknown; height?: unknown };
+        if (typeof record.id !== 'string') return null;
+        return {
+          id: record.id,
+          title: typeof record.title === 'string' ? record.title : 'Card',
+          description: typeof record.description === 'string' ? record.description : '',
+          height: numberValue(record.height, 110),
+        };
+      })
+      .filter((entry): entry is { id: string; title: string; description: string; height: number } => Boolean(entry));
+    if (normalized.length > 0) return normalized;
+  }
+  return [
+    { id: '1', title: 'Cluster health', description: '99.9% availability', height: 110 },
+    { id: '2', title: 'Queue depth', description: '124 pending jobs', height: 160 },
+    { id: '3', title: 'SLA warnings', description: '2 workflows near limit', height: 130 },
+    { id: '4', title: 'Rules latency', description: 'P95 44ms', height: 90 },
   ];
 }
 

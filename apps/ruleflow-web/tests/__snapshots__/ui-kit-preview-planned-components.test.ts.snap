@@ -1,0 +1,54 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ui-kit preview planned component upgrades > matches snapshots for upgraded component previews 1`] = `
+[
+  {
+    "hint": "platform.svgIcon",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">SVG Icon</h5></header><div class="pf-card__content _row_4e3904"><div class="_iconPreview_4e3904" aria-label="checkCircle"><svg width="24" height="24" viewBox="0 0 24 24" fill="#2e7d32" role="img"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2"></path></svg></div><p class="pf-typography pf-typography--body2 is-muted">checkCircle</p></div></article></section>",
+  },
+  {
+    "hint": "platform.imageList",
+    "html": "<link rel="preload" as="image" href="https://picsum.photos/seed/ruleflow-1/360/220"/><section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Image List</h5></header><div class="pf-card__content"><div class="_imageList_4e3904" style="grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px"><figure class="_imageTile_4e3904"><img src="https://picsum.photos/seed/ruleflow-1/360/220" alt="Server rack"/><figcaption>Runtime cluster</figcaption></figure></div></div></article></section>",
+  },
+  {
+    "hint": "platform.paper",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Paper Surface</h5></header><div class="pf-card__content"><div class="_paperDemo_4e3904" style="padding:16px;box-shadow:0 8px 18px rgba(20, 22, 31, 0.08);border-style:solid"><p class="pf-typography pf-typography--body2">Paper is a generic surface container for grouped content.</p></div></div></article></section>",
+  },
+  {
+    "hint": "platform.bottomNavigation",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Bottom Navigation</h5></header><div class="pf-card__content"><nav class="_bottomNav_4e3904" aria-label="Bottom navigation preview"><button type="button" class="_bottomNavActive_4e3904">Home</button><button type="button" class="">Flows</button><button type="button" class="">Alerts</button></nav></div></article></section>",
+  },
+  {
+    "hint": "platform.speedDial",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Speed Dial</h5></header><div class="pf-card__content _speedDialPreview_4e3904"><button type="button" class="pf-button pf-size-sm pf-button--outline pf-button--neutral" data-variant="outline" data-size="sm"><span class="pf-button__label">New Rule</span></button></div></article></section>",
+  },
+  {
+    "hint": "platform.link",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Link</h5></header><div class="pf-card__content"><a class="_linkDemo_4e3904" href="/docs/tutorial-builder" target="_self">Open deployment runbook</a></div></article></section>",
+  },
+  {
+    "hint": "platform.masonry",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Masonry</h5></header><div class="pf-card__content"><div class="_masonry_4e3904" style="columns:2;column-gap:12px"><article class="_masonryItem_4e3904" style="min-height:110px"><span class="pf-typography pf-typography--label">Cluster health</span><p class="pf-typography pf-typography--body2 is-muted">99.9% availability</p></article></div></div></article></section>",
+  },
+  {
+    "hint": "platform.noSsr",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">NoSSR</h5></header><div class="pf-card__content _formContent_4e3904"><p class="pf-typography pf-typography--body2 is-muted">Loading client-only content...</p><p class="pf-typography pf-typography--body2">Client metrics panel ready.</p></div></article></section>",
+  },
+  {
+    "hint": "platform.portal",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Portal Demo</h5></header><div class="pf-card__content _formContent_4e3904"><p class="pf-typography pf-typography--body2 is-muted">Portal target: #overlay-root</p><div class="pf-alert pf-alert--neutral" role="alert"><div class="pf-alert__body"><strong class="pf-alert__title">Overlay Content</strong><div class="pf-alert__content">Overlay content rendered outside the layout tree.</div></div></div></div></article></section>",
+  },
+  {
+    "hint": "platform.clickAwayListener",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header _cardToolbar_4e3904"><h5 class="pf-typography pf-typography--h5">Click Away Listener</h5><button type="button" class="pf-button pf-size-sm pf-button--solid pf-button--primary" data-variant="solid" data-size="sm"><span class="pf-button__label">Show panel</span></button></header><div class="pf-card__content _formContent_4e3904"><p class="pf-typography pf-typography--body2 is-muted">Click outside the panel to dismiss.</p></div></article></section>",
+  },
+  {
+    "hint": "platform.popper",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Popper</h5></header><div class="pf-card__content _formContent_4e3904"><button type="button" class="pf-button pf-size-sm pf-button--outline pf-button--neutral" data-variant="outline" data-size="sm"><span class="pf-button__label">Anchor element</span></button><div class="_popperDemo_4e3904"><span class="pf-typography pf-typography--caption is-muted">BOTTOM</span><p class="pf-typography pf-typography--body2">Contextual actions for selected row.</p></div></div></article></section>",
+  },
+  {
+    "hint": "platform.transitionFade",
+    "html": "<section class="_preview_4e3904" data-testid="ui-kit-preview"><article class="pf-card pf-surface-card"><header class="pf-card__header"><h5 class="pf-typography pf-typography--h5">Transition Fade</h5></header><div class="pf-card__content"><div class="_fadeDemo_4e3904" style="opacity:1;transition-duration:240ms">Faded content block</div></div></article></section>",
+  },
+]
+`;

@@ -444,7 +444,22 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-surface-border'],
   }),
-  seed('platform.svgIcon', 'SvgIcon', 'Data Display', 'Scalable icon wrapper component.', 'planned'),
+  seed('platform.svgIcon', 'SvgIcon', 'Data Display', 'Scalable icon wrapper component.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('SVG icon', {
+      name: stringSchema('Icon Name'),
+      path: stringSchema('Path Data'),
+      size: numberSchema('Size'),
+      color: stringSchema('Color'),
+    }),
+    defaultProps: {
+      name: 'checkCircle',
+      path: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1 14-4-4 1.4-1.4L11 13.2l5.6-5.6L18 9z',
+      size: 24,
+      color: '#2e7d32',
+    },
+    tokensUsed: ['--pf-color-success-600', '--pf-space-2'],
+  }),
   seed('platform.list', 'List', 'Data Display', 'Structured list with item actions and keyboard focus.', 'beta', {
     propsSchema: objectSchema('List', {
       items: arraySchema('Items', objectSchema('Item', {
@@ -501,7 +516,29 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-font-size-md', '--pf-line-height-normal'],
   }),
-  seed('platform.imageList', 'ImageList', 'Data Display', 'Responsive grid of images with captions.', 'planned'),
+  seed('platform.imageList', 'ImageList', 'Data Display', 'Responsive grid of images with captions.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Image list', {
+      columns: numberSchema('Columns'),
+      gap: numberSchema('Gap'),
+      images: arraySchema('Images', objectSchema('Image', {
+        src: stringSchema('Image URL'),
+        alt: stringSchema('Alt text'),
+        title: stringSchema('Title'),
+      })),
+    }),
+    defaultProps: {
+      columns: 3,
+      gap: 10,
+      images: [
+        { src: 'https://picsum.photos/seed/ruleflow-1/360/220', alt: 'Server rack', title: 'Runtime cluster' },
+        { src: 'https://picsum.photos/seed/ruleflow-2/360/220', alt: 'Data dashboard', title: 'Ops dashboard' },
+        { src: 'https://picsum.photos/seed/ruleflow-3/360/220', alt: 'Team review', title: 'Release review' },
+      ],
+    },
+    bindings: { data: ['images'] },
+    tokensUsed: ['--pf-radius-md', '--pf-surface-border', '--pf-space-2'],
+  }),
   seed('platform.map', 'Map', 'Data Display', 'Map component with layer controls and clustering.', 'beta', {
     propsSchema: objectSchema('Map', {
       mapLayers: arraySchema('Map Layers', objectSchema('Layer', {
@@ -615,7 +652,20 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-card-bg', '--pf-card-border', '--pf-card-shadow-elevated'],
   }),
-  seed('platform.paper', 'Paper', 'Surfaces', 'Generic paper surface container.', 'planned'),
+  seed('platform.paper', 'Paper', 'Surfaces', 'Generic paper surface container.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Paper', {
+      elevation: numberSchema('Elevation'),
+      outlined: booleanSchema('Outlined'),
+      padding: numberSchema('Padding'),
+    }),
+    defaultProps: {
+      elevation: 1,
+      outlined: true,
+      padding: 16,
+    },
+    tokensUsed: ['--pf-surface-layer', '--pf-surface-border', '--pf-radius-md'],
+  }),
   seed('platform.backdrop', 'Backdrop', 'Surfaces', 'Dimmed overlay layer behind modals.', 'stable', {
     propsSchema: objectSchema('Backdrop', {
       open: booleanSchema('Open'),
@@ -624,7 +674,28 @@ const CATALOG_SEEDS: SeedComponent[] = [
   }),
 
   // Navigation
-  seed('platform.bottomNavigation', 'BottomNavigation', 'Navigation', 'Mobile bottom navigation rail.', 'planned'),
+  seed('platform.bottomNavigation', 'BottomNavigation', 'Navigation', 'Mobile bottom navigation rail.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Bottom navigation', {
+      value: stringSchema('Active Value'),
+      items: arraySchema('Items', objectSchema('Item', {
+        value: stringSchema('Value'),
+        label: stringSchema('Label'),
+      })),
+      showLabels: booleanSchema('Show Labels'),
+    }),
+    defaultProps: {
+      value: 'home',
+      showLabels: true,
+      items: [
+        { value: 'home', label: 'Home' },
+        { value: 'flows', label: 'Flows' },
+        { value: 'alerts', label: 'Alerts' },
+      ],
+    },
+    bindings: { data: ['value'] },
+    tokensUsed: ['--pf-surface-layer', '--pf-surface-border', '--pf-space-2'],
+  }),
   seed('platform.breadcrumbs', 'Breadcrumbs', 'Navigation', 'Hierarchical breadcrumb navigation.', 'stable', {
     propsSchema: objectSchema('Breadcrumbs', {
       separator: stringSchema('Separator'),
@@ -638,7 +709,22 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-drawer-width', '--pf-z-drawer', '--pf-surface-overlay'],
   }),
-  seed('platform.link', 'Link', 'Navigation', 'Navigational text link.', 'planned'),
+  seed('platform.link', 'Link', 'Navigation', 'Navigational text link.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Link', {
+      label: stringSchema('Label'),
+      href: stringSchema('Href'),
+      target: stringEnumSchema('Target', ['_self', '_blank']),
+      underline: stringEnumSchema('Underline', ['always', 'hover', 'none']),
+    }),
+    defaultProps: {
+      label: 'Open deployment runbook',
+      href: '/docs/tutorial-builder',
+      target: '_self',
+      underline: 'hover',
+    },
+    tokensUsed: ['--pf-color-primary-600', '--pf-font-size-sm'],
+  }),
   seed('platform.menu', 'Menu', 'Navigation', 'Context menu and menu items.', 'stable', {
     propsSchema: objectSchema('Menu', {
       triggerLabel: stringSchema('Trigger Label'),
@@ -659,7 +745,27 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-surface-border', '--pf-color-primary-500'],
   }),
-  seed('platform.speedDial', 'SpeedDial', 'Navigation', 'Floating speed actions menu.', 'planned'),
+  seed('platform.speedDial', 'SpeedDial', 'Navigation', 'Floating speed actions menu.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Speed dial', {
+      ariaLabel: stringSchema('Aria Label'),
+      direction: stringEnumSchema('Direction', ['up', 'down', 'left', 'right']),
+      actions: arraySchema('Actions', objectSchema('Action', {
+        id: stringSchema('Id'),
+        label: stringSchema('Label'),
+      })),
+    }),
+    defaultProps: {
+      ariaLabel: 'Quick actions',
+      direction: 'up',
+      actions: [
+        { id: 'new-rule', label: 'New Rule' },
+        { id: 'clone-screen', label: 'Clone Screen' },
+        { id: 'export-json', label: 'Export JSON' },
+      ],
+    },
+    tokensUsed: ['--pf-z-fab', '--pf-color-primary-500', '--pf-radius-full'],
+  }),
   seed('platform.stepper', 'Stepper', 'Navigation', 'Progressive step navigation.', 'stable', {
     propsSchema: objectSchema('Stepper', {
       activeStep: numberSchema('Active Step'),
@@ -767,12 +873,71 @@ const CATALOG_SEEDS: SeedComponent[] = [
     bindings: { data: ['actionPath'] },
     tokensUsed: ['--pf-radius-lg', '--pf-color-primary-100', '--pf-surface-border'],
   }),
-  seed('platform.masonry', 'Masonry', 'Layout', 'Masonry layout with variable row heights.', 'planned'),
-  seed('platform.noSsr', 'NoSSR', 'Layout', 'Client-only rendering wrapper.', 'planned'),
-  seed('platform.portal', 'Portal', 'Layout', 'Portal rendering for overlays.', 'planned'),
+  seed('platform.masonry', 'Masonry', 'Layout', 'Masonry layout with variable row heights.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Masonry', {
+      columns: numberSchema('Columns'),
+      gap: numberSchema('Gap'),
+      items: arraySchema('Items', objectSchema('Item', {
+        id: stringSchema('Id'),
+        title: stringSchema('Title'),
+        description: stringSchema('Description'),
+        height: numberSchema('Height'),
+      })),
+    }),
+    defaultProps: {
+      columns: 3,
+      gap: 12,
+      items: [
+        { id: '1', title: 'Cluster health', description: '99.9% availability', height: 110 },
+        { id: '2', title: 'Queue depth', description: '124 pending jobs', height: 160 },
+        { id: '3', title: 'SLA warnings', description: '2 workflows near limit', height: 130 },
+        { id: '4', title: 'Rules latency', description: 'P95 44ms', height: 90 },
+      ],
+    },
+    bindings: { data: ['items'] },
+    tokensUsed: ['--pf-space-3', '--pf-surface-border', '--pf-radius-md'],
+  }),
+  seed('platform.noSsr', 'NoSSR', 'Layout', 'Client-only rendering wrapper.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('NoSSR', {
+      fallbackText: stringSchema('Fallback Text'),
+      contentText: stringSchema('Content Text'),
+    }),
+    defaultProps: {
+      fallbackText: 'Loading client-only content...',
+      contentText: 'Client metrics panel ready.',
+    },
+    tokensUsed: ['--pf-surface-layer-alt', '--pf-space-2'],
+  }),
+  seed('platform.portal', 'Portal', 'Layout', 'Portal rendering for overlays.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Portal', {
+      target: stringSchema('Target Selector'),
+      title: stringSchema('Title'),
+      content: stringSchema('Content'),
+    }),
+    defaultProps: {
+      target: '#overlay-root',
+      title: 'Portal Demo',
+      content: 'Overlay content rendered outside the layout tree.',
+    },
+    tokensUsed: ['--pf-z-modal', '--pf-surface-layer', '--pf-shadow-md'],
+  }),
 
   // Utils
-  seed('platform.clickAwayListener', 'ClickAwayListener', 'Utils', 'Utility for click-away dismissal behavior.', 'planned'),
+  seed('platform.clickAwayListener', 'ClickAwayListener', 'Utils', 'Utility for click-away dismissal behavior.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Click away listener', {
+      active: booleanSchema('Active'),
+      message: stringSchema('Message'),
+    }),
+    defaultProps: {
+      active: true,
+      message: 'Click outside the panel to dismiss.',
+    },
+    tokensUsed: ['--pf-surface-border', '--pf-space-2'],
+  }),
   seed('platform.focusTrap', 'FocusTrap', 'Utils', 'Trap keyboard focus within an interactive region.', 'beta', {
     propsSchema: objectSchema('Focus Trap', {
       active: booleanSchema('Active'),
@@ -786,8 +951,34 @@ const CATALOG_SEEDS: SeedComponent[] = [
     }),
     tokensUsed: ['--pf-z-popover', '--pf-surface-layer', '--pf-shadow-md'],
   }),
-  seed('platform.popper', 'Popper', 'Utils', 'Positioning engine wrapper for floating UI.', 'planned'),
-  seed('platform.transitionFade', 'TransitionFade', 'Utils', 'Fade transition primitive.', 'planned'),
+  seed('platform.popper', 'Popper', 'Utils', 'Positioning engine wrapper for floating UI.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Popper', {
+      open: booleanSchema('Open'),
+      placement: stringEnumSchema('Placement', ['top', 'bottom', 'left', 'right']),
+      content: stringSchema('Content'),
+    }),
+    defaultProps: {
+      open: true,
+      placement: 'bottom',
+      content: 'Contextual actions for selected row.',
+    },
+    tokensUsed: ['--pf-z-popover', '--pf-shadow-md', '--pf-surface-layer'],
+  }),
+  seed('platform.transitionFade', 'TransitionFade', 'Utils', 'Fade transition primitive.', 'beta', {
+    availability: 'implemented',
+    propsSchema: objectSchema('Transition fade', {
+      in: booleanSchema('In'),
+      durationMs: numberSchema('Duration (ms)'),
+      label: stringSchema('Label'),
+    }),
+    defaultProps: {
+      in: true,
+      durationMs: 240,
+      label: 'Faded content block',
+    },
+    tokensUsed: ['--pf-motion-normal', '--pf-surface-layer-alt'],
+  }),
   seed('platform.transitionGrow', 'TransitionGrow', 'Utils', 'Grow transition primitive.', 'planned'),
   seed('platform.transitionCollapse', 'TransitionCollapse', 'Utils', 'Collapse transition primitive.', 'planned'),
   seed('platform.transitionSlide', 'TransitionSlide', 'Utils', 'Slide transition primitive.', 'planned'),

@@ -78,3 +78,114 @@
   font-size: var(--pf-font-size-sm);
   font-weight: var(--pf-font-weight-semibold);
 }
+
+.iconPreview {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 42%, transparent);
+}
+
+.imageList {
+  display: grid;
+}
+
+.imageTile {
+  margin: 0;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  overflow: hidden;
+  background: var(--pf-surface-layer);
+}
+
+.imageTile img {
+  display: block;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.imageTile figcaption {
+  padding: 8px;
+  font-size: var(--pf-font-size-xs);
+  color: var(--pf-surface-text-muted);
+}
+
+.paperDemo {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-layer);
+}
+
+.bottomNav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bottomNav button {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-layer);
+  color: var(--pf-surface-text-muted);
+  min-height: var(--pf-control-height-sm);
+}
+
+.bottomNavActive {
+  border-color: color-mix(in srgb, var(--pf-color-primary-500) 70%, var(--pf-surface-border)) !important;
+  color: var(--pf-color-primary-600) !important;
+}
+
+.linkDemo {
+  color: var(--pf-color-primary-600);
+  font-weight: var(--pf-font-weight-semibold);
+  text-decoration: none;
+}
+
+.speedDialPreview {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.masonry {
+  width: 100%;
+}
+
+.masonryItem {
+  break-inside: avoid;
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 46%, transparent);
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.clickAwayPanel {
+  border: 1px dashed var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  padding: 10px;
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 32%, transparent);
+}
+
+.popperDemo {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  padding: 10px;
+  background: color-mix(in srgb, var(--pf-surface-layer-alt) 42%, transparent);
+  display: grid;
+  gap: 4px;
+}
+
+.fadeDemo {
+  border: 1px solid var(--pf-surface-border);
+  border-radius: var(--pf-radius-md);
+  padding: 10px;
+  background: color-mix(in srgb, var(--pf-color-primary-100) 16%, var(--pf-surface-layer));
+  transition-property: opacity;
+}
