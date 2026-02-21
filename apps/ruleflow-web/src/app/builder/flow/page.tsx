@@ -19,7 +19,7 @@ import {
   createConditionGroupDraft,
   type ConditionDraft,
 } from '@/components/rules/rule-visual-model';
-import { useBuilder } from '@/context/BuilderContext';
+import { useBuilderStore } from '../_domain/builderStore';
 import styles from './flow-builder.module.scss';
 
 type GetVersionResponse = { ok: true; version: ConfigVersion } | { ok: false; error: string };
@@ -68,10 +68,8 @@ function FlowBuilderInner() {
   const searchParams = useSearchParams();
   const versionId = searchParams.get('versionId');
   const { toast } = useToast();
-  const {
-    state: { flow },
-    dispatch,
-  } = useBuilder();
+  const flow = useBuilderStore((s) => s.flow);
+  const setFlowSchema = useBuilderStore((s) => s.setFlowSchema);
 
   const [version, setVersion] = useState<ConfigVersion | null>(null);
   const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
@@ -92,10 +90,12 @@ function FlowBuilderInner() {
     return Object.keys(pages.uiSchemasById);
   }, [version]);
 
+  const flowSchema = useMemo<FlowSchema>(() => flow.schema ?? { version: '1.0.0', flowId: 'flow', initialState: '', states: {} }, [flow.schema]);
+
   const flowDraft = useMemo(() => {
     const fallback = pageIds[0] ?? 'builder-preview';
-    return normalizeFlowSchema(flow, fallback);
-  }, [flow, pageIds]);
+    return normalizeFlowSchema(flowSchema, fallback);
+  }, [flowSchema, pageIds]);
 
   const stateIds = useMemo(() => Object.keys(flowDraft.states), [flowDraft.states]);
   const selectedState = selectedStateId ? flowDraft.states[selectedStateId] ?? null : null;
@@ -124,7 +124,7 @@ function FlowBuilderInner() {
         const normalizedFlow = normalizeFlowSchema(response.version.bundle.flowSchema, fallback);
 
         setVersion(response.version);
-        dispatch({ type: 'SET_FLOW', flow: normalizedFlow });
+        setFlowSchema(normalizedFlow);
         setSelectedStateId(normalizedFlow.initialState);
         setDirty(false);
       } catch (error) {
@@ -145,7 +145,7 @@ function FlowBuilderInner() {
   }, [toast, versionId]);
 
   const setNextFlow = (nextFlow: FlowSchema) => {
-    dispatch({ type: 'SET_FLOW', flow: nextFlow });
+    setFlowSchema(nextFlow);
     setDirty(true);
   };
 

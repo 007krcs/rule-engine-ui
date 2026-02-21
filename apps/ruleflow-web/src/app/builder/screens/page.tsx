@@ -5,7 +5,7 @@ import { useState } from "react";
 import { createUISchema } from "@platform/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useBuilder } from "@/context/BuilderContext";
+import { useBuilderStore } from "../_domain/builderStore";
 import styles from "./screens.module.scss";
 
 const nav = [
@@ -17,16 +17,18 @@ const nav = [
 ];
 
 export default function ScreensPage() {
-  const {
-    state: { screens, flow },
-    dispatch,
-  } = useBuilder();
+  const screens = useBuilderStore((s) => s.screens);
+  const activeScreenId = useBuilderStore((s) => s.activeScreenId);
+  const addScreenToStore = useBuilderStore((s) => s.addScreen);
+  const setActiveScreen = useBuilderStore((s) => s.setActiveScreen);
+  const flow = useBuilderStore((s) => s.flow);
   const [newId, setNewId] = useState("");
 
   const addScreen = () => {
     const id = (newId || `screen-${Object.keys(screens).length + 1}`).trim();
     if (!id || screens[id]) return;
-    dispatch({ type: "ADD_SCREEN", id, schema: createUISchema({ pageId: id }) });
+    addScreenToStore(id, createUISchema({ pageId: id }));
+    setActiveScreen(id);
     setNewId("");
   };
 
@@ -69,7 +71,7 @@ export default function ScreensPage() {
               <div>
                 <p className={styles.kicker}>Screen</p>
                 <h3 className={styles.cardTitle}>{id}</h3>
-                <p className={styles.subtext}>Initial? {flow.initialState === id ? "Yes" : "No"}</p>
+                <p className={styles.subtext}>Initial? {flow.startNodeId === id || flow.schema?.initialState === id ? "Yes" : "No"}</p>
               </div>
               <Link href={`/builder/screens?screenId=${encodeURIComponent(id)}`} className={styles.link}>
                 Edit
