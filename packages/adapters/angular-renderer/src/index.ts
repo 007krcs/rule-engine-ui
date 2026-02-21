@@ -97,6 +97,300 @@ export interface AngularRenderOptions {
   target?: HTMLElement | string;
 }
 
+// =============================================
+// Hydration Types
+// =============================================
+
+export interface HydrationOptions {
+  container: HTMLElement | string;
+  uiSchema: UISchema;
+  data: Record<string, JSONValue>;
+  context: ExecutionContext;
+  i18n?: I18nProvider;
+  adapterRegistry?: AngularAdapterRegistry;
+  onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
+  onAdapterEvent?: (
+    event: UIEventName,
+    payload: ChangeEventPayload | ClickEventPayload,
+    component: UIComponent,
+  ) => void;
+  onDataChange?: (data: Record<string, JSONValue>) => void;
+  onContextChange?: (context: ExecutionContext) => void;
+  onChange?: (bindingPath: string, value: JSONValue, componentId: string) => void;
+}
+
+export interface HydrationResult {
+  data: Record<string, JSONValue>;
+  context: ExecutionContext;
+  dispatchEvent: (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => void;
+  dispose: () => void;
+  rerender: () => void;
+}
+
+// =============================================
+// Event Dispatcher Service
+// =============================================
+
+export interface EventDispatcherConfig {
+  onEvent?: (event: UIEventName, actions: UIEventAction[], component: UIComponent) => void;
+  onAdapterEvent?: (
+    event: UIEventName,
+    payload: ChangeEventPayload | ClickEventPayload,
+    component: UIComponent,
+  ) => void;
+  onChange?: (bindingPath: string, value: JSONValue, componentId: string) => void;
+  onDataChange?: (data: Record<string, JSONValue>) => void;
+  onContextChange?: (context: ExecutionContext) => void;
+}
+
+export interface EventDispatcher {
+  dispatch: (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => void;
+  getData: () => Record<string, JSONValue>;
+  getContext: () => ExecutionContext;
+}
+
+export function createEventDispatcher(
+  componentMap: Map<string, UIComponent>,
+  initialData: Record<string, JSONValue>,
+  initialContext: ExecutionContext,
+  config: EventDispatcherConfig,
+): EventDispatcher {
+  let data = deepClone(initialData);
+  let context = deepClone(initialContext);
+
+  const dispatch = (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => {
+    const component = componentMap.get(input.componentId);
+    if (!component) return;
+
+    if (input.event === 'onChange') {
+      const bindingPath = input.bindingPath ?? component.bindings?.data?.value ?? 'data.value';
+      const parsed = parseBindingPath(bindingPath, 'data');
+      const value = input.value ?? null;
+
+      if (parsed) {
+        if (parsed.target === 'data') {
+          data = setPath(data, parsed.path, value);
+        } else {
+          context = setPath(
+            context as unknown as Record<string, JSONValue>,
+            parsed.path,
+            value,
+          ) as unknown as ExecutionContext;
+        }
+      }
+
+      config.onChange?.(bindingPath, value, component.id);
+      config.onDataChange?.(data);
+      config.onContextChange?.(context);
+      config.onAdapterEvent?.(
+        'onChange',
+        { componentId: component.id, value, bindingPath },
+        component,
+      );
+    } else {
+      config.onAdapterEvent?.(input.event, { componentId: component.id }, component);
+    }
+
+    const actions = component.events?.[input.event];
+    if (actions && actions.length > 0) {
+      config.onEvent?.(input.event, actions, component);
+    }
+  };
+
+  return {
+    dispatch,
+    getData: () => data,
+    getContext: () => context,
+  };
+}
+
+// =============================================
+// DOM Listener Binder
+// =============================================
+
+export interface DomListenerBinderOptions {
+  container: HTMLElement;
+  dispatchEvent: (input: {
+    event: UIEventName;
+    componentId: string;
+    value?: JSONValue;
+    bindingPath?: string;
+  }) => void;
+}
+
+export interface DomListenerBinderResult {
+  dispose: () => void;
+}
+
+export function createDomListenerBinder(options: DomListenerBinderOptions): DomListenerBinderResult {
+  const { container, dispatchEvent } = options;
+  const boundElements = new Set<Element>();
+  const eventHandlers = new Map<Element, { type: string; handler: EventListener }[]>();
+
+  const bindListeners = () => {
+    const elements = container.querySelectorAll('[data-rf-event]');
+    elements.forEach((el) => {
+      if (boundElements.has(el)) return;
+      boundElements.add(el);
+
+      const eventType = el.getAttribute('data-rf-event') as UIEventName | null;
+      const componentId = el.getAttribute('data-rf-component-id');
+      const bindingPath = el.getAttribute('data-rf-binding-path');
+
+      if (!eventType || !componentId) return;
+
+      const handlers: { type: string; handler: EventListener }[] = [];
+
+      if (eventType === 'onChange') {
+        const handler = (e: Event) => {
+          const target = e.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+          let value: JSONValue = target.value;
+          if (target.type === 'checkbox') {
+            value = (target as HTMLInputElement).checked;
+          } else if (target.type === 'number') {
+            value = parseFloat(target.value) || 0;
+          }
+          dispatchEvent({ event: 'onChange', componentId, value, bindingPath: bindingPath ?? undefined });
+        };
+        el.addEventListener('input', handler);
+        el.addEventListener('change', handler);
+        handlers.push({ type: 'input', handler }, { type: 'change', handler });
+      } else if (eventType === 'onClick') {
+        const handler = (e: Event) => {
+          e.preventDefault();
+          dispatchEvent({ event: 'onClick', componentId });
+        };
+        el.addEventListener('click', handler);
+        handlers.push({ type: 'click', handler });
+      } else if (eventType === 'onSubmit') {
+        const handler = (e: Event) => {
+          e.preventDefault();
+          dispatchEvent({ event: 'onSubmit', componentId });
+        };
+        el.addEventListener('submit', handler);
+        handlers.push({ type: 'submit', handler });
+      }
+
+      eventHandlers.set(el, handlers);
+    });
+  };
+
+  const dispose = () => {
+    eventHandlers.forEach((handlers, el) => {
+      handlers.forEach(({ type, handler }) => {
+        el.removeEventListener(type, handler);
+      });
+    });
+    eventHandlers.clear();
+    boundElements.clear();
+  };
+
+  bindListeners();
+
+  return { dispose };
+}
+
+// =============================================
+// Hydration API
+// =============================================
+
+export function hydrate(options: HydrationOptions): HydrationResult {
+  const container = resolveTarget(options.container);
+  if (!container) {
+    throw new Error('Hydration requires a valid container element');
+  }
+
+  const adapterRegistry = options.adapterRegistry ?? getDefaultAdapterRegistry();
+  ensureDefaultAdapters(adapterRegistry);
+
+  const componentMap = new Map(
+    options.uiSchema.components.map((component) => [component.id, component]),
+  );
+
+  const dispatcher = createEventDispatcher(
+    componentMap,
+    options.data,
+    options.context,
+    {
+      onEvent: options.onEvent,
+      onAdapterEvent: options.onAdapterEvent,
+      onChange: options.onChange,
+      onDataChange: options.onDataChange,
+      onContextChange: options.onContextChange,
+    },
+  );
+
+  let listenerBinder = createDomListenerBinder({
+    container,
+    dispatchEvent: dispatcher.dispatch,
+  });
+
+  const rerender = () => {
+    listenerBinder.dispose();
+
+    const runtime: Runtime = {
+      options: {
+        uiSchema: options.uiSchema,
+        data: dispatcher.getData(),
+        context: dispatcher.getContext(),
+        i18n: options.i18n,
+        target: container,
+        adapterRegistry,
+        onEvent: options.onEvent,
+        onAdapterEvent: options.onAdapterEvent,
+        onDataChange: options.onDataChange,
+        onContextChange: options.onContextChange,
+        onChange: options.onChange,
+      },
+      adapterRegistry,
+      i18n: options.i18n ?? createFallbackI18nProvider(),
+      data: dispatcher.getData(),
+      context: dispatcher.getContext(),
+      html: '',
+      componentMap,
+      target: container,
+    };
+
+    runtime.html = renderRuntime(runtime);
+    container.innerHTML = runtime.html;
+
+    listenerBinder = createDomListenerBinder({
+      container,
+      dispatchEvent: dispatcher.dispatch,
+    });
+  };
+
+  const dispose = () => {
+    listenerBinder.dispose();
+  };
+
+  return {
+    data: dispatcher.getData(),
+    context: dispatcher.getContext(),
+    dispatchEvent: (input) => {
+      dispatcher.dispatch(input);
+      rerender();
+    },
+    dispose,
+    rerender,
+  };
+}
+
 type Runtime = {
   options: RenderPageAngularOptions;
   adapterRegistry: AngularAdapterRegistry;
@@ -278,38 +572,119 @@ function renderRuntime(runtime: Runtime): string {
     return `<div data-rf-component-id="${escapeHtml(component.id)}">${html}</div>`;
   };
 
+  const getBreakpoint = (): 'lg' | 'md' | 'sm' => {
+    const device = runtime.context.device;
+    if (device === 'mobile') return 'sm';
+    if (device === 'tablet') return 'md';
+    return 'lg';
+  };
+
+  const getResponsiveGridSpec = () => {
+    const breakpoint = getBreakpoint();
+    const grid = runtime.options.uiSchema.grid;
+    const baseColumns = grid?.columns ?? 12;
+    const baseRowHeight = grid?.rowHeight ?? 56;
+    const baseGap = grid?.gap ?? 12;
+
+    if (breakpoint === 'lg') {
+      return { columns: baseColumns, rowHeight: baseRowHeight, gap: baseGap };
+    }
+
+    const bp = grid?.breakpoints?.[breakpoint];
+    return {
+      columns: bp?.columns ?? baseColumns,
+      rowHeight: bp?.rowHeight ?? baseRowHeight,
+      gap: bp?.gap ?? baseGap,
+    };
+  };
+
   const renderLayout = (node: LayoutNode): string => {
+    // Grid v2 layout with responsive breakpoints
     if (
       runtime.options.uiSchema.layoutType === 'grid' &&
       Array.isArray(runtime.options.uiSchema.items)
     ) {
-      const cols = runtime.options.uiSchema.grid?.columns ?? 12;
-      const gap = runtime.options.uiSchema.grid?.gap ?? 12;
-      const rowHeight = runtime.options.uiSchema.grid?.rowHeight ?? 56;
-      return `<div data-layout="grid-v2" style="display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:${gap}px;grid-auto-rows:${rowHeight}px">${runtime.options.uiSchema.items
+      const spec = getResponsiveGridSpec();
+      return `<div data-layout="grid-v2" style="display:grid;grid-template-columns:repeat(${spec.columns},minmax(0,1fr));gap:${spec.gap}px;grid-auto-rows:${spec.rowHeight}px">${runtime.options.uiSchema.items
         .map(
           (item) =>
             `<div style="grid-column:${item.x + 1} / span ${item.w};grid-row:${item.y + 1} / span ${item.h}">${renderComponent(item.componentId, item)}</div>`,
         )
         .join('')}</div>`;
     }
+
     const components = node.componentIds?.map((id) => renderComponent(id)).join('') ?? '';
     const children = node.children?.map((child) => renderLayout(child)).join('') ?? '';
-    if (node.type === 'grid') return `<div data-layout="grid">${components}${children}</div>`;
-    if (node.type === 'stack') return `<div data-layout="stack">${components}${children}</div>`;
+
+    // Grid layout with nested grid support
+    if (node.type === 'grid') {
+      const gridNode = node as { columns?: number; rows?: number };
+      const cols = gridNode.columns ?? 12;
+      const gap = node.props?.gap ?? 12;
+      return `<div data-layout="grid" style="display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:${gap}px">${components}${children}</div>`;
+    }
+
+    // Stack layout with flexbox support
+    if (node.type === 'stack') {
+      const stackNode = node as { direction?: 'vertical' | 'horizontal' };
+      const direction = stackNode.direction ?? 'vertical';
+      const flexDirection = direction === 'horizontal' ? 'row' : 'column';
+      const gap = node.props?.gap ?? 12;
+      const justify = node.props?.justify ?? 'flex-start';
+      const align = node.props?.align ?? 'stretch';
+      const wrap = node.props?.wrap === true ? 'wrap' : 'nowrap';
+      return `<div data-layout="stack" data-direction="${direction}" style="display:flex;flex-direction:${flexDirection};gap:${gap}px;justify-content:${justify};align-items:${align};flex-wrap:${wrap}">${components}${children}</div>`;
+    }
+
+    // Tabs layout
     if (node.type === 'tabs') {
       return `<div data-layout="tabs">${node.tabs
         .map(
-          (tab) => `<section><h3>${escapeHtml(tab.label)}</h3>${renderLayout(tab.child)}</section>`,
+          (tab) => `<section data-tab-id="${escapeHtml(tab.id)}"><h3>${escapeHtml(tab.label)}</h3>${renderLayout(tab.child)}</section>`,
         )
         .join('')}</div>`;
     }
+
+    // Section layout with optional flexbox
+    const sectionProps = node.props ?? {};
+    const useFlexbox = sectionProps.flexbox === true;
+    const flexDirection = sectionProps.direction === 'horizontal' ? 'row' : 'column';
+    const gap = sectionProps.gap ?? 12;
+
+    if (useFlexbox) {
+      return `<section data-layout="section" data-flexbox="true" style="display:flex;flex-direction:${flexDirection};gap:${gap}px">${node.title ? `<h2>${escapeHtml(node.title)}</h2>` : ''}${components}${children}</section>`;
+    }
+
     return `<section data-layout="section">${node.title ? `<h2>${escapeHtml(node.title)}</h2>` : ''}${components}${children}</section>`;
   };
 
   const html = `<div data-ui-page="${escapeHtml(runtime.options.uiSchema.pageId)}" dir="${runtime.i18n.direction}">${renderLayout(runtime.options.uiSchema.layout)}</div>`;
   if (runtime.target) runtime.target.innerHTML = html;
   return html;
+}
+
+// =============================================
+// Layout Helpers - Exported for Custom Layouts
+// =============================================
+
+export function renderRowLayout(componentIds: string[], columns: number, gap = 12): string {
+  return `<div data-layout="row" style="display:grid;grid-template-columns:repeat(${columns},minmax(0,1fr));gap:${gap}px">${componentIds.map((id) => `<div data-slot="${escapeHtml(id)}"></div>`).join('')}</div>`;
+}
+
+export function renderColumnLayout(span: number): string {
+  return `<div data-layout="column" style="grid-column:span ${span}"></div>`;
+}
+
+export function renderFlexboxLayout(direction: 'row' | 'column' = 'row', options?: { gap?: number; justify?: string; align?: string; wrap?: boolean }): string {
+  const gap = options?.gap ?? 12;
+  const justify = options?.justify ?? 'flex-start';
+  const align = options?.align ?? 'stretch';
+  const wrap = options?.wrap === true ? 'wrap' : 'nowrap';
+  return `<div data-layout="flexbox" style="display:flex;flex-direction:${direction};gap:${gap}px;justify-content:${justify};align-items:${align};flex-wrap:${wrap}"></div>`;
+}
+
+export function renderNestedGridLayout(columns: number, gap = 12): string {
+  return `<div data-layout="nested-grid" style="display:grid;grid-template-columns:repeat(${columns},minmax(0,1fr));gap:${gap}px"></div>`;
 }
 
 function ensureDefaultAdapters(adapterRegistry: AngularAdapterRegistry): void {

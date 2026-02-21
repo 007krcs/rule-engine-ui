@@ -306,13 +306,43 @@ export type RuleOperator =
   | 'dateBefore'
   | 'dateAfter'
   | 'dateBetween'
+  | 'dateOn'
+  | 'datePlusDays'
   | 'in'
   | 'contains'
   | 'startsWith'
   | 'endsWith'
-  | 'exists';
+  | 'exists'
+  | 'isEmpty'
+  | 'isNotEmpty'
+  | 'matches'
+  | 'add'
+  | 'subtract'
+  | 'multiply'
+  | 'divide'
+  | 'modulo'
+  | 'abs'
+  | 'round'
+  | 'floor'
+  | 'ceil'
+  | 'min'
+  | 'max'
+  | 'length'
+  | 'trim'
+  | 'upper'
+  | 'lower'
+  | 'concat'
+  | 'split'
+  | 'join'
+  | 'substring';
 
-export type RuleOperand = { path: string } | { value: JSONValue };
+export type RuleOperand = { path: string } | { value: JSONValue } | { transform: TransformOperand };
+
+export interface TransformOperand {
+  type: 'math' | 'string' | 'date';
+  operation: string;
+  args: RuleOperand[];
+}
 
 export type RuleAction =
   | { type: 'setField'; path: string; value: JSONValue }
@@ -321,7 +351,15 @@ export type RuleAction =
   | { type: 'addItem'; path: string; value: JSONValue }
   | { type: 'mapField'; from: string; to: string }
   | { type: 'throwError'; message: string; code?: string }
-  | { type: 'emitEvent'; event: string; payload?: JSONValue };
+  | { type: 'emitEvent'; event: string; payload?: JSONValue }
+  | { type: 'transform'; path: string; transform: TransformSpec }
+  | { type: 'custom'; handler: string; args?: Record<string, JSONValue> };
+
+export interface TransformSpec {
+  type: 'math' | 'string' | 'date' | 'template';
+  expression: string;
+  args?: Record<string, JSONValue>;
+}
 
 export interface ApiMapping {
   version: string;
