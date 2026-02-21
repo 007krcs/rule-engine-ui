@@ -608,9 +608,13 @@ function findBundle(bundles: TranslationBundle[], locale: string, namespace: str
   return bundles.find((bundle) => bundle.locale === locale && bundle.namespace === namespace);
 }
 
+function readProcessEnv(name: string): string | undefined {
+  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[name];
+}
+
 function shouldEnableMachineTranslation(options: MachineTranslationOptions | undefined): boolean {
   if (!options?.enabled) return false;
-  const rawEnv = (typeof process !== 'undefined' ? process.env?.RULEFLOW_ENV : undefined) ?? '';
+  const rawEnv = readProcessEnv('RULEFLOW_ENV') ?? '';
   const normalizedEnv = rawEnv.trim().toLowerCase();
   const currentEnv = (
     normalizedEnv === 'production' ||
@@ -618,7 +622,7 @@ function shouldEnableMachineTranslation(options: MachineTranslationOptions | und
     normalizedEnv === 'test' ||
     normalizedEnv === 'development'
       ? normalizedEnv
-      : ((typeof process !== 'undefined' ? process.env?.NODE_ENV : 'development') ?? 'development')
+      : (readProcessEnv('NODE_ENV') ?? 'development')
   ) as 'development' | 'staging' | 'test' | 'production';
   const allow = options.envs ?? ['development', 'staging'];
   return allow.includes(currentEnv);
